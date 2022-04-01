@@ -56,7 +56,9 @@ if __name__ == '__main__':
     # Seeding
     parser.add_argument('--seed', default=None, help='If a seed is specified training will be deterministic and slower')
     # Data and experiment directories
-    parser.add_argument('--data', help='Name of the dataset - CIFAR10 / CIFAR100', default='CIFAR10')
+    parser.add_argument('--data', help='Name of the dataset', default='CIFAR10')
+    parser.add_argument('--num_classes', help='Number of classes to classify', default=10)
+    parser.add_argument('--small_imgs', action='store_true', help='Whether input images to model are small. If yes, ResNet implementations for CIFAR will be used.')
     parser.add_argument('--num_workers', help='Number of workers for loading the data', type=int, default=8)
     parser.add_argument('--data_dir', default=os.environ['DATASET_LOCATION'] if 'DATASET_LOCATION' in os.environ.keys() else './data',
                         help='Location of the dataset')
@@ -70,6 +72,9 @@ if __name__ == '__main__':
     # Verbosity
     parser.add_argument('--suppress_progress_bar', action='store_true',
                         help='Will suppress the Lightning progress bar during training')
+
+    parser.add_argument('--dynamic', action='store_true')#TODO
+    parser.add_argument('--pool_op', type=str)
 
     args = parser.parse_args()
 
@@ -97,8 +102,16 @@ if __name__ == '__main__':
     params_to_log = get_params_to_log(params, model_name)
 
     # Choose correct model
-    num_classes = 10 if args.data=='CIFAR10' else 100
-    model = get_model(model_name, params, num_classes)
+    if args.data.startswith('CIFAR'):
+        num_classes = 10 if args.data=='CIFAR10' else 100
+        params['small_imgs'] = True
+    elif args.data == 'Imagenet':
+        num_classes = 1000
+    else:
+        num_classes = args.num_classes
+
+    params['num_classes'] = num_classes
+    model = get_model(model_name, params)
 
     ## Pytorch Lightning Trainer
     # Checkpoint callback if model should be saved

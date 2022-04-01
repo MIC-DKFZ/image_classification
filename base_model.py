@@ -8,13 +8,11 @@ import time
 import os
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.utils.data import DataLoader, RandomSampler
-from torchvision.datasets import CIFAR10, CIFAR100
 import pytorch_lightning as pl
-from torchmetrics import Accuracy
+from torchmetrics import Accuracy, F1, Precision, Recall
 from pytorch_lightning.callbacks import Callback
-from augmentation.albumentation_dataset import Cifar10Albumentation, Cifar100Albumentation
-from augmentation.policies import get_baseline, get_auto_augmentation, get_rand_augmentation, \
-    get_album, test_transform, get_baseline_cutout
+from datasets.cifar import CIFAR10, CIFAR100, Cifar10Albumentation, Cifar100Albumentation
+from datasets.imagenet import ImageNet
 from regularization.sam import SAM
 from regularization.label_smoothing import LabelSmoothLoss
 from madgrad import MADGRAD
@@ -29,7 +27,14 @@ class BaseModel(pl.LightningModule):
 
         # Metrics
         self.train_acc = Accuracy()
-        self.test_acc = Accuracy()
+        self.train_f1 = F1(average='macro', num_classes=hypparams['num_classes'], multiclass=True)
+        self.train_precision = Precision(average='macro', num_classes=hypparams['num_classes'], multiclass=True)
+        self.train_recall = Recall(average='macro', num_classes=hypparams['num_classes'], multiclass=True)
+
+        self.val_acc = Accuracy()
+        self.val_f1 = F1(average='macro', num_classes=hypparams['num_classes'], multiclass=True)
+        self.val_precision = Precision(average='macro', num_classes=hypparams['num_classes'], multiclass=True)
+        self.val_recall = Recall(average='macro', num_classes=hypparams['num_classes'], multiclass=True)
 
         # Training Args
         self.name = hypparams['name']
@@ -65,6 +70,45 @@ class BaseModel(pl.LightningModule):
 
         os.makedirs(self.data_dir, exist_ok=True)
         self.download = False if any(os.scandir(self.data_dir)) else True
+
+        ################################################################################################################
+        # dataset specific
+        if self.dataset.startswith('CIFAR'):
+            self.mean, self.std = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+            from augmentation.policies.cifar import get_baseline, get_auto_augmentation, get_rand_augmentation, \
+                get_album, test_transform, get_baseline_cutout
+
+            # according to https://arxiv.org/pdf/1708.04552v2.pdf a smaller cutout size should be used for more classes
+            cutout_size = 16 if self.dataset == 'CIFAR10' else 8
+
+            if self.aug == 'baseline':
+                self.transform_train = get_baseline(self.mean, self.std)
+
+            elif self.aug == 'baseline_cutout':
+                self.transform_train = get_baseline_cutout(self.mean, self.std, cutout_size)
+
+            elif self.aug == 'autoaugment':
+                self.transform_train = get_auto_augmentation(self.mean, self.std, cutout_size)
+
+            elif self.aug == 'randaugment':
+                self.transform_train = get_rand_augmentation(self.mean, self.std, cutout_size)
+
+            elif self.aug == 'album':
+                # Albumentation pipeline
+                self.transform_train = get_album(self.mean, self.std)
+
+            self.test_transform = test_transform(self.mean, self.std)
+
+        elif self.dataset == 'Imagenet':
+            self.mean, self.std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+            from augmentation.policies.imagenet import get_baseline, test_transform
+
+            if self.aug == 'baseline':
+                self.transform_train = get_baseline(self.mean, self.std)
+
+            self.test_transform = test_transform(self.mean, self.std)
+
+        ################################################################################################################
 
         # switch to manual optimization for Sharpness Aware Minimization
         if self.sam:
@@ -138,12 +182,12 @@ class BaseModel(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
 
-        test_loss = self.criterion(y_hat, y)
-        self.log('test_loss', test_loss, on_step=False, on_epoch=True, prog_bar=True)
+        val_loss = self.criterion(y_hat, y)
+        self.log('val_loss', val_loss, on_step=False, on_epoch=True, prog_bar=True)
 
         y_hat_norm = self.softmax(y_hat)
-        self.test_acc(y_hat_norm, y)
-        self.log('test_acc', self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
+        self.val_acc(y_hat_norm, y)
+        self.log('val_acc', self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_train_start(self):
 
@@ -267,38 +311,25 @@ class BaseModel(pl.LightningModule):
 
     def train_dataloader(self):
 
-        # according to https://arxiv.org/pdf/1708.04552v2.pdf a smaller cutout size should be used for more classes
-        cutout_size = 16 if self.dataset=='CIFAR10' else 8
-
-        if self.aug == 'baseline':
-            transform_train = get_baseline()
-
-        elif self.aug == 'baseline_cutout':
-            transform_train = get_baseline_cutout(cutout_size)
-
-        elif self.aug == 'autoaugment':
-            transform_train = get_auto_augmentation(cutout_size)
-
-        elif self.aug == 'randaugment':
-            transform_train = get_rand_augmentation(cutout_size)
-
-        elif self.aug == 'album':
-            # Albumentation pipeline
-            transform_train = get_album()
-
-        if self.dataset=='CIFAR10':
-            if self.aug=='album':
+        if self.dataset == 'CIFAR10':
+            if self.aug == 'album':
                 trainset = Cifar10Albumentation(root=self.data_dir, train=True,
-                                                download=self.download, transform=transform_train)
+                                                download=self.download, transform=self.transform_train)
             else:
-                trainset = CIFAR10(root=self.data_dir, train=True, download=self.download, transform=transform_train)
+                trainset = CIFAR10(root=self.data_dir, train=True, download=self.download, transform=self.transform_train)
 
-        elif self.dataset=='CIFAR100':
+        elif self.dataset == 'CIFAR100':
             if self.aug == 'album':
                 trainset = Cifar100Albumentation(root=self.data_dir, train=True,
-                                                 download=self.download, transform=transform_train)
+                                                 download=self.download, transform=self.transform_train)
             else:
-                trainset = CIFAR100(root=self.data_dir, train=True, download=self.download, transform=transform_train)
+                trainset = CIFAR100(root=self.data_dir, train=True, download=self.download, transform=self.transform_train)
+
+        elif self.dataset == 'Imagenet':
+
+            path_to_imagenet = '/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original'
+
+            trainset = ImageNet(root=path_to_imagenet, split='train', transform=self.transform_train)
 
         if not self.random_batches:
             trainloader = DataLoader(trainset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers,
@@ -315,13 +346,15 @@ class BaseModel(pl.LightningModule):
 
     def val_dataloader(self):
 
-        transform_test = test_transform()
-
         if self.dataset == 'CIFAR10':
-            testset = CIFAR10(root=self.data_dir, train=False, download=self.download, transform=transform_test)
+            testset = CIFAR10(root=self.data_dir, train=False, download=self.download, transform=self.test_transform)
 
         elif self.dataset == 'CIFAR100':
-            testset = CIFAR100(root=self.data_dir, train=False, download=self.download, transform=transform_test)
+            testset = CIFAR100(root=self.data_dir, train=False, download=self.download, transform=self.test_transform)
+
+        elif self.dataset == 'Imagenet':
+            path_to_imagenet = '/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original'
+            testset = ImageNet(root=path_to_imagenet, split='val', transform=self.test_transform)
 
         testloader = DataLoader(testset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers,
                                 pin_memory=True, worker_init_fn=seed_worker, persistent_workers=True)

@@ -161,7 +161,7 @@ class PyramidNet(BaseModel):
             self.avgpool = nn.AvgPool2d(8)
             self.fc = nn.Linear(self.final_featuremap_dim, num_classes)
 
-        elif self.dataset == 'imagenet':
+        elif self.dataset == 'Imagenet':
             blocks = {18: BasicBlock, 34: BasicBlock, 50: Bottleneck, 101: Bottleneck, 152: Bottleneck, 200: Bottleneck}
             layers = {18: [2, 2, 2, 2], 34: [3, 4, 6, 3], 50: [3, 4, 6, 3], 101: [3, 4, 23, 3], 152: [3, 8, 36, 3],
                       200: [3, 24, 36, 3]}
@@ -254,7 +254,7 @@ class PyramidNet(BaseModel):
             x = x.view(x.size(0), -1)
             x = self.fc(x)
 
-        elif self.dataset == 'imagenet':
+        elif self.dataset == 'Imagenet':
             x = self.conv1(x)
             x = self.bn1(x)
             x = self.relu(x)

@@ -133,6 +133,14 @@ class ResNet(BaseModel):
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
         self.linear = nn.Linear(512*block.expansion, num_classes)
 
+        self.pool_type = hypparams['pool_op']
+        if self.pool_type == 'avg':
+            self.pool_op = F.avg_pool2d
+        elif self.pool_type == 'max':
+            self.pool_op = F.max_pool2d
+        elif self.pool_type == 'strided_conv':
+            self.pool_op = nn.Conv2d(512, 512, 4, 2, bias=False)
+
 
 
     def _make_layer(self, block, planes, num_blocks, stride):
@@ -151,7 +159,8 @@ class ResNet(BaseModel):
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+        #out = F.avg_pool2d(out, 4)
+        out = self.pool_op(out, 4) if not self.pool_type=='strided_conv' else F.relu(self.pool_op(out))
 
         out = F.dropout(out, p=self.resnet_dropout, training=self.training)
 

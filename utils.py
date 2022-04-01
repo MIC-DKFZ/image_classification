@@ -3,6 +3,7 @@ from base_model import ModelConstructor
 from models.vgg import VGG
 from models.preact_resnet import PreActResNet18, PreActResNet34, PreActResNet50, PreActResNet101, PreActResNet152
 from models.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet110, ResNet152
+from models.dynamic_resnet import get_resnet
 from models.wide_resnet import WRN2810
 from models.efficientnet import EfficientNetL2, EfficientNetB7, EfficientNetB8, EfficientNetB0, EfficientNetB1
 from models.pyramidnet import PyramidNet110, PyramidNet272
@@ -14,8 +15,11 @@ registered_models = ['VGG16',
                       'WRN2810',
                       'PyramidNet110', 'PyramidNet272']
 
+registered_datasets = ['CIFAR10', 'CIFAR100', 'Imagenet']
 
-def get_model(model_name, params, num_classes):
+
+def get_model(model_name, params):
+    num_classes = params['num_classes']
     if model_name == 'VGG16':
         model = VGG('VGG16', num_classes=num_classes, hypparams=params)
 
@@ -30,37 +34,45 @@ def get_model(model_name, params, num_classes):
     elif model_name == 'PreActResNet152':
         model = PreActResNet152(num_classes=num_classes, hypparams=params)
 
-    elif model_name == 'ResNet18':
-        model = ResNet18(num_classes=num_classes, hypparams=params)
-    elif model_name == 'ResNet34':
-        model = ResNet34(num_classes=num_classes, hypparams=params)
-    elif model_name == 'ResNet50':
-        model = ResNet50(num_classes=num_classes, hypparams=params)
-    elif model_name == 'ResNet101':
-        model = ResNet101(num_classes=num_classes, hypparams=params)
-    elif model_name == 'ResNet110':
-        model = ResNet110(num_classes=num_classes, hypparams=params)
-    elif model_name == 'ResNet152':
-        model = ResNet152(num_classes=num_classes, hypparams=params)
+    if params['dynamic']: #TODO
 
-    elif model_name == 'EfficientNetL2':
-        model = EfficientNetL2(num_classes=num_classes, hypparams=params)
-    elif model_name == 'EfficientNetB8':
-        model = EfficientNetB8(num_classes=num_classes, hypparams=params)
-    elif model_name == 'EfficientNetB7':
-        model = EfficientNetB7(num_classes=num_classes, hypparams=params)
-    elif model_name == 'EfficientNetB1':
-        model = EfficientNetB1(num_classes=num_classes, hypparams=params)
-    elif model_name == 'EfficientNetB0':
-        model = EfficientNetB0(num_classes=num_classes, hypparams=params)
+        if model_name.startswith('ResNet'):
+            print('Choosing dynamic version')
+            model = get_resnet(params=params)
 
-    elif model_name == 'WRN2810':
-        model = WRN2810(num_classes=num_classes, hypparams=params)
+    else:
 
-    elif model_name == 'PyramidNet110':
-        model = PyramidNet110(num_classes=num_classes, hypparams=params)
-    elif model_name == 'PyramidNet272':
-        model = PyramidNet272(num_classes=num_classes, hypparams=params)
+        if model_name == 'ResNet18':
+            model = ResNet18(num_classes=num_classes, hypparams=params)
+        elif model_name == 'ResNet34':
+            model = ResNet34(num_classes=num_classes, hypparams=params)
+        elif model_name == 'ResNet50':
+            model = ResNet50(num_classes=num_classes, hypparams=params)
+        elif model_name == 'ResNet101':
+            model = ResNet101(num_classes=num_classes, hypparams=params)
+        elif model_name == 'ResNet110':
+            model = ResNet110(num_classes=num_classes, hypparams=params)
+        elif model_name == 'ResNet152':
+            model = ResNet152(num_classes=num_classes, hypparams=params)
+
+        elif model_name == 'EfficientNetL2':
+            model = EfficientNetL2(num_classes=num_classes, hypparams=params)
+        elif model_name == 'EfficientNetB8':
+            model = EfficientNetB8(num_classes=num_classes, hypparams=params)
+        elif model_name == 'EfficientNetB7':
+            model = EfficientNetB7(num_classes=num_classes, hypparams=params)
+        elif model_name == 'EfficientNetB1':
+            model = EfficientNetB1(num_classes=num_classes, hypparams=params)
+        elif model_name == 'EfficientNetB0':
+            model = EfficientNetB0(num_classes=num_classes, hypparams=params)
+
+        elif model_name == 'WRN2810':
+            model = WRN2810(num_classes=num_classes, hypparams=params)
+
+        elif model_name == 'PyramidNet110':
+            model = PyramidNet110(num_classes=num_classes, hypparams=params)
+        elif model_name == 'PyramidNet272':
+            model = PyramidNet272(num_classes=num_classes, hypparams=params)
 
     return model
 
@@ -68,7 +80,7 @@ def get_model(model_name, params, num_classes):
 def detect_misconfigurations(model_name, args):
 
     # data
-    assert args.data in ['CIFAR10', 'CIFAR100'], 'Only CIFAR10 and CIFAR100 datasets are supported'
+    assert args.data in registered_datasets, 'Only {} datasets are supported'.format(registered_datasets)
     # Model
     assert model_name in registered_models, 'Specified Model {} not available. Have you registered it?'.format(model_name)
     # Training
@@ -131,7 +143,10 @@ def get_params(selected_data_dir, model_name, args, seed):
         'shakedrop': args.shakedrop,
         'zero_init_residual': args.zero_init_residual,
         'bottleneck': args.bottleneck,
-        'seed': seed
+        'seed': seed,
+        'small_imgs': args.small_imgs,
+        'dynamic': args.dynamic,
+        'pool_op': args.pool_op
     }
 
     return params
@@ -166,7 +181,10 @@ def get_params_to_log(params, model_name):
                          'zero_init_residual': params['zero_init_residual'],
                          'bottleneck': params['bottleneck'],
                          'seed': params['seed'],
-                         'random_batches': params['random_batches']}
+                         'random_batches': params['random_batches'],
+                         'small_imgs': params['small_imgs'],
+                         'dynamic': params['dynamic'],
+                         'pool_op': params['pool_op']}
 
     return params_to_log
 

@@ -1,7 +1,7 @@
-import torchvision
+from torchvision.datasets import CIFAR10, CIFAR100
 
 
-class Cifar10Albumentation(torchvision.datasets.CIFAR10):
+class Cifar10Albumentation(CIFAR10):
 
     def __init__(self, root, train, download, transform):
         super().__init__(root=root, train=train, download=download, transform=transform)
@@ -15,7 +15,8 @@ class Cifar10Albumentation(torchvision.datasets.CIFAR10):
 
         return image, label
 
-class Cifar100Albumentation(torchvision.datasets.CIFAR100):
+
+class Cifar100Albumentation(CIFAR100):
 
     def __init__(self, root, train, download, transform):
         super().__init__(root=root, train=train, download=download, transform=transform)
