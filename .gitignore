@@ -1,6 +1,7 @@
 # dataset and mlflow
 data/
 experiments/
+cluster_jobs.txt
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -92,3 +93,5 @@ ENV/
 
 
 .trash
+
+datasets/imagenet_resize.py
