@@ -39,16 +39,20 @@ if __name__ == "__main__":
         "--T_max",
         default=None,
         type=int,
-        help="Defines the amount of epochs in which CosineAnneal scheduler decays LR to minimum LR, "
-        "afterwards LR gets increased again to initial LR for T_max epochs before decaying again,"
-        "if not specified, T_max will be set to the nb of epochs so that LR never gets increased",
+        help=(
+            "Defines the amount of epochs in which CosineAnneal scheduler decays LR to minimum LR, "
+            "afterwards LR gets increased again to initial LR for T_max epochs before decaying again,"
+            "if not specified, T_max will be set to the nb of epochs so that LR never gets increased"
+        ),
     )
     parser.add_argument(
         "--warmstart",
         default=0,
         type=int,
-        help="Specifies the nb of epochs for the CosineAnneal scheduler where "
-        "the LR will be gradually increased as a warmstart",
+        help=(
+            "Specifies the nb of epochs for the CosineAnneal scheduler where "
+            "the LR will be gradually increased as a warmstart"
+        ),
     )
     parser.add_argument(
         "--augmentation",
@@ -62,13 +66,13 @@ if __name__ == "__main__":
         "--label_smoothing",
         default=0.0,
         type=float,
-        help="Label Smoothing parameter, range:0.0-1.0, the higher the more smoothing, default applies" "no smoothing",
+        help="Label Smoothing parameter, range:0.0-1.0, the higher the more smoothing, default appliesno smoothing",
     )
     parser.add_argument(
         "--stochastic_depth",
         default=0.0,
         type=float,
-        help="Dropout rate for stochastic depth, only for ResNet-like models, default applies no" "stochastic depth",
+        help="Dropout rate for stochastic depth, only for ResNet-like models, default applies nostochastic depth",
     )
     parser.add_argument(
         "--final_layer_dropout",
@@ -84,11 +88,24 @@ if __name__ == "__main__":
     parser.add_argument(
         "--zero_init_residual",
         action="store_true",
-        help="Enables Zero-initialization of the last BN (or conv for PreAct models) in each "
-        "residual branch, only for ResNet-like models",
+        help=(
+            "Enables Zero-initialization of the last BN (or conv for PreAct models) in each "
+            "residual branch, only for ResNet-like models"
+        ),
     )
     parser.add_argument(
-        "--bottleneck", action="store_true", help="Whether to use bottleneck building " "blocks for ResNet"
+        "--bottleneck", action="store_true", help="Whether to use bottleneck building blocks for ResNet"
+    )
+
+    ##### Metrics #####
+    parser.add_argument(
+        "--metrics",
+        nargs="+",
+        default=["acc"],
+        help=(
+            "List of Metrics to be computed. acc=Accuracy, f1=F1 Score, pr=Precision and Recall, mse=Mean Squared"
+            " Error, mae=Mean Absolute Errors"
+        ),
     )
 
     ##### Seeding #####
@@ -104,8 +121,16 @@ if __name__ == "__main__":
     )
     parser.add_argument("--input_dim", type=int, help="Whether your input is 1, 2 or 3 dimensional", default=2)
     parser.add_argument("--input_channels", type=int, help="Number of channels of input data", default=3)
+    parser.add_argument(
+        "--regression",
+        action="store_true",
+        help=(
+            "Flag whether target is continuous / regression task. Will set num_classes to 1 and use MSE Loss instead"
+            " of CE"
+        ),
+    )
 
-    #### Directories ####
+    ##### Directories #####
     parser.add_argument(
         "--data_dir",
         default=os.environ["DATASET_LOCATION"] if "DATASET_LOCATION" in os.environ.keys() else "./data",
@@ -161,7 +186,7 @@ if __name__ == "__main__":
     params = get_params(selected_data_dir, model_name, args, seed)
     params_to_log = get_params_to_log(params, model_name)
 
-    # Choose correct model
+    # Choose correct model and num_classes
     if args.data.startswith("CIFAR"):
         num_classes = 10 if args.data == "CIFAR10" else 100
         params["cifar_size"] = True
@@ -170,7 +195,7 @@ if __name__ == "__main__":
     else:
         num_classes = args.num_classes
 
-    params["num_classes"] = num_classes
+    params["num_classes"] = num_classes if not params["regression"] else 1
     model = get_model(model_name, params)
 
     ## Pytorch Lightning Trainer

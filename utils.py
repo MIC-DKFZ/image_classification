@@ -123,7 +123,7 @@ def detect_misconfigurations(model_name, args):
     if args.T_max:
         assert (
             args.scheduler == "CosineAnneal"
-        ), "T_max is a parameter of the Cosine Annealing Scheduler, " "but you specified {}".format(args.scheduler)
+        ), "T_max is a parameter of the Cosine Annealing Scheduler, but you specified {}".format(args.scheduler)
     assert args.augmentation in [
         "baseline",
         "baseline_cutout",
@@ -139,13 +139,13 @@ def detect_misconfigurations(model_name, args):
             "ResNet" in model_name or "Pyramid" in model_name and "18" not in model_name and "34" not in model_name
         ), "Bottleneck not available for {}".format(model_name)
     if args.zero_init_residual or args.se or args.shakedrop:
-        assert "ResNet" in model_name or "WRN" in model_name or "Pyramid" in model_name, (
-            "specified regularization " "only for ResNet-like models"
-        )
+        assert (
+            "ResNet" in model_name or "WRN" in model_name or "Pyramid" in model_name
+        ), "specified regularization only for ResNet-like models"
     if args.stochastic_depth != 0 or args.final_layer_dropout != 0:
-        assert "ResNet" in model_name or "WRN" in model_name or "Pyramid" in model_name, (
-            "specified regularization " "only for ResNet-like models"
-        )
+        assert (
+            "ResNet" in model_name or "WRN" in model_name or "Pyramid" in model_name
+        ), "specified regularization only for ResNet-like models"
 
 
 def get_params(selected_data_dir, model_name, args, seed):
@@ -185,6 +185,8 @@ def get_params(selected_data_dir, model_name, args, seed):
         "cifar_size": args.cifar_size,
         "input_dim": args.input_dim,
         "input_channels": args.input_channels,
+        "regression": args.regression,
+        "metrics": args.metrics,
     }
 
     return params
@@ -225,7 +227,7 @@ def get_params_to_log(params, model_name):
         "cifar_size": params["cifar_size"],
         "input_dim": params["input_dim"],
         "input_channels": params["input_channels"],
+        "regression": params["regression"],
     }
 
     return params_to_log
-

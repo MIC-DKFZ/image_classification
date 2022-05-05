@@ -1,3 +1,4 @@
+from prometheus_client import Metric
 import torch
 import torch.nn as nn
 import numpy as np
@@ -9,7 +10,7 @@ import os
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.utils.data import DataLoader, RandomSampler
 import pytorch_lightning as pl
-from torchmetrics import Accuracy, F1, Precision, Recall
+from torchmetrics import Accuracy, F1, Precision, Recall, MeanAbsoluteError, MeanSquaredError, MetricCollection
 from pytorch_lightning.callbacks import Callback
 from datasets.cifar import CIFAR10, CIFAR100, Cifar10Albumentation, Cifar100Albumentation
 from datasets.imagenet import ImageNet
@@ -23,16 +24,43 @@ class BaseModel(pl.LightningModule):
     def __init__(self, hypparams):
         super(BaseModel, self).__init__()
 
-        # Metrics
-        self.train_acc = Accuracy()
-        self.train_f1 = F1(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
-        self.train_precision = Precision(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
-        self.train_recall = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+        # Task
+        self.task = "Classification" if not hypparams["regression"] else "Regression"
 
-        self.val_acc = Accuracy()
-        self.val_f1 = F1(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
-        self.val_precision = Precision(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
-        self.val_recall = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+        # Metrics
+        metrics_list = []
+
+        if self.task == "Classification":
+
+            if "acc" in hypparams["metrics"]:
+                metrics_list.append(Accuracy())
+                # self.train_acc = Accuracy()
+                # self.val_acc = Accuracy()
+            if "f1" in hypparams["metrics"]:
+                metrics_list.append(F1(average="macro", num_classes=hypparams["num_classes"], multiclass=True))
+                # self.train_f1 = F1(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+                # self.val_f1 = F1(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+            if "pr" in hypparams["metrics"]:
+                metrics_list.append(Precision(average="macro", num_classes=hypparams["num_classes"], multiclass=True))
+                metrics_list.append(Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=True))
+                # self.train_precision = Precision(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+                # self.train_recall = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+                # self.val_precision = Precision(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+                # self.val_recall = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+
+        elif self.task == "Regression":
+            if "mse" in hypparams["metrics"]:
+                metrics_list.append(MeanSquaredError())
+                # self.train_MSE = MeanSquaredError()
+                # self.val_MSE = MeanSquaredError()
+            if "mae" in hypparams["metrics"]:
+                metrics_list.append(MeanAbsoluteError())
+                # self.train_MAE = MeanAbsoluteError()
+                # self.val_MAE = MeanAbsoluteError()
+
+        metrics = MetricCollection(metrics_list)
+        self.train_metrics = metrics.clone(prefix="train_")
+        self.val_metrics = metrics.clone(prefix="val_")
 
         # Training Args
         self.name = hypparams["name"]
@@ -67,6 +95,7 @@ class BaseModel(pl.LightningModule):
         self.num_workers = hypparams["num_workers"]
         self.input_dim = hypparams["input_dim"]
         self.input_channels = hypparams["input_channels"]
+        self.num_classes = hypparams["num_classes"]
 
         os.makedirs(self.data_dir, exist_ok=True)
         self.download = False if any(os.scandir(self.data_dir)) else True
@@ -121,7 +150,10 @@ class BaseModel(pl.LightningModule):
             self.automatic_optimization = False
 
         # Loss
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
+        if self.task == "Classification":
+            self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
+        elif self.task == "Regression":
+            self.criterion = nn.MSELoss()
 
         # Inference
         self.softmax = nn.Softmax(dim=1)
@@ -142,6 +174,8 @@ class BaseModel(pl.LightningModule):
 
         else:
             y_hat = self(x)
+            if self.num_classes == 1:
+                y_hat = y_hat.view(-1)
 
         if self.sam:
             opt = self.optimizers()
@@ -158,7 +192,10 @@ class BaseModel(pl.LightningModule):
             if self.mixup:
                 self.manual_backward(mixup_criterion(self.criterion, self(inputs), targets_a, targets_b, lam))
             else:
-                self.manual_backward(self.criterion(self(x), y))
+                if self.num_classes == 1:
+                    self.manual_backward(self.criterion(self(x).view(-1), y))
+                else:
+                    self.manual_backward(self.criterion(self(x), y))
             opt.second_step(zero_grad=True)
 
         else:
@@ -167,16 +204,18 @@ class BaseModel(pl.LightningModule):
             else:
                 loss = self.criterion(y_hat, y)
 
-        # predict and save metrics
-        with torch.no_grad():
-            y_hat_norm = self.softmax(y_hat)
-            if torch.isnan(y_hat_norm).any():
-                print("######################################### Model predicts NaNs!")
-        self.train_acc(y_hat_norm, y)
-
-        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True)
-
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+
+        # predict and save metrics
+        if self.task == "Classification":
+            with torch.no_grad():
+                y_hat = self.softmax(y_hat)
+
+        if torch.isnan(y_hat).any():
+            print("######################################### Model predicts NaNs!")
+
+        metrics_res = self.train_metrics(y_hat, y)
+        self.log_dict(metrics_res, on_step=False, on_epoch=True, prog_bar=True)
 
         return loss
 
@@ -185,12 +224,17 @@ class BaseModel(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
 
+        if self.num_classes == 1:
+            y_hat = y_hat.view(-1)
+
         val_loss = self.criterion(y_hat, y)
         self.log("val_loss", val_loss, on_step=False, on_epoch=True, prog_bar=True)
 
-        y_hat_norm = self.softmax(y_hat)
-        self.val_acc(y_hat_norm, y)
-        self.log("val_acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
+        # predict and save metrics
+        if self.task == "Classification":
+            y_hat = self.softmax(y_hat)
+        metrics_res = self.val_metrics(y_hat, y)
+        self.log_dict(metrics_res, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_train_start(self):
 
@@ -471,7 +515,7 @@ def seed_worker(worker_id):
     to fix https://tanelp.github.io/posts/a-bug-that-plagues-thousands-of-open-source-ml-projects/
     ensures different random numbers each batch with each worker every epoch while keeping reproducibility
     """
-    worker_seed = torch.initial_seed() % 2 ** 32
+    worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
@@ -494,7 +538,7 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
     def get_lr(self):
         if not self._get_lr_called_within_step:
             warnings.warn(
-                "To get the last learning rate computed by the scheduler, " "please use `get_last_lr()`.", UserWarning
+                "To get the last learning rate computed by the scheduler, please use `get_last_lr()`.", UserWarning
             )
 
         # Warmstart

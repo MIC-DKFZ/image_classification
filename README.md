@@ -1,11 +1,11 @@
 # Experiments on CIFAR-10 and CIFAR-100 using Pytorch Lightning
 
-This repository contains a framework for training deep learning-based classifications models on CIFAR10/100
+This repository contains a framework for training deep learning-based classification and regression models 
 with Pytorch / Pytorch Lightning. \
 It comprises several architectures, regularization, augmentation and training techniques and
 aims to provide easy-to-use baselines for experimenting with a lot of different setups. \
 You can also integrate your own model and benefit from the features of this repository! \
-Results of experiments comparing different architectures in different training settings are shown below. \
+Results of experiments on CIFAR-10 comparing different architectures in different training settings are shown below. \
 Everything can be run via the Command Line Interface. Logging is accomplished with MLflow. \
 Training uses mixed precision and `torch.backends.cudnn.benchmark=True` by default to increase training speed. \
 Best results are achieved with a PyramidNet using RandAugment augmentation, Shakedrop and Mixup.
@@ -203,7 +203,7 @@ def get_model(model_name, params, num_classes):
         custom_model = CustomModel(num_classes) 
     
         # pass your initialized model to the ModelConstructor
-        model = ModelConstructor(custom_model,params)
+        model = ModelConstructor(custom_model, params)
         
     return model
 ```
@@ -214,9 +214,18 @@ You can now train your model e.g. with RandAugment, Mixup, Madgrad Optimizer, Sh
 ```shell
 python main.py CustomModel --lr 0.0001 --optimizer Madgrad --scheduler CosineAnneal --warmstart 5 --mixup --augmentation randaugment --SAM
 ```
+# Acknowledgements
+
+<p align="left">
+  <img src="imgs/Logos/HI_Logo.png" width="150"> &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="imgs/Logos/DKFZ_Logo.png" width="500"> 
+</p>
+
+This Repository is developed and maintained by the Applied Computer Vision Lab (ACVL)
+of [Helmholtz Imaging](https://www.helmholtz-imaging.de/).
 
 
-## CIFAR Results
+# CIFAR Results
 
 The following experiments aim to show general tendencies for different training settings and techniques. In order 
 to be consistent with the literature we evaluate all our experiments on the respective test sets. We are aware of 

@@ -14,7 +14,7 @@ def get_resnet(params):
             else:
                 resnet = ResNet18_CIFAR(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -27,7 +27,7 @@ def get_resnet(params):
             else:
                 resnet = ResNet34_CIFAR(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -38,7 +38,7 @@ def get_resnet(params):
             if params["bottleneck"]:
                 resnet = ResNet50bn_CIFAR(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -48,7 +48,7 @@ def get_resnet(params):
             else:
                 resnet = ResNet50_CIFAR(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -59,7 +59,7 @@ def get_resnet(params):
             if params["bottleneck"]:
                 resnet = ResNet152bn_CIFAR(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -69,7 +69,7 @@ def get_resnet(params):
             else:
                 resnet = ResNet152_CIFAR(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -83,7 +83,7 @@ def get_resnet(params):
             else:
                 resnet = ResNet18(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -96,7 +96,7 @@ def get_resnet(params):
             else:
                 resnet = ResNet34(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -107,7 +107,7 @@ def get_resnet(params):
             if params["bottleneck"]:
                 resnet = ResNet50bn(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -117,7 +117,7 @@ def get_resnet(params):
             else:
                 resnet = ResNet50(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -128,7 +128,7 @@ def get_resnet(params):
             if params["bottleneck"]:
                 resnet = ResNet152bn(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
@@ -138,7 +138,7 @@ def get_resnet(params):
             else:
                 resnet = ResNet152(
                     params["num_classes"],
-                    n_input_channel=params["input_channels"],
+                    n_input_channels=params["input_channels"],
                     input_dimension=params["input_dim"],
                     final_layer_dropout=params["resnet_dropout"],
                     stochastic_depth_p=params["stochastic_depth"],
