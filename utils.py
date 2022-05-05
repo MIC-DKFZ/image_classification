@@ -44,7 +44,7 @@ def get_model(model_name, params):
     #    model = VGG("VGG16", num_classes=num_classes, hypparams=params)
 
     if model_name.startswith("VGG"):
-        get_vgg(params=params)
+        model = get_vgg(params=params)
 
     elif model_name == "PreActResNet18":
         model = PreActResNet18(num_classes=num_classes, hypparams=params)

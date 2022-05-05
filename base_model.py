@@ -34,29 +34,18 @@ class BaseModel(pl.LightningModule):
 
             if "acc" in hypparams["metrics"]:
                 metrics_list.append(Accuracy())
-                # self.train_acc = Accuracy()
-                # self.val_acc = Accuracy()
             if "f1" in hypparams["metrics"]:
                 metrics_list.append(F1(average="macro", num_classes=hypparams["num_classes"], multiclass=True))
-                # self.train_f1 = F1(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
-                # self.val_f1 = F1(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
             if "pr" in hypparams["metrics"]:
                 metrics_list.append(Precision(average="macro", num_classes=hypparams["num_classes"], multiclass=True))
                 metrics_list.append(Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=True))
-                # self.train_precision = Precision(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
-                # self.train_recall = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
-                # self.val_precision = Precision(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
-                # self.val_recall = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
 
         elif self.task == "Regression":
+
             if "mse" in hypparams["metrics"]:
                 metrics_list.append(MeanSquaredError())
-                # self.train_MSE = MeanSquaredError()
-                # self.val_MSE = MeanSquaredError()
             if "mae" in hypparams["metrics"]:
                 metrics_list.append(MeanAbsoluteError())
-                # self.train_MAE = MeanAbsoluteError()
-                # self.val_MAE = MeanAbsoluteError()
 
         metrics = MetricCollection(metrics_list)
         self.train_metrics = metrics.clone(prefix="train_")
