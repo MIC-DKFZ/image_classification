@@ -125,10 +125,27 @@ class BaseModel(pl.LightningModule):
 
         elif self.dataset == "Imagenet":
             self.mean, self.std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
-            from augmentation.policies.imagenet import get_baseline, test_transform
+            from augmentation.policies.imagenet import (
+                get_baseline,
+                test_transform,
+                get_auto_augmentation,
+                get_baseline_cutout,
+                get_rand_augmentation,
+            )
+
+            cutout_size = 112
 
             if self.aug == "baseline":
                 self.transform_train = get_baseline(self.mean, self.std)
+
+            elif self.aug == "baseline_cutout":
+                self.transform_train = get_baseline_cutout(self.mean, self.std, cutout_size)
+
+            elif self.aug == "autoaugment":
+                self.transform_train = get_auto_augmentation(self.mean, self.std, cutout_size)
+
+            elif self.aug == "randaugment":
+                self.transform_train = get_rand_augmentation(self.mean, self.std, cutout_size)
 
             self.test_transform = test_transform(self.mean, self.std)
 
@@ -403,9 +420,9 @@ class BaseModel(pl.LightningModule):
 
         elif self.dataset == "Imagenet":
 
-            path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original"
+            # path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original" TODO
 
-            trainset = ImageNet(root=path_to_imagenet, split="train", transform=self.transform_train)
+            trainset = ImageNet(root=self.data_dir, split="train", transform=self.transform_train)
 
         if not self.random_batches:
             trainloader = DataLoader(
@@ -442,8 +459,8 @@ class BaseModel(pl.LightningModule):
             testset = CIFAR100(root=self.data_dir, train=False, download=self.download, transform=self.test_transform)
 
         elif self.dataset == "Imagenet":
-            path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original"
-            testset = ImageNet(root=path_to_imagenet, split="val", transform=self.test_transform)
+            # path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original" TODO
+            testset = ImageNet(root=self.data_dir, split="val", transform=self.test_transform)
 
         testloader = DataLoader(
             testset,

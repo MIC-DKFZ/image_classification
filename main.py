@@ -172,7 +172,7 @@ if __name__ == "__main__":
         pl.seed_everything(seed)
 
     # select correct directories according to dataset
-    selected_data_dir = os.path.join(data_dir, args.data)
+    selected_data_dir = os.path.join(data_dir, args.data if not args.data == "Imagenet" else "ILSVRC_2012")
     selected_exp_dir = os.path.join(exp_dir, args.data)
 
     # set MLflow and checkpoint directories
