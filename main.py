@@ -225,7 +225,6 @@ if __name__ == "__main__":
         gpus=args.gpu_count,
         accelerator="ddp" if args.gpu_count > 1 else None,
         callbacks=all_lightning_callbacks,
-        # checkpoint_callback=checkpoint_callback if args.save_model else False,  # False: no checkpoints are saved
         enable_checkpointing=True if args.save_model else False,
         max_epochs=args.epochs,
         benchmark=benchmark,
