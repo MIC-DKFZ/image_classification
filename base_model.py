@@ -146,10 +146,10 @@ class BaseModel(pl.LightningModule):
                 self.transform_train = get_baseline_cutout(self.mean, self.std, cutout_size)
 
             elif self.aug == "autoaugment":
-                self.transform_train = get_auto_augmentation(self.mean, self.std, cutout_size)
+                self.transform_train = get_auto_augmentation(self.mean, self.std)
 
             elif self.aug == "randaugment":
-                self.transform_train = get_rand_augmentation(self.mean, self.std, cutout_size)
+                self.transform_train = get_rand_augmentation(self.mean, self.std)
 
             self.test_transform = test_transform(self.mean, self.std)
 

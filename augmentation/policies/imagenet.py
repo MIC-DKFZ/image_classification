@@ -29,13 +29,13 @@ def get_baseline_cutout(mean, std, cutout_size):
     return transform_train
 
 
-def get_auto_augmentation(mean, std, cutout_size):
+def get_auto_augmentation(mean, std):
     transform_train = transforms.Compose(
         [
             transforms.RandomResizedCrop(224),
             transforms.RandomHorizontalFlip(),
             ImageNetPolicy(),
-            Cutout(size=cutout_size),
+            # Cutout(size=cutout_size),
             transforms.ToTensor(),
             transforms.Normalize(mean, std),
         ]
@@ -44,13 +44,13 @@ def get_auto_augmentation(mean, std, cutout_size):
     return transform_train
 
 
-def get_rand_augmentation(mean, std, cutout_size):
+def get_rand_augmentation(mean, std):
     transform_train = transforms.Compose(
         [
             transforms.RandomResizedCrop(224),
             transforms.RandomHorizontalFlip(),
             RandAugment(),
-            Cutout(size=cutout_size),
+            # Cutout(size=cutout_size),
             transforms.ToTensor(),
             transforms.Normalize(mean, std),
         ]
