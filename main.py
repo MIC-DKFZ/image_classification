@@ -244,7 +244,11 @@ if __name__ == "__main__":
     run_name = f"{args.data}-{model_name}"
 
     # Train the model
-    with mlflow.start_run(run_name=run_name) as run:
-        if trainer.is_global_zero:  # in case of multi gpu training only log additional parameters in process 0
+    if trainer.is_global_zero:  # in case of multi gpu training only log additional parameters in process 0
+
+        with mlflow.start_run(run_name=run_name) as run:
+
             mlflow.log_params(params_to_log)
+            trainer.fit(model)
+    else:
         trainer.fit(model)
