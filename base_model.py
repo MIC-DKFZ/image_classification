@@ -214,7 +214,14 @@ class BaseModel(pl.LightningModule):
             else:
                 loss = self.criterion(y_hat, y)
 
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(
+            "train_loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            sync_dist=True if self.trainer.num_devices > 1 else False,
+        )
 
         # predict and save metrics
         if self.task == "Classification":
@@ -225,7 +232,13 @@ class BaseModel(pl.LightningModule):
             print("######################################### Model predicts NaNs!")
 
         metrics_res = self.train_metrics(y_hat, y)
-        self.log_dict(metrics_res, on_step=False, on_epoch=True, prog_bar=True)
+        self.log_dict(
+            metrics_res,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            sync_dist=True if self.trainer.num_devices > 1 else False,
+        )
 
         return loss
 
@@ -238,13 +251,26 @@ class BaseModel(pl.LightningModule):
             y_hat = y_hat.view(-1)
 
         val_loss = self.criterion(y_hat, y)
-        self.log("val_loss", val_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(
+            "val_loss",
+            val_loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            sync_dist=True if self.trainer.num_devices > 1 else False,
+        )
 
         # predict and save metrics
         if self.task == "Classification":
             y_hat = self.softmax(y_hat)
         metrics_res = self.val_metrics(y_hat, y)
-        self.log_dict(metrics_res, on_step=False, on_epoch=True, prog_bar=True)
+        self.log_dict(
+            metrics_res,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            sync_dist=True if self.trainer.num_devices > 1 else False,
+        )
 
     def on_train_start(self):
 

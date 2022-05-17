@@ -224,6 +224,7 @@ if __name__ == "__main__":
         logger=None,
         gpus=args.gpu_count,
         accelerator="ddp" if args.gpu_count > 1 else None,
+        sync_batchnorm=True if args.gpu_count > 1 else False,
         callbacks=all_lightning_callbacks,
         enable_checkpointing=True if args.save_model else False,
         max_epochs=args.epochs,
