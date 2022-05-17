@@ -234,17 +234,17 @@ if __name__ == "__main__":
         progress_bar_refresh_rate=0 if args.suppress_progress_bar else None,
     )
 
-    # Log location
-    mlflow.set_tracking_uri(mlrun_dir)
-    # Auto log all MLflow entities
-    mlflow.pytorch.autolog(log_models=False)
-
-    # set MLflow experiment name
-    mlflow.set_experiment(args.data)  # creates exp if it does not exist yet
-    run_name = f"{args.data}-{model_name}"
-
     # Train the model
-    if trainer.is_global_zero:  # in case of multi gpu training only log additional parameters in process 0
+    if trainer.is_global_zero:  # in case of multi gpu training only log parameters in process 0
+
+        # Log location
+        mlflow.set_tracking_uri(mlrun_dir)
+        # Auto log all MLflow entities
+        mlflow.pytorch.autolog(log_models=False)
+
+        # set MLflow experiment name
+        mlflow.set_experiment(args.data)  # creates exp if it does not exist yet
+        run_name = f"{args.data}-{model_name}"
 
         with mlflow.start_run(run_name=run_name) as run:
 
