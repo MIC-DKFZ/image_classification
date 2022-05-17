@@ -1,21 +1,30 @@
-# Experiments on CIFAR-10 and CIFAR-100 using Pytorch Lightning
+<div align="center">
+<p align="left">
+  <img src="imgs/Logos/title.png" >
+</p>
+
+<a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/-Python 3.9-3776AB?&logo=python&logoColor=white"></a>
+<a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/-PyTorch 1.11-EE4C2C?logo=pytorch&logoColor=white"></a>
+<a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Pytorch Lightning 1.6-792EE5?logo=pytorchlightning&logoColor=white"></a>
+</div>
+
 
 This repository contains a framework for training deep learning-based classification and regression models 
-with Pytorch / Pytorch Lightning. \
+with Pytorch Lightning. \
 It comprises several architectures, regularization, augmentation and training techniques and
 aims to provide easy-to-use baselines for experimenting with a lot of different setups. \
-You can also integrate your own model and benefit from the features of this repository! \
+You can also integrate your own model and/or dataset and benefit from the features of this repository! \
 Results of experiments on CIFAR-10 comparing different architectures in different training settings are shown below. \
-Everything can be run via the Command Line Interface. Logging is accomplished with MLflow. \
+Everything can be run via the Command Line Interface. Logging is accomplished via MLflow. \
 Training uses mixed precision and `torch.backends.cudnn.benchmark=True` by default to increase training speed. \
 Best results are achieved with a PyramidNet using RandAugment augmentation, Shakedrop and Mixup.
 It yields 0.986 Test Accuracy on CIFAR-10 and 0.875 Test Accuracy on CIFAR-100. \
 Detailed results and used configurations can be seen in [CIFAR Results](CIFAR-results).
 
 
-## How to run
+# How to run
 
-### Requirements
+## Requirements
 First install the requirements in a [virtual environment](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) by:
 
 ```shell
@@ -25,12 +34,12 @@ pip install -r requirements.txt
 You might need to adapt the cuda versions for torch and torchvision specified in the requirements. 
 Find a torch installation guide for your system [here](https://pytorch.org/get-started/locally/). 
 
-### General instructions
+## General instructions
 
 Everything in this repository can be run by executing the ```main.py``` script with corresponding arguments.
 In order to train a model, one needs to specify the path to the directory that contains the datasets (```data_dir```) and the
-path to the directory where logs should be saved (```exp_dir```). You can either train on CIFAR10 or CIFAR100.
-If the specified dataset is not found in the specified ```data_dir```, it will be automatically downloaded (178 MB each).
+path to the directory where logs should be saved (```exp_dir```). You can e.g. train on CIFAR10 or CIFAR100.
+If the specified dataset is not found in the specified ```data_dir```, it will be automatically downloaded (178 MB for CIFAR). See [Including custom datasets](including-other-datasets) for instructions about using your own data. This repository also handles regression problems. For that simply add the ```--regression``` flag, it will use the MSE Loss instead of Cross Entropy.
 Here is an example of the command line for training a ResNet34 on CIFAR10:
 
 ```shell
@@ -39,11 +48,11 @@ python main.py ResNet34 --data CIFAR10 --data_dir "Path/to/data" --exp_dir "Path
 
 By default, no checkpoints are saved. If you want to save the trained model you can use the ```--save_model``` flag. 
 The model checkpoint will then be saved in the ```exp_dir``` along with the logs. You can adapt the name of the 
-file by specifying ```--chpt_name "your-file-name"```. By default, the model is trained on one GPU, you can adapt 
-this by setting e.g. ```--gpu_count 2```. If you want to use the CPU instead, set ```--gpu_count 0```.
-Use the ```--suppress_progress_bar``` flag for not showing the progress bar during training.
+file by specifying ```--chpt_name "your-file-name"```. By default, the model is trained on one GPU. You can adapt 
+this by setting e.g. ```--gpu_count 2``` to train on multiple GPUs using ddp strategy. If you want to use the CPU instead, set ```--gpu_count 0```.
+Use the ```--suppress_progress_bar``` flag for not showing the progress bar during training. By default, only model accuracy is tracked. You can specify other metrics by adding them in the command line. Set ```--metrics acc f1 pr top5acc``` for tracking Accuracy, F1-Score, Precision & Recall and the Top-5 Accuracy. For regression ```--metrics mse mae``` are available.
 
-### Available models and parameters
+## Available models and parameters
 
 The following models are available:
 * [PyramidNet](https://arxiv.org/pdf/1610.02915.pdf)
@@ -65,6 +74,7 @@ The following models are available:
   * PreActResNet18
 * [VGG](https://arxiv.org/pdf/1409.1556.pdf)
   * VGG16 (uses batch norm, does not include the fully connected layers at the end)
+  * VGG19 (uses batch norm, does not include the fully connected layers at the end)
   
 If you want to include your own model please see [Including custom models](#including-custom-pytorch-models) for instructions.
 
@@ -75,6 +85,7 @@ By default, the following training settings are used:
 
 * Epochs: 200 | ```--epochs 200```
 * Batch Size: 128 | ```--batch_size 128```
+  * If you set the number of GPUs > 1, your effective batch size becomes gpu_count * batch_size
 * Optimizer: SGD (momentum=0.9, nesterov=False) | ```--optimizer SGD```
   * for enabling nesterov use the ```--nesterov``` flag (SGD only)
   * other available optimizers are:
@@ -95,21 +106,49 @@ By default, the following training settings are used:
         * Value used in experiments: 10
     * MultiStep (multiply LR with 0.1 after 1/2 and 3/4 of epochs) | ```--scheduler MultiStep```
     * Step (multiply LR with 0.1 every 1/4 of epochs) | ```--scheduler Step```
-* Augmentation: Baseline (Random Crop, Random Horizontal Flips and Normalization) | ```--augmentation baseline```
-  * other available augmentations are:
-    * Baseline + [Cutout](https://arxiv.org/pdf/1708.04552.pdf) (cutout size 16 for CIFAR10 and size 8 for CIFAR100) | ```--augmentation baseline_cutout```
-    * Baseline + Cutout + [AutoAugment](https://arxiv.org/pdf/1805.09501.pdf) | ```--augmentation autoaugment```
-    * Baseline + Cutout + [RandAugment](https://arxiv.org/pdf/1909.13719.pdf) | ```--augmentation randaugment```
+
 * Seed: None
   * Specify a seed with ```--seed your_seed```
   * Disables cudnn.benchmark flag (required to make training deterministic) which results in slower training
 * Number of workers in dataloaders: 8 | ```--num_workers 8```
+* Number of GPUs | ```--gpu_count 1```
+  * If > 1 training will be executed on multiple GPUs following ddp strategy
+  * If 0 training will be executed on CPU
 
 <!--
 Run ```
 python main.py -h``` for a description of all possible parameters.
 -->
 
+
+Additionally, you can adapt the following parameters to your data.
+* Number of classes | ```--num_classes 10```
+  * If you train on CIFAR or Imagenet this parameter will default to the correct number of classes, otherwise you have to specify it
+* Set the task to Regression | ```--regression```
+  * will use the MSE Loss instead of Cross Entropy
+  * sets num_classes to 1
+* Augmentation | ```--augmentation baseline```
+  * Different augmentations depending on dataset
+    * CIFAR:
+      * Baseline (Random Crop, Random Horizontal Flips and Normalization) | ```--augmentation baseline```
+      * Baseline + [Cutout](https://arxiv.org/pdf/1708.04552.pdf) (cutout size 16 for CIFAR10 and size 8 for CIFAR100) | ```--augmentation baseline_cutout```
+      * Baseline + Cutout + [AutoAugment](https://arxiv.org/pdf/1805.09501.pdf) | ```--augmentation autoaugment```
+      * Baseline + Cutout + [RandAugment](https://arxiv.org/pdf/1909.13719.pdf) | ```--augmentation randaugment```
+    * Imagenet:
+      * Baseline (Random Resized Crop (224), Random Horizontal Flip and Normalization) | ```--augmentation baseline```
+      * Baseline + [Cutout](https://arxiv.org/pdf/1708.04552.pdf) (cutout size 112) | ```--augmentation baseline_cutout```
+      * Baseline + [AutoAugment](https://arxiv.org/pdf/1805.09501.pdf) | ```--augmentation autoaugment```
+      * Baseline + [RandAugment](https://arxiv.org/pdf/1909.13719.pdf) | ```--augmentation randaugment```
+* Number of Input Dimensions | ```--input_dim 2```
+  * At the moment only available for ResNets and VGGs
+  * Specifies the number of dimensions of your data and chooses dynamically the corresponding 1D, 2D or 3D model operations
+* Number of Input Channels | ```--input_channels 3```
+  * At the moment only available for ResNets and VGGs
+  * Specifies the number of channels of your data, e.g. 1 for grayscale images or 3 for RGB, and adapts the model architecture accordingly
+* Very small images | ```--cifar_size```
+  * At the moment only available for ResNets and VGGs
+  * If used, more lightweight architectures designed for smaller images like CIFAR are used
+  * if data is CIFAR this flag is activated by default
 
 Moreover, there are several additional techniques available that are all disabled by default. 
 <!--
@@ -171,7 +210,7 @@ The following techniques can only be used with ResNet-like models (including Pyr
     * Parameter: bool
     * Although bottleneck blocks are standard for deeper ResNets we have empirically found that deeper ResNets with basic blocks outperform their respective bottleneck versions on Cifar
 
-### MLflow 
+## MLflow 
 
 You can view the MLflow logs by navigating to your log directory (specified with the ```--exp_dir``` flag) and run:
 
@@ -182,7 +221,7 @@ mlflow ui
 In the MLflow user interface you can see all your runs and corresponding metrics. You can analyse your runs there or download
 them as a csv file for further analysis.
 
-## Including custom pytorch models
+# Including custom pytorch models
 
 
 In order to make the functionalities of this repository available for your model you can use the ```ModelConstructor```.\
@@ -214,15 +253,54 @@ You can now train your model e.g. with RandAugment, Mixup, Madgrad Optimizer, Sh
 ```shell
 python main.py CustomModel --lr 0.0001 --optimizer Madgrad --scheduler CosineAnneal --warmstart 5 --mixup --augmentation randaugment --SAM
 ```
-# Acknowledgements
 
-<p align="left">
-  <img src="imgs/Logos/HI_Logo.png" width="150"> &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="imgs/Logos/DKFZ_Logo.png" width="500"> 
-</p>
+# Including other datasets
 
-This Repository is developed and maintained by the Applied Computer Vision Lab (ACVL)
-of [Helmholtz Imaging](https://www.helmholtz-imaging.de/).
+If you want to train on your own data, you can easily integrate it into this repository. \
+Follow these steps:
+1. In the ```dataset``` directory create a new file that implements the torch dataset class for your data.
+2. Choose a name for your dataset and add it to the ```registered_datasets``` in ```utils.py```.
+3. In the ```augmentation/policies``` directory there are files with specific augmentation policies for each dataset. You can add one with custom augmentations for your dataset if you want. If you want to use policies that are used on CIFAR or Imagenet you do not need to add a file here.
+4. Adapt ```base_model.py```\
+4.1 Import your data class from step 1.\
+4.2 In the ```__init__``` function of the ```BaseModel``` there is a dataset specific part that chooses the augmentations. Add a new ```elif``` clause that checks for your custom dataset name and assign your augmentations:
+    ```python
+    class BaseModel(pl.LightningModule):
+        def __init__(self):
+          
+            ...
+            
+            # use your dataset name
+            elif self.dataset == 'CustomData':
+                self.mean, self.std = <mean_and_standard_deviations>
+                from augmentations.policies.custom_data import custom_aug1, custom_aug2, custom_test_transform
+
+                # transformations that will be used for training
+                if self.aug == 'aug1':
+                    # assumes that custom_aug1 is a function that takes mean and std and returns a composed augmentation pipeline
+                    self.transform_train = custom_aug1(self.mean, self.std)
+                
+                elif self.aug == 'aug2':
+                    self.transform_train = custom_aug2(self.mean, self.std)
+
+                # transformations that will be used for validation and test data
+                self.test_transform = custom_test_transform(self.mean, self.std)
+              
+      ```
+    4.3 In the ```train_dataloader``` and ```val_dataloader``` functions of the ```BaseModel``` again add a new ```elif``` clause that checks for the dataset name and initialize your dataset with the transforms that you assigned ealier:
+    ```python
+    class BaseModel(pl.LightningModule):
+        def train_dataloader(self):
+          
+            ...
+            
+            # use your dataset name
+            elif self.dataset == 'CustomData':
+                trainset = CustomDataset(..., transform=self.transform_train)
+              
+      ```
+      Do the same for the ```val_dataloader```.\
+      That's it! You can now use all training pipelines, regularization techniques and models with your dataset.
 
 
 # CIFAR Results
@@ -374,3 +452,12 @@ all increased performance.
 
 ![](imgs/techniques.png?raw=true "Other techniques across models")
 
+# Acknowledgements
+
+<p align="left">
+  <img src="imgs/Logos/HI_Logo.png" width="150"> &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="imgs/Logos/DKFZ_Logo.png" width="500"> 
+</p>
+
+This Repository is developed and maintained by the Applied Computer Vision Lab (ACVL)
+of [Helmholtz Imaging](https://www.helmholtz-imaging.de/).

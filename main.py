@@ -83,7 +83,7 @@ if __name__ == "__main__":
     parser.add_argument("--se", action="store_true", help="Enables Squeeze and Excitation for ResNet-like models")
     parser.add_argument("--se_rd_ratio", default=0.25, type=float, help="Squeeze Excitation Reduction Ratio")
     parser.add_argument(
-        "--shakedrop", action="store_true", help="Enables ShakeDrop Regularization for ResNet-like models"
+        "--shakedrop", action="store_true", help="Enables ShakeDrop Regularization for PyramidNet models"
     )
     parser.add_argument(
         "--zero_init_residual",

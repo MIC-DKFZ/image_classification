@@ -103,7 +103,11 @@ def get_model(model_name, params):
 def detect_misconfigurations(model_name, args):
 
     # data
-    assert args.data in registered_datasets, "Only {} datasets are supported".format(registered_datasets)
+    assert (
+        args.data in registered_datasets
+    ), "Only {} datasets are supported. See the README for instructions how to add new datasets".format(
+        registered_datasets
+    )
     # Model
     assert model_name in registered_models, "Specified Model {} not available. Have you registered it?".format(
         model_name
