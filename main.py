@@ -245,5 +245,6 @@ if __name__ == "__main__":
 
     # Train the model
     with mlflow.start_run(run_name=run_name) as run:
-        mlflow.log_params(params_to_log)
+        if trainer.is_global_zero:  # in case of multi gpu training only log additional parameters in process 0
+            mlflow.log_params(params_to_log)
         trainer.fit(model)
