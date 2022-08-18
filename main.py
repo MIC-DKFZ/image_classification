@@ -222,8 +222,8 @@ if __name__ == "__main__":
     # Configure Trainer
     trainer = pl.Trainer(
         logger=None,
-        gpus=args.gpu_count,
-        accelerator="ddp" if args.gpu_count > 1 else None,
+        devices=args.gpu_count,
+        accelerator="gpu" if args.gpu_count > 0 else "cpu",
         sync_batchnorm=True if args.gpu_count > 1 else False,
         callbacks=all_lightning_callbacks,
         enable_checkpointing=True if args.save_model else False,
@@ -231,7 +231,8 @@ if __name__ == "__main__":
         benchmark=benchmark,
         deterministic=deterministic,
         precision=precision_value,
-        progress_bar_refresh_rate=0 if args.suppress_progress_bar else None,
+        enable_progress_bar=not args.suppress_progress_bar,
+        strategy="ddp" if args.gpu_count > 1 else None,
     )
 
     # Train the model

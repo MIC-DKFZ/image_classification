@@ -8,7 +8,7 @@ from models.preact_resnet import PreActResNet18, PreActResNet34, PreActResNet50,
 # from models.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet110, ResNet152
 from models.dynamic_resnet import get_resnet
 from models.wide_resnet import WRN2810
-from models.efficientnet import EfficientNetL2, EfficientNetB7, EfficientNetB8, EfficientNetB0, EfficientNetB1
+from models.efficientnet import *
 from models.pyramidnet import PyramidNet110, PyramidNet272
 
 registered_models = [
@@ -27,6 +27,11 @@ registered_models = [
     "ResNet152",
     "EfficientNetB0",
     "EfficientNetB1",
+    "EfficientNetB2",
+    "EfficientNetB3",
+    "EfficientNetB4",
+    "EfficientNetB5",
+    "EfficientNetB6",
     "EfficientNetB7",
     "EfficientNetB8",
     "EfficientNetL2",
@@ -57,8 +62,6 @@ def get_model(model_name, params):
     elif model_name == "PreActResNet152":
         model = PreActResNet152(num_classes=num_classes, hypparams=params)
 
-    # if params['dynamic']:
-
     elif model_name.startswith("ResNet"):
 
         model = get_resnet(params=params)
@@ -84,6 +87,16 @@ def get_model(model_name, params):
         model = EfficientNetB8(num_classes=num_classes, hypparams=params)
     elif model_name == "EfficientNetB7":
         model = EfficientNetB7(num_classes=num_classes, hypparams=params)
+    elif model_name == "EfficientNetB6":
+        model = EfficientNetB6(num_classes=num_classes, hypparams=params)
+    elif model_name == "EfficientNetB5":
+        model = EfficientNetB5(num_classes=num_classes, hypparams=params)
+    elif model_name == "EfficientNetB4":
+        model = EfficientNetB4(num_classes=num_classes, hypparams=params)
+    elif model_name == "EfficientNetB3":
+        model = EfficientNetB3(num_classes=num_classes, hypparams=params)
+    elif model_name == "EfficientNetB2":
+        model = EfficientNetB2(num_classes=num_classes, hypparams=params)
     elif model_name == "EfficientNetB1":
         model = EfficientNetB1(num_classes=num_classes, hypparams=params)
     elif model_name == "EfficientNetB0":

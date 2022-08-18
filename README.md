@@ -62,7 +62,6 @@ The following models are available:
   * WRN2810 (depth 28, widen factor 10)
 * [ResNet](https://arxiv.org/pdf/1512.03385.pdf)
   * ResNet152
-  * ResNet101
   * ResNet50
   * ResNet34
   * ResNet18
