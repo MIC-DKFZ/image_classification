@@ -1,14 +1,14 @@
 --find-links https://download.pytorch.org/whl/cu113/torch_stable.html
-torch>=1.8.0+cu113
-numpy>=1.20.1
-pytorch-lightning>=1.2.3
-timm>=0.4.5
+torch>=1.12.1+cu113
+torchvision>=0.13.1+cu113
+numpy>=1.23.2
+pytorch-lightning>=1.7.2
+timm>=0.6.7
 argparse>=1.4.0
-mlflow>=1.14.1
-torchvision>=0.9.0+cu113
-albumentations>=0.5.2
+mlflow>=1.28.0
+albumentations>=1.2.1
 randaugment>=1.0.2
-pillow>=8.1.2
-efficientnet-pytorch>=0.7.0
-madgrad>=1.1
+pillow>=9.2.0
+efficientnet-pytorch>=0.7.1
+madgrad>=1.2
 git+https://gitlab.hzdr.de/hi-dkfz/applied-computer-vision-lab/tools/dynamic-network-architectures.git

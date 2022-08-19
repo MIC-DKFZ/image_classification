@@ -3,9 +3,9 @@
   <img src="imgs/Logos/title.png" >
 </p>
 
-<a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/-Python 3.9-3776AB?&logo=python&logoColor=white"></a>
-<a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/-PyTorch 1.11-EE4C2C?logo=pytorch&logoColor=white"></a>
-<a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Pytorch Lightning 1.6-792EE5?logo=pytorchlightning&logoColor=white"></a>
+<a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/-Python 3.10-3776AB?&logo=python&logoColor=white"></a>
+<a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/-PyTorch 1.12-EE4C2C?logo=pytorch&logoColor=white"></a>
+<a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Pytorch Lightning 1.7-792EE5?logo=pytorchlightning&logoColor=white"></a>
 </div>
 
 
@@ -19,7 +19,24 @@ Everything can be run via the Command Line Interface. Logging is accomplished vi
 Training uses mixed precision and `torch.backends.cudnn.benchmark=True` by default to increase training speed. \
 Best results are achieved with a PyramidNet using RandAugment augmentation, Shakedrop and Mixup.
 It yields 0.986 Test Accuracy on CIFAR-10 and 0.875 Test Accuracy on CIFAR-100. \
-Detailed results and used configurations can be seen in [CIFAR Results](CIFAR-results).
+Detailed results and used configurations can be seen in [CIFAR Results](#cifar-results).
+
+
+# Table of Contents
+
+* [How to run](#how-to-run)
+  * [Requirements](#requirements)
+  * [General instructions](#general-instructions)
+  * [Available models and parameters](#available-models-and-parameters)
+    * [Models](#models)
+    * [Training Settings](#training-settings)
+    * [Data Settings](#data-settings)
+    * [Regularization Techniques](#regularization-techniques)
+  * [Mlflow](#mlflow)
+* [Including custom pytorch models](#including-custom-pytorch-models)
+* [Including other datasets](#including-other-datasets)
+* [Add custom augmentations](#add-custom-augmentations)
+* [CIFAR Results](#cifar-results)
 
 
 # How to run
@@ -38,21 +55,26 @@ Find a torch installation guide for your system [here](https://pytorch.org/get-s
 
 Everything in this repository can be run by executing the ```main.py``` script with corresponding arguments.
 In order to train a model, one needs to specify the path to the directory that contains the datasets (```data_dir```) and the
-path to the directory where logs should be saved (```exp_dir```). You can e.g. train on CIFAR10 or CIFAR100.
-If the specified dataset is not found in the specified ```data_dir```, it will be automatically downloaded (178 MB for CIFAR). See [Including custom datasets](including-other-datasets) for instructions about using your own data. This repository also handles regression problems. For that simply add the ```--regression``` flag, it will use the MSE Loss instead of Cross Entropy.
+path to the directory where logs should be saved (```exp_dir```). You can e.g. train on CIFAR10/CIFAR100 or Imagenet.
+If the specified dataset is not found in the specified ```data_dir```, it will be automatically downloaded (178 MB for CIFAR). Imagenet cannot be downloaded automatically, please see [Imagenet Download](https://image-net.org/challenges/LSVRC/2012/2012-downloads.php) for access.
+
+See [Including custom datasets](#including-other-datasets) for instructions about using your own data. This repository also handles regression problems. For that simply add the ```--regression``` flag, it will use the MSE Loss instead of Cross Entropy.
 Here is an example of the command line for training a ResNet34 on CIFAR10:
 
 ```shell
 python main.py ResNet34 --data CIFAR10 --data_dir "Path/to/data" --exp_dir "Path/to/logs"
 ```
 
-By default, no checkpoints are saved. If you want to save the trained model you can use the ```--save_model``` flag. 
+By default, no checkpoints are saved! If you want to save the trained model you can use the ```--save_model``` flag. 
 The model checkpoint will then be saved in the ```exp_dir``` along with the logs. You can adapt the name of the 
 file by specifying ```--chpt_name "your-file-name"```. By default, the model is trained on one GPU. You can adapt 
 this by setting e.g. ```--gpu_count 2``` to train on multiple GPUs using ddp strategy. If you want to use the CPU instead, set ```--gpu_count 0```.
 Use the ```--suppress_progress_bar``` flag for not showing the progress bar during training. By default, only model accuracy is tracked. You can specify other metrics by adding them in the command line. Set ```--metrics acc f1 pr top5acc``` for tracking Accuracy, F1-Score, Precision & Recall and the Top-5 Accuracy. For regression ```--metrics mse mae``` are available.
 
 ## Available models and parameters
+#
+### Models
+#
 
 The following models are available:
 * [PyramidNet](https://arxiv.org/pdf/1610.02915.pdf)
@@ -77,10 +99,11 @@ The following models are available:
   
 If you want to include your own model please see [Including custom models](#including-custom-pytorch-models) for instructions.
 
+#
+### Training Settings
+#
 
 By default, the following training settings are used:
-
-
 
 * Epochs: 200 | ```--epochs 200```
 * Batch Size: 128 | ```--batch_size 128```
@@ -118,9 +141,15 @@ By default, the following training settings are used:
 Run ```
 python main.py -h``` for a description of all possible parameters.
 -->
-
+#
+### Data Settings
+#
 
 Additionally, you can adapt the following parameters to your data.
+* Dataset | ```--data CIFAR10```
+  * You can choose between CIFAR10, CIFAR100 and Imagenet
+  * See [Including custom datasets](#including-other-datasets) for using your own data
+  * See [here](https://image-net.org/challenges/LSVRC/2012/2012-downloads.php) for instructions to download Imagenet
 * Number of classes | ```--num_classes 10```
   * If you train on CIFAR or Imagenet this parameter will default to the correct number of classes, otherwise you have to specify it
 * Set the task to Regression | ```--regression```
@@ -148,6 +177,11 @@ Additionally, you can adapt the following parameters to your data.
   * At the moment only available for ResNets and VGGs
   * If used, more lightweight architectures designed for smaller images like CIFAR are used
   * if data is CIFAR this flag is activated by default
+
+
+#
+### Regularization Techniques
+#
 
 Moreover, there are several additional techniques available that are all disabled by default. 
 <!--
@@ -194,7 +228,9 @@ The following techniques can only be used with ResNet-like models (including Pyr
     * Parameter: bool
     * Authors recommend training 6 times longer with shakedrop than you would normally do
 * [Squeeze and Excitation](https://arxiv.org/pdf/1709.01507.pdf) | ```--se```
-    * Enables the network to adapt the weighting of CNN feature maps
+    * Adds a Squeeze & Excitation Layer to the end of the encoding part of the network
+    * Squeeze: Aggregates feature maps across their spatial dimensions to an embedding allowing all layers to use the global receptive field of the network
+    * Excitation: Takes the embedding as input and produces per-channel modulation weights, so that it enables the network to adapt the weighting of CNN feature maps
     * Parameter: bool
 * [Final Layer Dropout](https://jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf) | ```--final_layer_dropout 0.5```
     * Applies Dropout right before the network's final output
@@ -209,9 +245,10 @@ The following techniques can only be used with ResNet-like models (including Pyr
     * Parameter: bool
     * Although bottleneck blocks are standard for deeper ResNets we have empirically found that deeper ResNets with basic blocks outperform their respective bottleneck versions on Cifar
 
+#
 ## MLflow 
 
-You can view the MLflow logs by navigating to your log directory (specified with the ```--exp_dir``` flag) and run:
+You can view the MLflow logs by navigating to your log directory (specified with the ```--exp_dir``` flag) into the respective data folder and run:
 
 ```shell
 mlflow ui
@@ -301,6 +338,8 @@ Follow these steps:
       Do the same for the ```val_dataloader```.\
       That's it! You can now use all training pipelines, regularization techniques and models with your dataset.
 
+# Add custom augmentations
+See [Including other datasets](#including-other-datasets) if you want to use a new dataset including specific augmentations. If you only want to try out new augmentations for already included datasets like CIFAR or Imagenet you can simply add them to the respective dataset file. For CIFAR this would be augmentation/policies/cifar.py. See 4.2 of [Including other datasets](#including-other-datasets) on how to integrate the new augmentation policy.
 
 # CIFAR Results
 
@@ -372,12 +411,6 @@ It erases a random patch of the image and is able to improve the robustness of t
 AutoAugment and RandAugment both include the baseline augmentation, then their respective policy and finally also utilize cutout.
 While AutoAugment is a set of learned augmentation policies that work well on CIFAR, RandAugment does not have to be learned first 
 but applies a subset of transformations randomly. 
-<!--
-Here all models were trained again for 200 epochs, using either SGD or SGD with SAM as an optimizer, LR of 0.1 and a Cosine Annealing scheduler.
-The PreActResNets were all using a gradually increasing warmstart for 10 epochs before starting to decay the LR, because otherwise 
-the LR of 0.1 would have been too high for them in the beginning, so they would result in NaNs. The other models did not use a warmstart.
-If you e.g. want to reproduce the results of a PreActResNet50 with RandAugment and SGD - SAM optimizer, you can run the following:
--->
 
 Here all models were using either SGD or SGD with SAM as an optimizer, an initial LR of 0.1 and a Cosine Annealing scheduler.
 While the SGD models were trained for 400 epochs, the SAM models were trained for 200 epochs to ensure a fair comparison 
@@ -433,7 +466,7 @@ can be a good trade-off between performance and training time.
 
 There are several architectural tweaks such as e.g. stochastic depth, general regularization techniques (e.g. mixup) 
 and other tricks like using a LR scheduler warmstart or using nesterov accelerated SGD. Find a short description, links to papers
-and an explanation how they were used for all techniques in [Available models and parameters](available-models-and-parameters).
+and an explanation how they were used for all techniques in [Available models and parameters](#available-models-and-parameters).
 In order to test their effects on the CIFAR datasets each of them was added individually to a baseline model. 
 Since final test accuracies can vary for similar runs, all models were trained 5 times. 
 The baseline models were trained for 200 epochs, using SGD with a LR of 0.1, a Cosine Annealing scheduler and AutoAugment augmentation. 
