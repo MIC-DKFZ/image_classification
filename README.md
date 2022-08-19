@@ -72,7 +72,7 @@ this by setting e.g. ```--gpu_count 2``` to train on multiple GPUs using ddp str
 Use the ```--suppress_progress_bar``` flag for not showing the progress bar during training. By default, only model accuracy is tracked. You can specify other metrics by adding them in the command line. Set ```--metrics acc f1 pr top5acc``` for tracking Accuracy, F1-Score, Precision & Recall and the Top-5 Accuracy. For regression ```--metrics mse mae``` are available.
 
 ## Available models and parameters
-#
+
 ### Models
 #
 
