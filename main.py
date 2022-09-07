@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     ##### Environment #####
     parser.add_argument("--gpu_count", type=int, help="Nb of GPUs", default=1)
-    parser.add_argument("--num_workers", help="Number of workers for loading the data", type=int, default=8)
+    parser.add_argument("--num_workers", help="Number of workers for loading the data", type=int, default=12)
 
     ##### Verbosity #####
     parser.add_argument(
