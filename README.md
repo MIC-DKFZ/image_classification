@@ -132,7 +132,7 @@ By default, the following training settings are used:
 * Seed: None
   * Specify a seed with ```--seed your_seed```
   * Disables cudnn.benchmark flag (required to make training deterministic) which results in slower training
-* Number of workers in dataloaders: 8 | ```--num_workers 8```
+* Number of workers in dataloaders: 12 | ```--num_workers 12```
 * Number of GPUs | ```--gpu_count 1```
   * If > 1 training will be executed on multiple GPUs following ddp strategy
   * If 0 training will be executed on CPU
