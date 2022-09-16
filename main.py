@@ -113,7 +113,7 @@ if __name__ == "__main__":
 
     ##### Data #####
     parser.add_argument("--data", help="Name of the dataset", default="CIFAR10")
-    parser.add_argument("--num_classes", help="Number of classes to classify", default=10)
+    parser.add_argument("--num_classes", help="Number of classes to classify", default=10, type=int)
     parser.add_argument(
         "--cifar_size",
         action="store_true",
