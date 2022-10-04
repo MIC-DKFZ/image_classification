@@ -205,6 +205,7 @@ def get_params(selected_data_dir, model_name, args, seed):
         "regression": args.regression,
         "metrics": args.metrics,
         "num_gpus": args.gpu_count,
+        "metric_computation_mode": args.metric_computation_mode,
     }
 
     return params
@@ -247,6 +248,7 @@ def get_params_to_log(params, model_name):
         "input_channels": params["input_channels"],
         "regression": params["regression"],
         "num_gpus": params["num_gpus"],
+        "metric_computation_mode": params["metric_computation_mode"],
     }
 
     return params_to_log

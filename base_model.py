@@ -28,6 +28,7 @@ class BaseModel(pl.LightningModule):
         self.task = "Classification" if not hypparams["regression"] else "Regression"
 
         # Metrics
+        self.metric_computation_mode = hypparams["metric_computation_mode"]
         metrics_dict = {}
 
         if self.task == "Classification":
@@ -35,12 +36,16 @@ class BaseModel(pl.LightningModule):
             if "acc" in hypparams["metrics"]:
                 metrics_dict["Accuracy"] = Accuracy()
             if "f1" in hypparams["metrics"]:
-                metrics_dict["F1"] = F1Score(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+                metrics_dict["F1"] = F1Score(average="macro", num_classes=hypparams["num_classes"], multiclass=None)
+            if "f1_per_class" in hypparams["metrics"]:
+                metrics_dict["F1_per_class"] = F1Score(
+                    average=None, num_classes=hypparams["num_classes"], multiclass=None
+                )
             if "pr" in hypparams["metrics"]:
                 metrics_dict["Precision"] = Precision(
-                    average="macro", num_classes=hypparams["num_classes"], multiclass=True
+                    average="macro", num_classes=hypparams["num_classes"], multiclass=None
                 )
-                metrics_dict["Recall"] = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=True)
+                metrics_dict["Recall"] = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=None)
             if "top5acc" in hypparams["metrics"]:
                 metrics_dict["Accuracy_top5"] = Accuracy(top_k=5)
 
@@ -223,22 +228,25 @@ class BaseModel(pl.LightningModule):
             sync_dist=True if self.trainer.num_devices > 1 else False,
         )
 
-        # predict and save metrics
-        if self.task == "Classification":
-            with torch.no_grad():
-                y_hat = self.softmax(y_hat)
-
         if torch.isnan(y_hat).any():
             print("######################################### Model predicts NaNs!")
 
-        metrics_res = self.train_metrics(y_hat, y)
-        self.log_dict(
-            metrics_res,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-            sync_dist=True if self.trainer.num_devices > 1 else False,
-        )
+        # save metrics
+        if self.metric_computation_mode == "stepwise":
+            metrics_res = self.train_metrics(y_hat, y)
+            if "train_F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["train_F1_per_class"]):
+                    metrics_res["train_F1_class_{}".format(i)] = value if not torch.isnan(value) else 0.0
+                del metrics_res["train_F1_per_class"]
+            self.log_dict(
+                metrics_res,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                sync_dist=True if self.trainer.num_devices > 1 else False,
+            )
+        elif self.metric_computation_mode == "epochwise":
+            self.train_metrics.update(y_hat, y)
 
         return loss
 
@@ -260,17 +268,63 @@ class BaseModel(pl.LightningModule):
             sync_dist=True if self.trainer.num_devices > 1 else False,
         )
 
-        # predict and save metrics
-        if self.task == "Classification":
-            y_hat = self.softmax(y_hat)
-        metrics_res = self.val_metrics(y_hat, y)
-        self.log_dict(
-            metrics_res,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-            sync_dist=True if self.trainer.num_devices > 1 else False,
-        )
+        # save metrics
+        if self.metric_computation_mode == "stepwise":
+            metrics_res = self.val_metrics(y_hat, y)
+            if "val_F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["val_F1_per_class"]):
+                    metrics_res["val_F1_class_{}".format(i)] = value if not torch.isnan(value) else 0.0
+                del metrics_res["val_F1_per_class"]
+            self.log_dict(
+                metrics_res,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                sync_dist=True if self.trainer.num_devices > 1 else False,
+            )
+        elif self.metric_computation_mode == "epochwise":
+            self.val_metrics.update(y_hat, y)
+
+    def on_validation_epoch_end(self) -> None:
+
+        if self.metric_computation_mode == "epochwise":
+            metrics_res = self.val_metrics.compute()
+            if "val_F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["val_F1_per_class"]):
+                    metrics_res["val_F1_class_{}".format(i)] = value if not torch.isnan(value) else 0.0
+                del metrics_res["val_F1_per_class"]
+            self.log_dict(
+                metrics_res,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                sync_dist=True if self.trainer.num_devices > 1 else False,
+            )
+
+            self.val_metrics.reset()
+        else:
+            pass
+
+    def on_train_epoch_end(self) -> None:
+
+        if self.metric_computation_mode == "epochwise":
+            metrics_res = self.train_metrics.compute()
+            if "train_F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["train_F1_per_class"]):
+                    metrics_res["train_F1_class_{}".format(i)] = value if not torch.isnan(value) else 0.0
+                del metrics_res["train_F1_per_class"]
+
+            self.log_dict(
+                metrics_res,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=True,
+                sync_dist=True if self.trainer.num_devices > 1 else False,
+            )
+
+            self.train_metrics.reset()
+        else:
+            pass
 
     def on_train_start(self):
 

@@ -103,9 +103,14 @@ if __name__ == "__main__":
         nargs="+",
         default=["acc"],
         help=(
-            "List of Metrics to be computed. acc=Accuracy, top5acc=Top-5 Accuracy, f1=F1 Score, pr=Precision and"
-            " Recall, mse=Mean Squared Error, mae=Mean Absolute Errors"
+            "List of Metrics to be computed. acc=Accuracy, top5acc=Top-5 Accuracy, f1=Macro F1 Score, f1_per_class=F1"
+            " for each individual class, pr=Precision and Recall, mse=Mean Squared Error, mae=Mean Absolute Errors"
         ),
+    )
+    parser.add_argument(
+        "--metric_computation_mode",
+        default="epochwise",
+        help="epochwise: compute metrics every epoch, stepwise: compute metrics every step",
     )
 
     ##### Seeding #####
