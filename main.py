@@ -6,6 +6,10 @@ import mlflow.pytorch
 from base_model import TimerCallback
 from utils import detect_misconfigurations, get_model, get_params_to_log, get_params
 
+from pytorch_lightning.loggers.mlflow import MLFlowLogger
+from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
+from pytorch_lightning.loggers.wandb import WandbLogger
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Choose your model configuration for training")
@@ -166,6 +170,14 @@ if __name__ == "__main__":
         "--suppress_progress_bar", action="store_true", help="Will suppress the Lightning progress bar during training"
     )
 
+    #### Logger #####
+    parser.add_argument(
+        "--logger",
+        nargs="+",
+        default=["mlflow"],
+        help="Choose one or multiple logger for your experiment tracking. Available logger: mlflow, tensorboard, wandb",
+    )
+
     args = parser.parse_args()
 
     model_name = args.model
@@ -224,9 +236,49 @@ if __name__ == "__main__":
     if args.save_model:
         all_lightning_callbacks.append(checkpoint_callback)
 
+    # setup logger
+    loggers = args.logger
+    run_name = f"{args.data}-{model_name}"
+
+    final_loggers = []
+    if "mlflow" in loggers:
+        mlf_logger = MLFlowLogger(experiment_name=args.data, tracking_uri=mlrun_dir, run_name=run_name)
+        mlf_logger.log_hyperparams(params_to_log)
+        final_loggers.append(mlf_logger)
+    if "tensorboard" in loggers:
+        tb_logger = TensorBoardLogger(
+            save_dir=os.path.join(selected_exp_dir, "tensorboard"),
+            name=model_name,
+            default_hp_metric=False,
+        )
+        # tell tensorboard which metrics to track
+        train_metrics = {key: 0.0 for key in model.train_metrics.keys()}
+        val_metrics = {key: 0.0 for key in model.val_metrics.keys()}
+        final_metrics = train_metrics | val_metrics
+        if "val_F1_per_class" in final_metrics:
+            for i in range(num_classes):
+                final_metrics["val_F1_class_{}".format(i)] = 0.0
+            del final_metrics["val_F1_per_class"]
+        if "train_F1_per_class" in final_metrics:
+            for i in range(num_classes):
+                final_metrics["train_F1_class_{}".format(i)] = 0.0
+            del final_metrics["train_F1_per_class"]
+        tb_logger.log_hyperparams(params_to_log, metrics=final_metrics)
+        final_loggers.append(tb_logger)
+    if "wandb" in loggers:
+        wb_logger = WandbLogger(
+            save_dir=os.path.join(selected_exp_dir),
+            name=run_name,
+            offline=False,
+            anonymous=True,
+            project=args.data,
+        )
+        wb_logger.log_hyperparams(params_to_log)
+        final_loggers.append(wb_logger)
+
     # Configure Trainer
     trainer = pl.Trainer(
-        logger=None,
+        logger=final_loggers,
         devices=args.gpu_count,
         accelerator="gpu" if args.gpu_count > 0 else "cpu",
         sync_batchnorm=True if args.gpu_count > 1 else False,
@@ -240,7 +292,16 @@ if __name__ == "__main__":
         strategy="ddp" if args.gpu_count > 1 else None,
     )
 
-    # Train the model
+    trainer.fit(model)
+
+    """try:
+        trainer.fit(model)
+        # mlf_logger.finalize(status="FINISHED")
+    except KeyboardInterrupt:
+        print("I was here")
+        # mlf_logger.finalize(status="FAILED")"""
+
+    """# Train the model
     if trainer.is_global_zero:  # in case of multi gpu training only log parameters in process 0
 
         # Log location
@@ -257,4 +318,4 @@ if __name__ == "__main__":
             mlflow.log_params(params_to_log)
             trainer.fit(model)
     else:
-        trainer.fit(model)
+        trainer.fit(model)"""

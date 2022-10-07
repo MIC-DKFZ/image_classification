@@ -221,12 +221,16 @@ def get_params_to_log(params, model_name):
         opt = params["optimizer"]
 
     params_to_log = {
+        "epochs": params["epochs"],
         "batch_size": params["batch_size"],
         "scheduler": params["scheduler"],
+        "lr": params["lr"],
+        "weight_decay": params["weight_decay"],
         "undecay_norm": params["undecay_norm"],
         "T_max": params["T_max"] if params["scheduler"] == "CosineAnneal" else None,
         "warmstart": params["warmstart"],
         "optimizer_name": opt,
+        "nesterov": params["nesterov"],
         "sam": params["sam"],
         "adaptive_sam": params["adaptive_sam"],
         "augmentation": params["augmentation"],
