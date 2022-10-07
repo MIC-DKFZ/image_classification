@@ -6,6 +6,10 @@
 <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/-Python 3.10-3776AB?&logo=python&logoColor=white"></a>
 <a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/-PyTorch 1.12-EE4C2C?logo=pytorch&logoColor=white"></a>
 <a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Pytorch Lightning 1.7-792EE5?logo=pytorchlightning&logoColor=white"></a>
+
+<a href="https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.loggers.mlflow.html#mlflow"><img alt="MLflow" src="https://img.shields.io/badge/Logging-MLflow-blue"></a>
+<a href="https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.loggers.wandb.html#wandb"><img alt="Weights&Biases" src="https://img.shields.io/badge/Logging-Weigths%26Biases-yellow"></a>
+<a href="https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.loggers.tensorboard.html"><img alt="Tensorboard" src="https://img.shields.io/badge/Logging-Tensorboard-FF6F00"></a>
 </div>
 
 
@@ -15,7 +19,7 @@ It comprises several architectures, regularization, augmentation and training te
 aims to provide easy-to-use baselines for experimenting with a lot of different setups. \
 You can also integrate your own model and/or dataset and benefit from the features of this repository! \
 Results of experiments on CIFAR-10 comparing different architectures in different training settings are shown below. \
-Everything can be run via the Command Line Interface. Logging is accomplished via MLflow. \
+Everything can be run via the Command Line Interface. You can choose one or multiple logger from Mlflow, Tensorboard and Weights&Biases for your experiment tracking. \
 Training uses mixed precision and `torch.backends.cudnn.benchmark=True` by default to increase training speed. \
 Best results are achieved with a PyramidNet using RandAugment augmentation, Shakedrop and Mixup.
 It yields 0.986 Test Accuracy on CIFAR-10 and 0.875 Test Accuracy on CIFAR-100. \
@@ -246,17 +250,27 @@ The following techniques can only be used with ResNet-like models (including Pyr
     * Although bottleneck blocks are standard for deeper ResNets we have empirically found that deeper ResNets with basic blocks outperform their respective bottleneck versions on Cifar
 
 #
-## MLflow 
+## Logging
 
-You can view the MLflow logs by navigating to your log directory (specified with the ```--exp_dir``` flag) into the respective data folder and run:
+In the logging interfaces you can see all your runs and corresponding metrics. You can analyse your runs there or download them as a csv file for further analysis.
+
+For viewing your logs navigate to the log directory (specified with the ```--exp_dir``` flag) and go into the directory named after your dataset. Depending on what logger you chose, there are different ways to view the logs:
+
+### MLflow 
 
 ```shell
 mlflow ui
 ```
 
-In the MLflow user interface you can see all your runs and corresponding metrics. You can analyse your runs there or download
-them as a csv file for further analysis.
+### Weights&Biases
 
+A link will be displayed at the beginning of the training that will lead to the wandb interface. If you have an account then logs will be automatically synced. 
+
+### Tensorboard
+
+```shell
+tensorboard --logdir tensorboard
+```
 # Including custom pytorch models
 
 
