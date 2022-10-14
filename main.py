@@ -2,7 +2,8 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 import argparse
 import os
-import mlflow.pytorch
+import yaml
+import re
 from base_model import TimerCallback
 from utils import detect_misconfigurations, get_model, get_params_to_log, get_params
 
@@ -177,6 +178,15 @@ if __name__ == "__main__":
         default=["mlflow"],
         help="Choose one or multiple logger for your experiment tracking. Available logger: mlflow, tensorboard, wandb",
     )
+    parser.add_argument(
+        "--confmat",
+        type=str,
+        help=(
+            "Only for Classification tasks. Choose whether to log a confusion matrix for only validation (val), train"
+            " and validation (all) or not at all (disable)"
+        ),
+        default="val",
+    )
 
     args = parser.parse_args()
 
@@ -242,7 +252,11 @@ if __name__ == "__main__":
 
     final_loggers = []
     if "mlflow" in loggers:
-        mlf_logger = MLFlowLogger(experiment_name=args.data, tracking_uri=mlrun_dir, run_name=run_name)
+        mlf_logger = MLFlowLogger(
+            experiment_name=args.data,
+            tracking_uri=mlrun_dir,
+            run_name=run_name,
+        )
         mlf_logger.log_hyperparams(params_to_log)
         final_loggers.append(mlf_logger)
     if "tensorboard" in loggers:
@@ -293,6 +307,16 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model)
+
+    if "mlflow" in loggers:
+        # adapt mlflow artifact path in meta.yaml so that logged figures will be shown in ui
+        meta_file = os.path.join(os.path.join(mlrun_dir, mlf_logger.experiment_id), mlf_logger.run_id) + "/meta.yaml"
+        adapted_relative_path = "." + re.sub(".*?(?=/mlruns/)", "", meta_file.replace("meta.yaml", "artifacts"))
+        with open(meta_file, "r") as f:
+            meta_info = yaml.load(f, Loader=yaml.FullLoader)
+            meta_info["artifact_uri"] = adapted_relative_path
+        with open(meta_file, "w") as f:
+            yaml.dump(meta_info, f)
 
     """try:
         trainer.fit(model)

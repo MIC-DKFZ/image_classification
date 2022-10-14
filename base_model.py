@@ -18,6 +18,7 @@ from regularization.sam import SAM
 from madgrad import MADGRAD
 from timm.optim import RMSpropTF
 from augmentation.mixup import mixup_data, mixup_criterion
+from metrics.conf_mat import ConfusionMatrix
 
 
 class BaseModel(pl.LightningModule):
@@ -29,6 +30,7 @@ class BaseModel(pl.LightningModule):
 
         # Metrics
         self.metric_computation_mode = hypparams["metric_computation_mode"]
+        self.confmat_setting = hypparams["confmat"]
         metrics_dict = {}
 
         if self.task == "Classification":
@@ -48,6 +50,11 @@ class BaseModel(pl.LightningModule):
                 metrics_dict["Recall"] = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=None)
             if "top5acc" in hypparams["metrics"]:
                 metrics_dict["Accuracy_top5"] = Accuracy(top_k=5)
+
+            if self.confmat_setting in ["val", "all"]:
+                self.val_conf_mat = ConfusionMatrix(num_classes=hypparams["num_classes"])
+            if self.confmat_setting == "all":
+                self.train_conf_mat = ConfusionMatrix(num_classes=hypparams["num_classes"])
 
         elif self.task == "Regression":
 
@@ -248,6 +255,9 @@ class BaseModel(pl.LightningModule):
         elif self.metric_computation_mode == "epochwise":
             self.train_metrics.update(y_hat, y)
 
+        if hasattr(self, "train_conf_mat"):
+            self.train_conf_mat.update(y_hat, y)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -285,6 +295,9 @@ class BaseModel(pl.LightningModule):
         elif self.metric_computation_mode == "epochwise":
             self.val_metrics.update(y_hat, y)
 
+        if hasattr(self, "val_conf_mat"):
+            self.val_conf_mat.update(y_hat, y)
+
     def on_validation_epoch_end(self) -> None:
 
         if self.metric_computation_mode == "epochwise":
@@ -301,9 +314,15 @@ class BaseModel(pl.LightningModule):
                 sync_dist=True if self.trainer.num_devices > 1 else False,
             )
 
+            """if hasattr(self, "val_conf_mat"):
+                self.val_conf_mat.save_state(self, "val")
+                self.val_conf_mat.reset()"""
+
             self.val_metrics.reset()
-        else:
-            pass
+
+        if hasattr(self, "val_conf_mat"):
+            self.val_conf_mat.save_state(self, "val")
+            self.val_conf_mat.reset()
 
     def on_train_epoch_end(self) -> None:
 
@@ -322,9 +341,15 @@ class BaseModel(pl.LightningModule):
                 sync_dist=True if self.trainer.num_devices > 1 else False,
             )
 
+            """if hasattr(self, "train_conf_mat"):
+                self.train_conf_mat.save_state(self, "train")
+                self.train_conf_mat.reset()"""
+
             self.train_metrics.reset()
-        else:
-            pass
+
+        if hasattr(self, "train_conf_mat"):
+            self.train_conf_mat.save_state(self, "train")
+            self.train_conf_mat.reset()
 
     def on_train_start(self):
 

@@ -206,6 +206,7 @@ def get_params(selected_data_dir, model_name, args, seed):
         "metrics": args.metrics,
         "num_gpus": args.gpu_count,
         "metric_computation_mode": args.metric_computation_mode,
+        "confmat": args.confmat,
     }
 
     return params

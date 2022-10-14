@@ -252,7 +252,27 @@ The following techniques can only be used with ResNet-like models (including Pyr
 #
 ## Logging
 
+You can choose one or multiple logger. [MLFlow](https://mlflow.org/), [Tensorboard](https://www.tensorflow.org/tensorboard) and [Weights&Biases](https://wandb.ai/site) are available. Use the ```--logger``` flag to specify your logger, e.g. 
+```
+--logger mlflow tensorboard wandb
+``` 
+will use all, while 
+```
+--logger wandb
+```
+will only use Weights&Biases. By default, only MLFlow is used.
+
 In the logging interfaces you can see all your runs and corresponding metrics. You can analyse your runs there or download them as a csv file for further analysis.
+
+Moreover, a confusion matrix is logged, by default, for your validation set. You can additionally log a confusion matrix for training by
+```
+--confmat all
+```
+or disable confusion matrix logging with
+```
+--confmat disable
+```
+
 
 For viewing your logs navigate to the log directory (specified with the ```--exp_dir``` flag) and go into the directory named after your dataset. Depending on what logger you chose, there are different ways to view the logs:
 
@@ -262,15 +282,17 @@ For viewing your logs navigate to the log directory (specified with the ```--exp
 mlflow ui
 ```
 
-### Weights&Biases
-
-A link will be displayed at the beginning of the training that will lead to the wandb interface. If you have an account then logs will be automatically synced. 
-
 ### Tensorboard
 
 ```shell
 tensorboard --logdir tensorboard
 ```
+
+### Weights&Biases
+
+A link will be displayed at the beginning of the training that will lead to the wandb interface. If you have an account then logs will be automatically synced. 
+
+
 # Including custom pytorch models
 
 
