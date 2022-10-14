@@ -36,7 +36,10 @@ Detailed results and used configurations can be seen in [CIFAR Results](#cifar-r
     * [Training Settings](#training-settings)
     * [Data Settings](#data-settings)
     * [Regularization Techniques](#regularization-techniques)
-  * [Mlflow](#mlflow)
+  * [Logging](#logging)
+    * [MLflow](#mlflow)
+    * [Tensorboard](#tensorboard)
+    * [Weights&Biases](#weightsbiases)
 * [Including custom pytorch models](#including-custom-pytorch-models)
 * [Including other datasets](#including-other-datasets)
 * [Add custom augmentations](#add-custom-augmentations)
@@ -54,6 +57,8 @@ pip install -r requirements.txt
 
 You might need to adapt the cuda versions for torch and torchvision specified in the requirements. 
 Find a torch installation guide for your system [here](https://pytorch.org/get-started/locally/). 
+
+The default logger [MLflow](https://mlflow.org/) is installed via the requirements file. If you want to use [Tensorboard](https://www.tensorflow.org/tensorboard) and/or [Weights&Biases](https://wandb.ai/site) you need to install them, additionally. 
 
 ## General instructions
 
@@ -252,7 +257,7 @@ The following techniques can only be used with ResNet-like models (including Pyr
 #
 ## Logging
 
-You can choose one or multiple logger. [MLFlow](https://mlflow.org/), [Tensorboard](https://www.tensorflow.org/tensorboard) and [Weights&Biases](https://wandb.ai/site) are available. Use the ```--logger``` flag to specify your logger, e.g. 
+You can choose one or multiple logger. [MLflow](https://mlflow.org/), [Tensorboard](https://www.tensorflow.org/tensorboard) and [Weights&Biases](https://wandb.ai/site) are available. Use the ```--logger``` flag to specify your logger, e.g. 
 ```
 --logger mlflow tensorboard wandb
 ``` 
@@ -260,7 +265,7 @@ will use all, while
 ```
 --logger wandb
 ```
-will only use Weights&Biases. By default, only MLFlow is used.
+will only use Weights&Biases. By default, only MLflow is used.
 
 In the logging interfaces you can see all your runs and corresponding metrics. You can analyse your runs there or download them as a csv file for further analysis.
 

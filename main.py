@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, RichProgressBar
 import argparse
 import os
 import yaml
@@ -243,6 +243,8 @@ if __name__ == "__main__":
 
     # add checkpoint callback only if you want to save model weights
     all_lightning_callbacks = [TimerCallback(params["epochs"], args.gpu_count)]
+    if not args.suppress_progress_bar:
+        all_lightning_callbacks.append(RichProgressBar())
     if args.save_model:
         all_lightning_callbacks.append(checkpoint_callback)
 
@@ -293,7 +295,7 @@ if __name__ == "__main__":
     # Configure Trainer
     trainer = pl.Trainer(
         logger=final_loggers,
-        devices=args.gpu_count,
+        devices=args.gpu_count if args.gpu_count > 0 else 1,
         accelerator="gpu" if args.gpu_count > 0 else "cpu",
         sync_batchnorm=True if args.gpu_count > 1 else False,
         callbacks=all_lightning_callbacks,
