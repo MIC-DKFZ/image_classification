@@ -322,29 +322,3 @@ if __name__ == "__main__":
                 meta_info["artifact_uri"] = adapted_relative_path
             with open(meta_file, "w") as f:
                 yaml.dump(meta_info, f)
-
-    """try:
-        trainer.fit(model)
-        # mlf_logger.finalize(status="FINISHED")
-    except KeyboardInterrupt:
-        print("I was here")
-        # mlf_logger.finalize(status="FAILED")"""
-
-    """# Train the model
-    if trainer.is_global_zero:  # in case of multi gpu training only log parameters in process 0
-
-        # Log location
-        mlflow.set_tracking_uri(mlrun_dir)
-        # Auto log all MLflow entities
-        mlflow.pytorch.autolog(log_models=False)
-
-        # set MLflow experiment name
-        mlflow.set_experiment(args.data)  # creates exp if it does not exist yet
-        run_name = f"{args.data}-{model_name}"
-
-        with mlflow.start_run(run_name=run_name) as run:
-
-            mlflow.log_params(params_to_log)
-            trainer.fit(model)
-    else:
-        trainer.fit(model)"""
