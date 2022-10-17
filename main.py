@@ -310,15 +310,18 @@ if __name__ == "__main__":
 
     trainer.fit(model)
 
-    if "mlflow" in loggers:
-        # adapt mlflow artifact path in meta.yaml so that logged figures will be shown in ui
-        meta_file = os.path.join(os.path.join(mlrun_dir, mlf_logger.experiment_id), mlf_logger.run_id) + "/meta.yaml"
-        adapted_relative_path = "." + re.sub(".*?(?=/mlruns/)", "", meta_file.replace("meta.yaml", "artifacts"))
-        with open(meta_file, "r") as f:
-            meta_info = yaml.load(f, Loader=yaml.FullLoader)
-            meta_info["artifact_uri"] = adapted_relative_path
-        with open(meta_file, "w") as f:
-            yaml.dump(meta_info, f)
+    if trainer.is_global_zero:
+        if "mlflow" in loggers:
+            # adapt mlflow artifact path in meta.yaml so that logged figures will be shown in ui
+            meta_file = (
+                os.path.join(os.path.join(mlrun_dir, mlf_logger.experiment_id), mlf_logger.run_id) + "/meta.yaml"
+            )
+            adapted_relative_path = "." + re.sub(".*?(?=/mlruns/)", "", meta_file.replace("meta.yaml", "artifacts"))
+            with open(meta_file, "r") as f:
+                meta_info = yaml.load(f, Loader=yaml.FullLoader)
+                meta_info["artifact_uri"] = adapted_relative_path
+            with open(meta_file, "w") as f:
+                yaml.dump(meta_info, f)
 
     """try:
         trainer.fit(model)

@@ -13,3 +13,4 @@ efficientnet-pytorch>=0.7.1
 madgrad>=1.2
 git+https://github.com/MIC-DKFZ/dynamic-network-architectures.git
 rich>=12.6.0
+matplotlib>=3.6.0
