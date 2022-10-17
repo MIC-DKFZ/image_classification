@@ -305,7 +305,7 @@ if __name__ == "__main__":
         deterministic=deterministic,
         precision=precision_value,
         enable_progress_bar=not args.suppress_progress_bar,
-        strategy="ddp" if args.gpu_count > 1 else None,
+        strategy="ddp_find_unused_parameters_false" if args.gpu_count > 1 else None,
     )
 
     trainer.fit(model)
