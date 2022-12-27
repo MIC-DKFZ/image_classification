@@ -1,4 +1,3 @@
-from prometheus_client import Metric
 import torch
 import torch.nn as nn
 import numpy as np
@@ -34,22 +33,40 @@ class BaseModel(pl.LightningModule):
         metrics_dict = {}
 
         if self.task == "Classification":
-
             if "acc" in hypparams["metrics"]:
-                metrics_dict["Accuracy"] = Accuracy()
+                metrics_dict["Accuracy"] = Accuracy(
+                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=hypparams["num_classes"],
+                )
             if "f1" in hypparams["metrics"]:
-                metrics_dict["F1"] = F1Score(average="macro", num_classes=hypparams["num_classes"], multiclass=None)
+                metrics_dict["F1"] = F1Score(
+                    average="macro",
+                    num_classes=hypparams["num_classes"],
+                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                )
             if "f1_per_class" in hypparams["metrics"]:
                 metrics_dict["F1_per_class"] = F1Score(
-                    average=None, num_classes=hypparams["num_classes"], multiclass=None
+                    average=None,
+                    num_classes=hypparams["num_classes"],
+                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
                 )
             if "pr" in hypparams["metrics"]:
                 metrics_dict["Precision"] = Precision(
-                    average="macro", num_classes=hypparams["num_classes"], multiclass=None
+                    average="macro",
+                    num_classes=hypparams["num_classes"],
+                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
                 )
-                metrics_dict["Recall"] = Recall(average="macro", num_classes=hypparams["num_classes"], multiclass=None)
+                metrics_dict["Recall"] = Recall(
+                    average="macro",
+                    num_classes=hypparams["num_classes"],
+                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                )
             if "top5acc" in hypparams["metrics"]:
-                metrics_dict["Accuracy_top5"] = Accuracy(top_k=5)
+                metrics_dict["Accuracy_top5"] = Accuracy(
+                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=hypparams["num_classes"],
+                    top_k=5,
+                )
 
             if self.confmat_setting in ["val", "all"]:
                 self.val_conf_mat = ConfusionMatrix(num_classes=hypparams["num_classes"])
@@ -57,7 +74,6 @@ class BaseModel(pl.LightningModule):
                 self.train_conf_mat = ConfusionMatrix(num_classes=hypparams["num_classes"])
 
         elif self.task == "Regression":
-
             if "mse" in hypparams["metrics"]:
                 metrics_dict["MSE"] = MeanSquaredError()
             if "mae" in hypparams["metrics"]:
@@ -187,7 +203,6 @@ class BaseModel(pl.LightningModule):
         pass
 
     def training_step(self, batch, batch_idx):
-
         x, y = batch
 
         if self.mixup:
@@ -261,7 +276,6 @@ class BaseModel(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-
         x, y = batch
         y_hat = self(x)
 
@@ -299,7 +313,6 @@ class BaseModel(pl.LightningModule):
             self.val_conf_mat.update(y_hat, y)
 
     def on_validation_epoch_end(self) -> None:
-
         if self.metric_computation_mode == "epochwise":
             metrics_res = self.val_metrics.compute()
             if "val_F1_per_class" in metrics_res.keys():
@@ -325,7 +338,6 @@ class BaseModel(pl.LightningModule):
             self.val_conf_mat.reset()
 
     def on_train_epoch_end(self) -> None:
-
         if self.metric_computation_mode == "epochwise":
             metrics_res = self.train_metrics.compute()
             if "train_F1_per_class" in metrics_res.keys():
@@ -352,7 +364,6 @@ class BaseModel(pl.LightningModule):
             self.train_conf_mat.reset()
 
     def on_train_start(self):
-
         from models.resnet import BasicBlock, Bottleneck
         from models.wide_resnet import BasicBlock as Wide_BasicBlock, Bottleneck as Wide_Bottleneck
         from models.pyramidnet import BasicBlock as BasicBlock_pyramid, Bottleneck as Bottleneck_pyramid
@@ -378,7 +389,6 @@ class BaseModel(pl.LightningModule):
         # so that the residual branch starts with zeros, and each residual block behaves like an identity.
         # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
         if self.zero_init_residual:
-
             if "PreAct" in self.name:
                 for m in self.modules():
                     if isinstance(m, PreActBottleneck):
@@ -401,7 +411,6 @@ class BaseModel(pl.LightningModule):
                         nn.init.constant_(m.bn3.weight, 0)
 
     def configure_optimizers(self):
-
         # leave bias and params of batch norm undecayed as in https://arxiv.org/pdf/1812.01187.pdf (Bag of tricks)
         if self.undecay_norm:
             model_params = []
@@ -431,7 +440,6 @@ class BaseModel(pl.LightningModule):
                 optimizer = MADGRAD(params, lr=self.lr, momentum=0.9, weight_decay=self.weight_decay)
 
         else:
-
             # ASAM paper suggests 10x larger rho for adaptive SAM than in normal SAM
             rho = 0.5 if self.adaptive_sam else 0.05
 
@@ -506,7 +514,6 @@ class BaseModel(pl.LightningModule):
             return [optimizer], [scheduler]
 
     def train_dataloader(self):
-
         if self.dataset == "CIFAR10":
             if self.aug == "album":
                 trainset = Cifar10Albumentation(
@@ -528,7 +535,6 @@ class BaseModel(pl.LightningModule):
                 )
 
         elif self.dataset == "Imagenet":
-
             # path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original" TODO
 
             trainset = ImageNet(root=self.data_dir, split="train", transform=self.transform_train)
@@ -560,7 +566,6 @@ class BaseModel(pl.LightningModule):
         return trainloader
 
     def val_dataloader(self):
-
         if self.dataset == "CIFAR10":
             testset = CIFAR10(root=self.data_dir, train=False, download=self.download, transform=self.test_transform)
 
@@ -586,7 +591,6 @@ class BaseModel(pl.LightningModule):
 
 class TimerCallback(Callback):
     def __init__(self, epochs, num_gpus):
-
         self.num_gpus = num_gpus
         if self.num_gpus > 0:
             self.start = torch.cuda.Event(enable_timing=True)
@@ -595,7 +599,6 @@ class TimerCallback(Callback):
         self.epoch_times = []
 
     def on_train_epoch_start(self, trainer, pl_module):
-
         if trainer.current_epoch == 0:  # ignore first epoch
             pass
         else:
@@ -605,7 +608,6 @@ class TimerCallback(Callback):
                 self.start.record()
 
     def on_train_epoch_end(self, trainer, pl_module):  # , outputs):
-
         if trainer.current_epoch == 0:
             pass
         else:
@@ -642,7 +644,6 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
     """
 
     def __init__(self, optimizer, T_max, eta_min=0, last_epoch=-1, verbose=False, warmstart=0):
-
         self.T_max = T_max - warmstart  # do not consider warmstart epochs for T_max
         self.eta_min = eta_min
         self.warmstart = warmstart
@@ -658,19 +659,16 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
 
         # Warmstart
         if self.last_epoch < self.warmstart:
-
             addrates = [(lr / (self.warmstart + 1)) for lr in self.base_lrs]
             updated_lr = [addrates[i] * (self.last_epoch + 1) for i, group in enumerate(self.optimizer.param_groups)]
 
             return updated_lr
 
         else:
-
             if self.T == 0:
                 self.T += 1
                 return self.base_lrs
             elif (self.T - 1 - self.T_max) % (2 * self.T_max) == 0:
-
                 updated_lr = [
                     group["lr"] + (base_lr - self.eta_min) * (1 - math.cos(math.pi / self.T_max)) / 2
                     for base_lr, group in zip(self.base_lrs, self.optimizer.param_groups)
