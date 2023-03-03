@@ -11,8 +11,6 @@ from torch.utils.data import DataLoader, RandomSampler
 import pytorch_lightning as pl
 from torchmetrics import Accuracy, F1Score, Precision, Recall, MeanAbsoluteError, MeanSquaredError, MetricCollection
 from pytorch_lightning.callbacks import Callback
-
-from augmentation.policies.diadem_islets import nnunetv2_lite_transform
 from datasets.cifar import CIFAR10, CIFAR100, Cifar10Albumentation, Cifar100Albumentation
 from datasets.imagenet import ImageNet
 from regularization.sam import SAM
@@ -180,21 +178,6 @@ class BaseModel(pl.LightningModule):
 
             elif self.aug == "randaugment":
                 self.transform_train = get_rand_augmentation(self.mean, self.std)
-
-            self.test_transform = test_transform(self.mean, self.std)
-
-        elif self.dataset == "DiademIslets":
-            self.mean, self.std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
-            from augmentation.policies.diadem_islets import (
-                baseline_transform,
-                test_transform
-            )
-
-            if self.aug == "baseline":
-                self.transform_train = baseline_transform(self.mean, self.std)
-
-            elif self.aug == "nnunetv2_lite_transform":
-                self.transform_train = nnunetv2_lite_transform(self.mean, self.std)
 
             self.test_transform = test_transform(self.mean, self.std)
 
@@ -556,16 +539,6 @@ class BaseModel(pl.LightningModule):
 
             trainset = ImageNet(root=self.data_dir, split="train", transform=self.transform_train)
 
-        elif self.dataset == "DiademIslets":
-            from datasets.diadem_islets import DiademIslets
-            image_dir = "/home/k539i/Documents/datasets/original/HMGU_2022_DIADEM/dataset_WSI_mzz/train"
-            split_filepath = "/home/k539i/Documents/datasets/original/HMGU_2022_DIADEM/dataset_WSI/splits/splits_0.csv"
-            labels_filepath = "/home/k539i/Documents/datasets/original/HMGU_2022_DIADEM/dataset_WSI/label.csv"
-            islets_filepath = "/home/k539i/Documents/datasets/original/HMGU_2022_DIADEM/dataset_stacked_islets/islets.pkl"
-
-            trainset = DiademIslets(image_dir, split_filepath, labels_filepath, islets_filepath, transform=self.transform_train, train=True)
-            print("Trainset size: ", len(trainset))
-
         if not self.random_batches:
             trainloader = DataLoader(
                 trainset,
@@ -575,7 +548,6 @@ class BaseModel(pl.LightningModule):
                 pin_memory=True,
                 worker_init_fn=seed_worker,
                 persistent_workers=True,
-                drop_last=True
             )
 
         else:
@@ -589,7 +561,6 @@ class BaseModel(pl.LightningModule):
                 worker_init_fn=seed_worker,
                 persistent_workers=True,
                 sampler=random_sampler,
-                drop_last=True
             )
 
         return trainloader
@@ -605,16 +576,6 @@ class BaseModel(pl.LightningModule):
             # path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original" TODO
             testset = ImageNet(root=self.data_dir, split="val", transform=self.test_transform)
 
-        elif self.dataset == "DiademIslets":
-            from datasets.diadem_islets import DiademIslets
-            image_dir = "/home/k539i/Documents/datasets/original/HMGU_2022_DIADEM/dataset_WSI_mzz/train"
-            split_filepath = "/home/k539i/Documents/datasets/original/HMGU_2022_DIADEM/dataset_WSI/splits/splits_0.csv"
-            labels_filepath = "/home/k539i/Documents/datasets/original/HMGU_2022_DIADEM/dataset_WSI/label.csv"
-            islets_filepath = "/home/k539i/Documents/datasets/original/HMGU_2022_DIADEM/dataset_stacked_islets/islets.pkl"
-
-            testset = DiademIslets(image_dir, split_filepath, labels_filepath, islets_filepath, transform=self.test_transform, train=False)
-            print("Valset size: ", len(testset))
-
         testloader = DataLoader(
             testset,
             batch_size=self.batch_size,
@@ -623,7 +584,6 @@ class BaseModel(pl.LightningModule):
             pin_memory=True,
             worker_init_fn=seed_worker,
             persistent_workers=True,
-            drop_last=True
         )
 
         return testloader
