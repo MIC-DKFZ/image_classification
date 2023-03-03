@@ -40,7 +40,7 @@ registered_models = [
     "PyramidNet272",
 ]
 
-registered_datasets = ["CIFAR10", "CIFAR100", "Imagenet"]
+registered_datasets = ["CIFAR10", "CIFAR100", "Imagenet", "DiademIslets"]
 
 
 def get_model(model_name, params):
@@ -147,6 +147,7 @@ def detect_misconfigurations(model_name, args):
         "autoaugment",
         "randaugment",
         "album",
+        "nnunetv2_lite_transform",
     ], "not a valid augmentation"
     if args.mixup_alpha != 0.2:
         assert args.mixup, "Mixup has to be True for specifying the mixup alpha parameter"
