@@ -9,7 +9,7 @@ import os
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.utils.data import DataLoader, RandomSampler
 import pytorch_lightning as pl
-from torchmetrics import Accuracy, F1Score, Precision, Recall, MeanAbsoluteError, MeanSquaredError, MetricCollection
+from torchmetrics import Accuracy, F1Score, Precision, Recall, MeanAbsoluteError, MeanSquaredError, MetricCollection, AUROC
 from pytorch_lightning.callbacks import Callback
 from datasets.cifar import CIFAR10, CIFAR100, Cifar10Albumentation, Cifar100Albumentation
 from datasets.imagenet import ImageNet
@@ -66,6 +66,12 @@ class BaseModel(pl.LightningModule):
                     task="binary" if hypparams["num_classes"] == 2 else "multiclass",
                     num_classes=hypparams["num_classes"],
                     top_k=5,
+                )
+            if "auroc" in hypparams["metrics"]:
+                metrics_dict["AUROC"] = AUROC(
+                    average="macro",
+                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=hypparams["num_classes"],
                 )
 
             if self.confmat_setting in ["val", "all"]:
