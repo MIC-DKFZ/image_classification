@@ -90,7 +90,7 @@ ENV/
 *.xml
 *.pdf
 *.model
-
+.vscode
 
 .trash
 
