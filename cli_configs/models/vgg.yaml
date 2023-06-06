@@ -1,0 +1,4 @@
+model:
+  class_path: models.dynamic_vgg.VGG16
+  init_args:
+    cifar_size: True

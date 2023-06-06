@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint, RichProgressBar
+from pytorch_lightning.callbacks import ModelCheckpoint#, RichProgressBar
 import argparse
 import os
 import yaml
@@ -11,12 +11,14 @@ from pytorch_lightning.loggers.mlflow import MLFlowLogger
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 from pytorch_lightning.loggers.wandb import WandbLogger
 
+from cli import CustomLightningCLI
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Choose your model configuration for training")
+    '''parser = argparse.ArgumentParser(description="Choose your model configuration for training")
 
     ##### Model #####
-    parser.add_argument("model", type=str, help="Name of the model")
+    parser.add_argument("--model", type=str, help="Name of the model", default='ResNet18')
 
     ##### Training Settings #####
     parser.add_argument("--epochs", type=int, help="Number of epochs", default=200)
@@ -186,9 +188,9 @@ if __name__ == "__main__":
             " and validation (all) or not at all (disable)"
         ),
         default="val",
-    )
+    )'''
 
-    args = parser.parse_args()
+    '''args = parser.parse_args()
 
     model_name = args.model
     data_dir = args.data_dir
@@ -196,36 +198,38 @@ if __name__ == "__main__":
     seed = args.seed
 
     if seed:
-        pl.seed_everything(seed)
+        pl.seed_everything(seed)'''
 
     # select correct directories according to dataset
-    selected_data_dir = os.path.join(data_dir, args.data if not args.data == "Imagenet" else "ILSVRC_2012")
-    selected_exp_dir = os.path.join(exp_dir, args.data)
+    data_dir = './data'
+    exp_dir = "./experiments"
+    selected_data_dir = os.path.join(data_dir, 'CIFAR10')#args.data if not args.data == "Imagenet" else "ILSVRC_2012")
+    selected_exp_dir = os.path.join(exp_dir, 'CIFAR10')#args.data)
 
     # set MLflow and checkpoint directories
     chpt_dir = os.path.join(selected_exp_dir, "checkpoints")
     mlrun_dir = os.path.join(selected_exp_dir, "mlruns")
 
     # check for misconfigurations in the parameters
-    detect_misconfigurations(model_name, args)
+    #detect_misconfigurations(model_name, args)
 
-    # save specified parameters in dictionaries
+    '''# save specified parameters in dictionaries
     params = get_params(selected_data_dir, model_name, args, seed)
-    params_to_log = get_params_to_log(params, model_name)
+    params_to_log = get_params_to_log(params, model_name)'''
 
-    # Choose correct model and num_classes
+    '''# Choose correct model and num_classes
     if args.data.startswith("CIFAR"):
         num_classes = 10 if args.data == "CIFAR10" else 100
         params["cifar_size"] = True
     elif args.data == "Imagenet":
         num_classes = 1000
     else:
-        num_classes = args.num_classes
+        num_classes = args.num_classes'''
 
-    params["num_classes"] = num_classes if not params["regression"] else 1
-    model = get_model(model_name, params)
+    '''params["num_classes"] = num_classes if not params["regression"] else 1
+    model = get_model(model_name, params)'''
 
-    ## Pytorch Lightning Trainer
+    '''## Pytorch Lightning Trainer
     # Checkpoint callback if model should be saved
     chpt_name = args.chpt_name if len(args.chpt_name) > 0 else model_name
     checkpoint_callback = ModelCheckpoint(
@@ -235,7 +239,7 @@ if __name__ == "__main__":
     # Sharpness Aware Minimization fails with 16-bit precision because
     # GradScaler does not support closure functions at the moment
     # https://pytorch.org/docs/stable/amp.html#torch.cuda.amp.GradScaler.step
-    precision_value = 32 if params["sam"] or args.gpu_count == 0 else 16
+    precision_value = 32 if params["sam"] or args.gpu_count == 0 else "16-mixed"
 
     # Make run deterministic if a seed is given
     benchmark = False if seed else True
@@ -250,9 +254,9 @@ if __name__ == "__main__":
 
     # setup logger
     loggers = args.logger
-    run_name = f"{args.data}-{model_name}"
+    run_name = f"{args.data}-{model_name}"'''
 
-    final_loggers = []
+    '''final_loggers = []
     if "mlflow" in loggers:
         mlf_logger = MLFlowLogger(
             experiment_name=args.data,
@@ -290,10 +294,10 @@ if __name__ == "__main__":
             project=args.data,
         )
         wb_logger.log_hyperparams(params_to_log)
-        final_loggers.append(wb_logger)
+        final_loggers.append(wb_logger)'''
 
     # Configure Trainer
-    trainer = pl.Trainer(
+    '''trainer = pl.Trainer(
         logger=final_loggers,
         devices=args.gpu_count if args.gpu_count > 0 else 1,
         accelerator="gpu" if args.gpu_count > 0 else "cpu",
@@ -305,12 +309,36 @@ if __name__ == "__main__":
         deterministic=deterministic,
         precision=precision_value,
         enable_progress_bar=not args.suppress_progress_bar,
-        strategy="ddp_find_unused_parameters_false" if args.gpu_count > 1 else None,
-    )
+        strategy="ddp"#"ddp_find_unused_parameters_false" if args.gpu_count > 1 else None,
+    )'''
 
-    trainer.fit(model)
+    '''cli = LightningCLI(trainer_defaults={'logger':final_loggers,
+                                        'devices':args.gpu_count if args.gpu_count > 0 else 1,
+                                        'accelerator':"gpu" if args.gpu_count > 0 else "cpu",
+                                        'sync_batchnorm':True if args.gpu_count > 1 else False,
+                                        'callbacks':all_lightning_callbacks,
+                                        'enable_checkpointing':True if args.save_model else False,
+                                        'max_epochs':args.epochs,
+                                        'benchmark':benchmark,
+                                        'deterministic':deterministic,
+                                        'precision':precision_value,
+                                        'enable_progress_bar':not args.suppress_progress_bar,
+                                        'strategy':"ddp"})'''
+    #from lightning.pytorch.demos.boring_classes import DemoModel
+    from base_model import BaseModel
+    from datasets.base_datamodule import BaseDataModule
+    #from models.vgg import VGG
 
-    if trainer.is_global_zero:
+    
+    #cli = LightningCLI(model_class=BaseModel, parser_kwargs={"parser_mode": "omegaconf"})
+    cli = CustomLightningCLI(model_class=BaseModel, subclass_mode_model=True, datamodule_class=BaseDataModule, 
+                       subclass_mode_data=True, parser_kwargs={"parser_mode": "omegaconf",
+                        "fit": {"default_config_files": ["cli_configs/train.yaml"]}}, 
+                       save_config_kwargs={"overwrite": True})
+
+    #trainer.fit(model)
+
+    '''if cli.trainer.is_global_zero:
         if "mlflow" in loggers:
             # adapt mlflow artifact path in meta.yaml so that logged figures will be shown in ui
             meta_file = (
@@ -321,4 +349,4 @@ if __name__ == "__main__":
                 meta_info = yaml.load(f, Loader=yaml.FullLoader)
                 meta_info["artifact_uri"] = adapted_relative_path
             with open(meta_file, "w") as f:
-                yaml.dump(meta_info, f)
+                yaml.dump(meta_info, f)'''

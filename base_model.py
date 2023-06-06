@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import random
+
 import math
 import warnings
 import time
 import os
 from torch.optim.lr_scheduler import _LRScheduler
-from torch.utils.data import DataLoader, RandomSampler
+
 import pytorch_lightning as pl
 from torchmetrics import Accuracy, F1Score, Precision, Recall, MeanAbsoluteError, MeanSquaredError, MetricCollection, AUROC
 from pytorch_lightning.callbacks import Callback
@@ -19,70 +19,75 @@ from timm.optim import RMSpropTF
 from augmentation.mixup import mixup_data, mixup_criterion
 from metrics.conf_mat import ConfusionMatrix
 
+import lightning as L
 
-class BaseModel(pl.LightningModule):
-    def __init__(self, hypparams):
+
+class BaseModel(L.LightningModule):
+    def __init__(self, regression, metric_computation_mode, confmat, metrics, num_classes, name,
+                 lr, weight_decay, optimizer, nesterov, sam, adaptive_sam, scheduler, T_max, warmstart, epochs,
+                 aug, mixup, mixup_alpha, label_smoothing, stochastic_depth, resnet_dropout, squeeze_excitation, apply_shakedrop, 
+                 undecay_norm, zero_init_residual, input_dim, input_channels):
         super(BaseModel, self).__init__()
 
         # Task
-        self.task = "Classification" if not hypparams["regression"] else "Regression"
+        self.task = "Classification" if not regression else "Regression"
 
         # Metrics
-        self.metric_computation_mode = hypparams["metric_computation_mode"]
-        self.confmat_setting = hypparams["confmat"]
+        self.metric_computation_mode = metric_computation_mode
+        self.confmat_setting = confmat
         metrics_dict = {}
 
         if self.task == "Classification":
-            if "acc" in hypparams["metrics"]:
+            if "acc" in metrics:
                 metrics_dict["Accuracy"] = Accuracy(
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
-                    num_classes=hypparams["num_classes"],
+                    task="binary" if num_classes == 2 else "multiclass",
+                    num_classes=num_classes,
                 )
-            if "f1" in hypparams["metrics"]:
+            if "f1" in metrics:
                 metrics_dict["F1"] = F1Score(
                     average="macro",
-                    num_classes=hypparams["num_classes"],
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=num_classes,
+                    task="binary" if num_classes == 2 else "multiclass",
                 )
-            if "f1_per_class" in hypparams["metrics"]:
+            if "f1_per_class" in metrics:
                 metrics_dict["F1_per_class"] = F1Score(
                     average=None,
-                    num_classes=hypparams["num_classes"],
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=num_classes,
+                    task="binary" if num_classes == 2 else "multiclass",
                 )
-            if "pr" in hypparams["metrics"]:
+            if "pr" in metrics:
                 metrics_dict["Precision"] = Precision(
                     average="macro",
-                    num_classes=hypparams["num_classes"],
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=num_classes,
+                    task="binary" if num_classes == 2 else "multiclass",
                 )
                 metrics_dict["Recall"] = Recall(
                     average="macro",
-                    num_classes=hypparams["num_classes"],
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=num_classes,
+                    task="binary" if num_classes == 2 else "multiclass",
                 )
-            if "top5acc" in hypparams["metrics"]:
+            if "top5acc" in metrics:
                 metrics_dict["Accuracy_top5"] = Accuracy(
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
-                    num_classes=hypparams["num_classes"],
+                    task="binary" if num_classes == 2 else "multiclass",
+                    num_classes=num_classes,
                     top_k=5,
                 )
-            if "auroc" in hypparams["metrics"]:
+            if "auroc" in metrics:
                 metrics_dict["AUROC"] = AUROC(
                     average="macro",
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
-                    num_classes=hypparams["num_classes"],
+                    task="binary" if num_classes == 2 else "multiclass",
+                    num_classes=num_classes,
                 )
 
             if self.confmat_setting in ["val", "all"]:
-                self.val_conf_mat = ConfusionMatrix(num_classes=hypparams["num_classes"])
+                self.val_conf_mat = ConfusionMatrix(num_classes=num_classes)
             if self.confmat_setting == "all":
-                self.train_conf_mat = ConfusionMatrix(num_classes=hypparams["num_classes"])
+                self.train_conf_mat = ConfusionMatrix(num_classes=num_classes)
 
         elif self.task == "Regression":
-            if "mse" in hypparams["metrics"]:
+            if "mse" in metrics:
                 metrics_dict["MSE"] = MeanSquaredError()
-            if "mae" in hypparams["metrics"]:
+            if "mae" in metrics:
                 metrics_dict["MAE"] = MeanAbsoluteError()
 
         metrics = MetricCollection(metrics_dict)
@@ -90,41 +95,38 @@ class BaseModel(pl.LightningModule):
         self.val_metrics = metrics.clone(prefix="val_")
 
         # Training Args
-        self.name = hypparams["name"]
-        self.batch_size = hypparams["batch_size"]
-        self.lr = hypparams["lr"]
-        self.weight_decay = hypparams["weight_decay"]
-        self.optimizer = hypparams["optimizer"]
-        self.nesterov = hypparams["nesterov"]
-        self.sam = hypparams["sam"]
-        self.adaptive_sam = hypparams["adaptive_sam"]
-        self.scheduler = hypparams["scheduler"]
-        self.T_max = hypparams["T_max"]
-        self.warmstart = hypparams["warmstart"]
-        self.epochs = hypparams["epochs"]
-        self.random_batches = hypparams["random_batches"]
+        self.name = name
+        #self.batch_size = batch_size
+        self.lr = lr
+        self.weight_decay = weight_decay
+        self.optimizer = optimizer
+        self.nesterov = nesterov
+        self.sam = sam
+        self.adaptive_sam = adaptive_sam
+        self.scheduler = scheduler
+        self.T_max = T_max
+        self.warmstart = warmstart
+        self.epochs = epochs
+        
 
         # Regularization techniques
-        self.aug = hypparams["augmentation"]
-        self.mixup = hypparams["mixup"]
-        self.mixup_alpha = hypparams["mixup_alpha"]  # 0.2
-        self.label_smoothing = hypparams["label_smoothing"]  # 0.1
-        self.stochastic_depth = hypparams["stochastic_depth"]  # 0.1 (with higher resolution maybe 0.2)
-        self.resnet_dropout = hypparams["resnet_dropout"]  # 0.5
-        self.se = hypparams["squeeze_excitation"]
-        self.apply_shakedrop = hypparams["shakedrop"]
-        self.undecay_norm = hypparams["undecay_norm"]
-        self.zero_init_residual = hypparams["zero_init_residual"]
+        self.aug = aug
+        self.mixup = mixup
+        self.mixup_alpha = mixup_alpha # 0.2
+        self.label_smoothing = label_smoothing  # 0.1
+        self.stochastic_depth = stochastic_depth  # 0.1 (with higher resolution maybe 0.2)
+        self.resnet_dropout = resnet_dropout  # 0.5
+        self.se = squeeze_excitation
+        self.apply_shakedrop = apply_shakedrop
+        self.undecay_norm = undecay_norm
+        self.zero_init_residual = zero_init_residual
 
         # Data and Dataloading
-        self.data_dir = hypparams["data_dir"]
-        self.dataset = hypparams["dataset"]
-        self.num_workers = hypparams["num_workers"]
-        self.input_dim = hypparams["input_dim"]
-        self.input_channels = hypparams["input_channels"]
-        self.num_classes = hypparams["num_classes"]
+        self.input_dim = input_dim
+        self.input_channels = input_channels
+        self.num_classes = num_classes
 
-        os.makedirs(self.data_dir, exist_ok=True)
+        '''os.makedirs(self.data_dir, exist_ok=True)
         self.download = False if any(os.scandir(self.data_dir)) else True
 
         ################################################################################################################
@@ -185,7 +187,7 @@ class BaseModel(pl.LightningModule):
             elif self.aug == "randaugment":
                 self.transform_train = get_rand_augmentation(self.mean, self.std)
 
-            self.test_transform = test_transform(self.mean, self.std)
+            self.test_transform = test_transform(self.mean, self.std)'''
 
         ################################################################################################################
 
@@ -203,7 +205,7 @@ class BaseModel(pl.LightningModule):
         self.softmax = nn.Softmax(dim=1)
 
         # Seed
-        self.seed = hypparams["seed"]
+        #self.seed = seed
 
     def forward(self, x):
         pass
@@ -519,7 +521,7 @@ class BaseModel(pl.LightningModule):
 
             return [optimizer], [scheduler]
 
-    def train_dataloader(self):
+    '''def train_dataloader(self):
         if self.dataset == "CIFAR10":
             if self.aug == "album":
                 trainset = Cifar10Albumentation(
@@ -592,7 +594,7 @@ class BaseModel(pl.LightningModule):
             persistent_workers=True,
         )
 
-        return testloader
+        return testloader'''
 
 
 class TimerCallback(Callback):
@@ -632,15 +634,7 @@ class TimerCallback(Callback):
             print("Average time per train epoch in seconds: ", avg_epoch_time)
 
 
-def seed_worker(worker_id):
-    """
-    https://pytorch.org/docs/stable/notes/randomness.html#dataloader
-    to fix https://tanelp.github.io/posts/a-bug-that-plagues-thousands-of-open-source-ml-projects/
-    ensures different random numbers each batch with each worker every epoch while keeping reproducibility
-    """
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
+
 
 
 class CosineAnnealingLR_Warmstart(_LRScheduler):
@@ -697,7 +691,7 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
 
 class ModelConstructor(BaseModel):
     def __init__(self, model, hypparams):
-        super(ModelConstructor, self).__init__(hypparams)
+        super(ModelConstructor, self).__init__(**hypparams)
         self.model = model
 
     def forward(self, x):

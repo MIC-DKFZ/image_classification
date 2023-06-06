@@ -1,0 +1,6 @@
+model:
+  class_path: models.dynamic_resnet.ResNet18
+  init_args:
+    cifar_size: True
+    se_rd_ratio: 0.25
+    bottleneck: False

@@ -17,11 +17,11 @@ cfg = {
 
 
 class VGG(BaseModel):
-    def __init__(self, vgg_name, num_classes=10, hypparams={}):
-        super(VGG, self).__init__(hypparams)
+    def __init__(self, vgg_name, **kwargs):
+        super(VGG, self).__init__(**kwargs)
 
         self.features = self._make_layers(cfg[vgg_name])
-        self.classifier = nn.Linear(512, num_classes)
+        self.classifier = nn.Linear(512, kwargs['num_classes'])
 
     def forward(self, x):
         out = self.features(x)

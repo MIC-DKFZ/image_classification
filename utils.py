@@ -2,11 +2,11 @@
 from base_model import ModelConstructor
 
 # from models.vgg import VGG
-from models.dynamic_vgg import get_vgg
+#from models.dynamic_vgg import get_vgg
 from models.preact_resnet import PreActResNet18, PreActResNet34, PreActResNet50, PreActResNet101, PreActResNet152
 
 # from models.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet110, ResNet152
-from models.dynamic_resnet import get_resnet
+#from models.dynamic_resnet import get_resnet
 from models.wide_resnet import WRN2810
 from models.efficientnet import *
 from models.pyramidnet import PyramidNet110, PyramidNet272

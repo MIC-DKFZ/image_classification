@@ -1,0 +1,63 @@
+seed_everything: False
+
+trainer:
+  logger: 
+    - class_path: WandbLogger
+      init_args:
+        save_dir: './experiments'
+        offline: False
+        anonymous: True
+        project: 'CIFAR10'
+  callbacks: 
+    - class_path: RichProgressBar
+  devices: 1
+  accelerator: 'gpu'
+  sync_batchnorm: False
+  enable_checkpointing: False
+  max_epochs: 100
+  benchmark: True
+  deterministic: False
+  precision: '16-mixed'
+  enable_progress_bar: True
+  strategy: 'ddp'
+
+model:
+  class_path: base_model.BaseModel
+  init_args:
+    optimizer: SGD
+    sam: False
+    adaptive_sam: False
+    lr: 0.01
+    nesterov: False
+    scheduler: CosineAnneal
+    T_max: ${trainer.max_epochs}
+    warmstart: 0
+    aug: 'randaugment'
+    mixup: False
+    mixup_alpha: 0.2
+    epochs: ${trainer.max_epochs}
+    weight_decay: 5e-4
+    undecay_norm: False
+    label_smoothing: 0.0
+    stochastic_depth: False
+    resnet_dropout: 0.0
+    squeeze_excitation: False
+    apply_shakedrop: False
+    zero_init_residual: False
+    input_dim: 2
+    input_channels: 3
+    regression: False
+    metrics: 'acc'
+    num_gpus: 1
+    metric_computation_mode: 'epochwise'
+    confmat: 'val'
+    
+data:
+  class_path: datasets.base_datamodule.BaseDataModule
+  init_args:
+    batch_size: 128
+    random_batches: False
+    num_workers: 12
+    prepare_data_per_node: False
+
+

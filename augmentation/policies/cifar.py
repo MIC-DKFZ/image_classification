@@ -3,15 +3,16 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from randaugment import RandAugment, Cutout, CIFAR10Policy
 
+MEAN, STD = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
 
-def get_baseline(mean, std):
+def get_baseline():
 
     transform_train = transforms.Compose(
         [
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize(mean, std),
+            transforms.Normalize(MEAN, STD),
         ]
     )
 
@@ -161,13 +162,19 @@ def get_album(mean, std):
     return transform_train
 
 
-def test_transform(mean, std):
+def test_transform():
 
     transform_test = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Normalize(mean, std),
+            transforms.Normalize(MEAN, STD),
         ]
     )
 
     return transform_test
+
+
+from jsonargparse import class_from_function
+
+test_transform_class = class_from_function(test_transform)
+get_baseline_class = class_from_function(get_baseline)
