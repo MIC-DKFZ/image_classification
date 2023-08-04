@@ -1,0 +1,15 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.cifar.CIFAR10DataModule
+    name: CIFAR10
+    batch_size: 128
+    train_transforms: 
+      _target_: augmentation.policies.cifar.RandAugmentTransform
+      cutout_size: 8
+    test_transforms: 
+      _target_: augmentation.policies.cifar.TestTransform
+
+  num_classes: 10
+
+

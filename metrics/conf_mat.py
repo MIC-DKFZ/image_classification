@@ -4,7 +4,7 @@ from torchmetrics.utilities.data import _bincount
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 
 class ConfusionMatrix(Metric):

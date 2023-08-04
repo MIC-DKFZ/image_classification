@@ -1,17 +1,48 @@
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint#, RichProgressBar
-import argparse
 import os
-import yaml
-import re
-from base_model import TimerCallback
-from utils import detect_misconfigurations, get_model, get_params_to_log, get_params
+from pathlib import Path
+from uuid import uuid4
+from lightning.pytorch import seed_everything
+import hydra
+from hydra.utils import instantiate
+from parsing_utils import make_omegaconf_resolvers
+from omegaconf import DictConfig, OmegaConf
 
-from pytorch_lightning.loggers.mlflow import MLFlowLogger
-from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
-from pytorch_lightning.loggers.wandb import WandbLogger
+@hydra.main(version_base=None, config_path="./cli_configs", config_name="train")
+def main(cfg):
+    
+    make_omegaconf_resolvers()
+     
+    print(OmegaConf.to_yaml(cfg))
+    if cfg.seed:
+        seed_everything(cfg.seed)
+        cfg.trainer.benchmark=False
+        cfg.trainer.deterministic=True
+    
+    # setup logger
+    Path('./main.log').unlink()  # gets automatically created, however logs are available in Weights and Biases so we do not need to log twice
+    log_path = Path(cfg.trainer.logger.save_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+    cfg.trainer.logger.group = str(uuid4())
 
-from cli import CustomLightningCLI
+    # instantiate trainer, model and dataset
+    trainer = instantiate(cfg.trainer)
+    model = instantiate(cfg.model)
+    dataset = instantiate(cfg.data).module
+    
+    # log hypperparams
+    cfg_dict = OmegaConf.to_container(cfg, resolve=True)
+    cfg_dict['model'].pop('_target_')
+    cfg_dict['model']['model'] = cfg_dict['model'].pop('name')
+    trainer.logger.log_hyperparams(cfg_dict['model'])
+    cfg_dict['data']['module'].pop('_target_')
+    cfg_dict['data']['module']['train_transforms'] = '.'.join(cfg_dict['data']['module']['train_transforms']['_target_'].split('.')[-2:])
+    cfg_dict['data']['module']['test_transforms'] = '.'.join(cfg_dict['data']['module']['test_transforms']['_target_'].split('.')[-2:])
+    cfg_dict['data']['module'].pop('name')
+    trainer.logger.log_hyperparams(cfg_dict['data']['module'])
+
+    # start fitting
+    trainer.fit(model, dataset)
+
 
 
 if __name__ == "__main__":
@@ -208,7 +239,7 @@ if __name__ == "__main__":
 
     # set MLflow and checkpoint directories
     chpt_dir = os.path.join(selected_exp_dir, "checkpoints")
-    mlrun_dir = os.path.join(selected_exp_dir, "mlruns")
+    #mlrun_dir = os.path.join(selected_exp_dir, "mlruns")
 
     # check for misconfigurations in the parameters
     #detect_misconfigurations(model_name, args)
@@ -325,16 +356,16 @@ if __name__ == "__main__":
                                         'enable_progress_bar':not args.suppress_progress_bar,
                                         'strategy':"ddp"})'''
     #from lightning.pytorch.demos.boring_classes import DemoModel
-    from base_model import BaseModel
-    from datasets.base_datamodule import BaseDataModule
+    #from base_model import BaseModel
+    #from datasets.base_datamodule import BaseDataModule
     #from models.vgg import VGG
 
     
     #cli = LightningCLI(model_class=BaseModel, parser_kwargs={"parser_mode": "omegaconf"})
-    cli = CustomLightningCLI(model_class=BaseModel, subclass_mode_model=True, datamodule_class=BaseDataModule, 
-                       subclass_mode_data=True, parser_kwargs={"parser_mode": "omegaconf",
+    '''cli = CustomLightningCLI(model_class=BaseModel, subclass_mode_model=True, datamodule_class=BaseDataModule, 
+                       subclass_mode_data=True, auto_configure_optimizers=False, parser_kwargs={"parser_mode": "omegaconf",
                         "fit": {"default_config_files": ["cli_configs/train.yaml"]}}, 
-                       save_config_kwargs={"overwrite": True})
+                       save_config_kwargs={"overwrite": True})'''
 
     #trainer.fit(model)
 
@@ -350,3 +381,6 @@ if __name__ == "__main__":
                 meta_info["artifact_uri"] = adapted_relative_path
             with open(meta_file, "w") as f:
                 yaml.dump(meta_info, f)'''
+    
+
+    main()

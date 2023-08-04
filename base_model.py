@@ -23,14 +23,14 @@ import lightning as L
 
 
 class BaseModel(L.LightningModule):
-    def __init__(self, regression, metric_computation_mode, confmat, metrics, num_classes, name,
+    def __init__(self, task, metric_computation_mode, confmat, metrics, num_classes, name,
                  lr, weight_decay, optimizer, nesterov, sam, adaptive_sam, scheduler, T_max, warmstart, epochs,
-                 aug, mixup, mixup_alpha, label_smoothing, stochastic_depth, resnet_dropout, squeeze_excitation, apply_shakedrop, 
+                 mixup, mixup_alpha, label_smoothing, stochastic_depth, resnet_dropout, squeeze_excitation, apply_shakedrop, 
                  undecay_norm, zero_init_residual, input_dim, input_channels):
         super(BaseModel, self).__init__()
 
         # Task
-        self.task = "Classification" if not regression else "Regression"
+        self.task = task
 
         # Metrics
         self.metric_computation_mode = metric_computation_mode
@@ -110,7 +110,6 @@ class BaseModel(L.LightningModule):
         
 
         # Regularization techniques
-        self.aug = aug
         self.mixup = mixup
         self.mixup_alpha = mixup_alpha # 0.2
         self.label_smoothing = label_smoothing  # 0.1
@@ -202,7 +201,7 @@ class BaseModel(L.LightningModule):
             self.criterion = nn.MSELoss()
 
         # Inference
-        self.softmax = nn.Softmax(dim=1)
+        #self.softmax = nn.Softmax(dim=1)
 
         # Seed
         #self.seed = seed
@@ -396,6 +395,7 @@ class BaseModel(L.LightningModule):
         # Zero-initialize the last BN in each residual branch,
         # so that the residual branch starts with zeros, and each residual block behaves like an identity.
         # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
+        # TODO
         if self.zero_init_residual:
             if "PreAct" in self.name:
                 for m in self.modules():
@@ -597,7 +597,7 @@ class BaseModel(L.LightningModule):
         return testloader'''
 
 
-class TimerCallback(Callback):
+'''class TimerCallback(Callback):
     def __init__(self, epochs, num_gpus):
         self.num_gpus = num_gpus
         if self.num_gpus > 0:
@@ -631,7 +631,7 @@ class TimerCallback(Callback):
         if trainer.current_epoch == self.epochs - 1:
             avg_epoch_time = np.mean(self.epoch_times)
             self.log("avg_epoch_time", avg_epoch_time)
-            print("Average time per train epoch in seconds: ", avg_epoch_time)
+            print("Average time per train epoch in seconds: ", avg_epoch_time)'''
 
 
 

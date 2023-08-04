@@ -1,15 +1,71 @@
-seed_everything: False
+hydra:
+  output_subdir: null
+  job:
+    chdir: False
+  run:
+    dir: .
+  #job_logging:
+  #  handlers:
+  #    file:
+  #      filename: 
+  #  root:
+  #    root: 
+  #    - console
+
+override hydra/hydra_logging: disable
+override hydra/job_logging: disable
+
+
+seed: False
+
+model:
+  optimizer: SGD
+  sam: False
+  adaptive_sam: False
+  lr: 0.01
+  nesterov: False
+  scheduler: CosineAnneal
+  T_max: ${trainer.max_epochs}
+  warmstart: 0
+  mixup: False
+  mixup_alpha: 0.2
+  weight_decay: 5e-4
+  undecay_norm: False
+  label_smoothing: 0.0
+  stochastic_depth: False
+  resnet_dropout: 0.0
+  squeeze_excitation: False
+  apply_shakedrop: False
+  zero_init_residual: False
+  input_dim: 2
+  input_channels: 3
+  task: 'Classification'
+  metric_computation_mode: 'epochwise'
+  confmat: 'val'
+  num_classes: ${data.num_classes}
+  metrics: ${metrics}
+  epochs: ${trainer.max_epochs}
+  name: ${model_name_extractor:${model._target_}}
+    
+data:
+  module:
+    data_root_dir: ./data
+    random_batches: False
+    num_workers: 12
+    prepare_data_per_node: False
+  num_classes: ???
+
+metrics:
+  - 'acc'
+  - 'f1'
+
+exp_dir: './experiments'
+
 
 trainer:
-  logger: 
-    - class_path: WandbLogger
-      init_args:
-        save_dir: './experiments'
-        offline: False
-        anonymous: True
-        project: 'CIFAR10'
+  _target_: lightning.pytorch.Trainer
   callbacks: 
-    - class_path: RichProgressBar
+    - _target_: lightning.pytorch.callbacks.RichProgressBar
   devices: 1
   accelerator: 'gpu'
   sync_batchnorm: False
@@ -20,44 +76,10 @@ trainer:
   precision: '16-mixed'
   enable_progress_bar: True
   strategy: 'ddp'
-
-model:
-  class_path: base_model.BaseModel
-  init_args:
-    optimizer: SGD
-    sam: False
-    adaptive_sam: False
-    lr: 0.01
-    nesterov: False
-    scheduler: CosineAnneal
-    T_max: ${trainer.max_epochs}
-    warmstart: 0
-    aug: 'randaugment'
-    mixup: False
-    mixup_alpha: 0.2
-    epochs: ${trainer.max_epochs}
-    weight_decay: 5e-4
-    undecay_norm: False
-    label_smoothing: 0.0
-    stochastic_depth: False
-    resnet_dropout: 0.0
-    squeeze_excitation: False
-    apply_shakedrop: False
-    zero_init_residual: False
-    input_dim: 2
-    input_channels: 3
-    regression: False
-    metrics: 'acc'
-    num_gpus: 1
-    metric_computation_mode: 'epochwise'
-    confmat: 'val'
-    
-data:
-  class_path: datasets.base_datamodule.BaseDataModule
-  init_args:
-    batch_size: 128
-    random_batches: False
-    num_workers: 12
-    prepare_data_per_node: False
-
+  logger: 
+    _target_: lightning.pytorch.loggers.WandbLogger
+    save_dir: ${exp_dir}/${data.module.name}
+    offline: False
+    project: ${data.module.name}
+    group: 
 

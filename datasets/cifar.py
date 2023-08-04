@@ -38,15 +38,32 @@ class CIFAR10DataModule(BaseDataModule):
 
     def setup(self, stage: str):
 
-        if not self.albumentation:
-            self.train_dataset = CIFAR10(self.root, train=True, transform=self.train_transforms, download=True)
-            self.val_dataset = CIFAR10(self.root, train=False, transform=self.test_transforms, download=True)
-        else:
+        if "albumentations" in str(self.train_transforms.__class__):
             self.train_dataset = Cifar10Albumentation(self.root, train=True, transform=self.train_transforms, download=True)
+        else:
+            self.train_dataset = CIFAR10(self.root, train=True, transform=self.train_transforms, download=True)
+
+        if "albumentations" in str(self.test_transforms.__class__):
             self.val_dataset = Cifar10Albumentation(self.root, train=False, transform=self.test_transforms, download=True)
+        else:
+            self.val_dataset = CIFAR10(self.root, train=False, transform=self.test_transforms, download=True)
 
     
+class CIFAR100DataModule(BaseDataModule):
+    def __init__(self, **params):
+        super(CIFAR100DataModule, self).__init__(**params)
 
+    def setup(self, stage: str):
+
+        if "albumentations" in str(self.train_transforms.__class__):
+            self.train_dataset = Cifar100Albumentation(self.root, train=True, transform=self.train_transforms, download=True)
+        else:
+            self.train_dataset = CIFAR100(self.root, train=True, transform=self.train_transforms, download=True)
+
+        if "albumentations" in str(self.test_transforms.__class__):
+            self.val_dataset = Cifar100Albumentation(self.root, train=False, transform=self.test_transforms, download=True)
+        else:
+            self.val_dataset = CIFAR100(self.root, train=False, transform=self.test_transforms, download=True)
 
 
 

@@ -1,0 +1,13 @@
+data:
+  class_path: datasets.imagenet.ImagenetDataModule
+  init_args:
+    data_dir: /home/s522r/network_drives/E132-Projekte/Projects/Helmholtz_Imaging_ACVL/misc/imagenet/ILSVRC_2012
+    batch_size: 128
+
+num_classes: 1000
+
+train_transforms: 
+  class_path: augmentation.policies.imagenet.RandAugmentTransform
+
+test_transforms: 
+  class_path: augmentation.policies.imagenet.TestTransform

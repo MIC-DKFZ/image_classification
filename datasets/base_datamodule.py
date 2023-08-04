@@ -3,18 +3,18 @@ from torch.utils.data import DataLoader, RandomSampler
 import numpy as np
 import torch
 import random
+from pathlib import Path
 
 
 class BaseDataModule(LightningDataModule):
-    def __init__(self, data_dir, batch_size, train_transforms, test_transforms, albumentation, random_batches, 
+    def __init__(self, data_root_dir, name, batch_size, train_transforms, test_transforms, random_batches, 
                  num_workers, prepare_data_per_node):
         super(BaseDataModule, self).__init__()
 
-        self.root = data_dir
+        self.root = Path(data_root_dir) / name
         self.batch_size = batch_size
-        self.train_transforms = train_transforms
-        self.test_transforms = test_transforms
-        self.albumentation = albumentation
+        self.train_transforms = train_transforms()
+        self.test_transforms = test_transforms()
         self.random_batches = random_batches
         self.num_workers = num_workers
         self.prepare_data_per_node = prepare_data_per_node
@@ -80,8 +80,6 @@ class BaseDataModule(LightningDataModule):
         )
 
         return testloader
-
-
 
 
 def seed_worker(worker_id):
