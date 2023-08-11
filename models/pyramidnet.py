@@ -127,9 +127,10 @@ class Bottleneck(nn.Module):
 class PyramidNet(BaseModel):
 
     def __init__(self, depth, alpha, bottleneck=False, num_classes=10, hypparams={}):
-        super(PyramidNet, self).__init__(hypparams)
+        super(PyramidNet, self).__init__(**hypparams)
+        self.cifar_size = hypparams["cifar_size"]
 
-        if self.dataset.startswith('CIFAR'):
+        if self.cifar_size:
             self.inplanes = 16
             if bottleneck:
                 n = int((depth - 2) / 9)
@@ -161,7 +162,7 @@ class PyramidNet(BaseModel):
             self.avgpool = nn.AvgPool2d(8)
             self.fc = nn.Linear(self.final_featuremap_dim, num_classes)
 
-        elif self.dataset == 'Imagenet':
+        else:
             blocks = {18: BasicBlock, 34: BasicBlock, 50: Bottleneck, 101: Bottleneck, 152: Bottleneck, 200: Bottleneck}
             layers = {18: [2, 2, 2, 2], 34: [3, 4, 6, 3], 50: [3, 4, 6, 3], 101: [3, 4, 23, 3], 152: [3, 8, 36, 3],
                       200: [3, 24, 36, 3]}
@@ -237,7 +238,7 @@ class PyramidNet(BaseModel):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        if self.dataset.startswith('CIFAR'):
+        if self.cifar_size:
             x = self.conv1(x)
             x = self.bn1(x)
 
@@ -254,7 +255,7 @@ class PyramidNet(BaseModel):
             x = x.view(x.size(0), -1)
             x = self.fc(x)
 
-        elif self.dataset == 'Imagenet':
+        else:
             x = self.conv1(x)
             x = self.bn1(x)
             x = self.relu(x)
@@ -277,12 +278,12 @@ class PyramidNet(BaseModel):
         return x
 
 
-def PyramidNet110(num_classes, hypparams):
-    return PyramidNet(depth=110, alpha=270, bottleneck=hypparams['bottleneck'],
-                      num_classes=num_classes, hypparams=hypparams)
+def PyramidNet110(**kwargs):
+    return PyramidNet(depth=110, alpha=270, bottleneck=kwargs['bottleneck'],
+                      num_classes=kwargs['num_classes'], hypparams=kwargs)
 
 
-def PyramidNet272(num_classes, hypparams):
-    return PyramidNet(depth=272, alpha=200, bottleneck=hypparams['bottleneck'],
-                      num_classes=num_classes, hypparams=hypparams)
+def PyramidNet272(**kwargs):
+    return PyramidNet(depth=272, alpha=200, bottleneck=kwargs['bottleneck'],
+                      num_classes=kwargs['num_classes'], hypparams=kwargs)
 

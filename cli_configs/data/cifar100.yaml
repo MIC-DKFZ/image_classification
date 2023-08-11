@@ -12,3 +12,6 @@ data:
 
   num_classes: 100
 
+model:
+  task: 'Classification'
+  cifar_size: True

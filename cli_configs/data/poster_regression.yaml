@@ -14,7 +14,6 @@ data:
 
 model:
   task: 'Regression'
-  confmat: 'disable'
   cifar_size: False
   lr: 0.0001
   optimizer: AdamW

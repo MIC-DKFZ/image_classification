@@ -1,20 +1,18 @@
+defaults:
+  - _self_
+  - env: local
+  - model: resnet
+  - data: cifar10
+
 hydra:
   output_subdir: null
   job:
     chdir: False
   run:
     dir: .
-  #job_logging:
-  #  handlers:
-  #    file:
-  #      filename: 
-  #  root:
-  #    root: 
-  #    - console
 
 override hydra/hydra_logging: disable
 override hydra/job_logging: disable
-
 
 seed: False
 
@@ -41,7 +39,7 @@ model:
   input_channels: 3
   task: 'Classification'
   metric_computation_mode: 'epochwise'
-  confmat: 'val'
+  result_plot: 'val'
   num_classes: ${data.num_classes}
   metrics: ${metrics}
   epochs: ${trainer.max_epochs}
@@ -49,7 +47,6 @@ model:
     
 data:
   module:
-    data_root_dir: ./data
     random_batches: False
     num_workers: 12
     prepare_data_per_node: False
@@ -59,13 +56,19 @@ metrics:
   - 'acc'
   - 'f1'
 
-exp_dir: './experiments'
-
-
 trainer:
   _target_: lightning.pytorch.Trainer
   callbacks: 
-    - _target_: lightning.pytorch.callbacks.RichProgressBar
+    progressbar:
+      _target_: lightning.pytorch.callbacks.RichProgressBar
+    lr_monitor:
+      _target_: lightning.pytorch.callbacks.LearningRateMonitor
+      logging_interval: epoch
+    checkpoint:
+      _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      dirpath: ${exp_dir}/${data.module.name}/checkpoints
+      filename: '{epoch}-{val_loss:.2f}'
+      auto_insert_metric_name: True
   devices: 1
   accelerator: 'gpu'
   sync_batchnorm: False
@@ -82,4 +85,11 @@ trainer:
     offline: False
     project: ${data.module.name}
     group: 
+  num_sanity_val_steps: 0
+  # Some usefull trainer parameters for debugging
+  #limit_train_batches: 0.1
+  #limit_val_batches: 0.5
+  #limit_test_batches: 0.25
+  #accumulate_grad_batches: 2
+
 

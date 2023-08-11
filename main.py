@@ -24,6 +24,11 @@ def main(cfg):
     log_path.mkdir(parents=True, exist_ok=True)
     cfg.trainer.logger.group = str(uuid4())
 
+    # remove callbacks that are not enabled
+    cfg.trainer.callbacks = [i for i in cfg.trainer.callbacks.values() if i]
+    if not cfg.trainer["enable_checkpointing"]:
+        cfg.trainer.callbacks = [i for i in cfg.trainer.callbacks if i['_target_'] != 'lightning.pytorch.callbacks.ModelCheckpoint']
+    
     # instantiate trainer, model and dataset
     trainer = instantiate(cfg.trainer)
     model = instantiate(cfg.model)

@@ -1,5 +1,0 @@
-seed_everything: True
-
-trainer:
-  benchmark: False
-  deterministic: True

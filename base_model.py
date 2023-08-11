@@ -20,13 +20,14 @@ from augmentation.mixup import mixup_data, mixup_criterion
 from metrics.conf_mat import ConfusionMatrix
 
 import lightning as L
+import wandb
 
 
 class BaseModel(L.LightningModule):
-    def __init__(self, task, metric_computation_mode, confmat, metrics, num_classes, name,
+    def __init__(self, task, metric_computation_mode, result_plot, metrics, num_classes, name,
                  lr, weight_decay, optimizer, nesterov, sam, adaptive_sam, scheduler, T_max, warmstart, epochs,
                  mixup, mixup_alpha, label_smoothing, stochastic_depth, resnet_dropout, squeeze_excitation, apply_shakedrop, 
-                 undecay_norm, zero_init_residual, input_dim, input_channels):
+                 undecay_norm, zero_init_residual, input_dim, input_channels, *args, **kwargs):
         super(BaseModel, self).__init__()
 
         # Task
@@ -34,7 +35,7 @@ class BaseModel(L.LightningModule):
 
         # Metrics
         self.metric_computation_mode = metric_computation_mode
-        self.confmat_setting = confmat
+        self.result_plot_setting = result_plot
         metrics_dict = {}
 
         if self.task == "Classification":
@@ -79,16 +80,24 @@ class BaseModel(L.LightningModule):
                     num_classes=num_classes,
                 )
 
-            if self.confmat_setting in ["val", "all"]:
-                self.val_conf_mat = ConfusionMatrix(num_classes=num_classes)
-            if self.confmat_setting == "all":
-                self.train_conf_mat = ConfusionMatrix(num_classes=num_classes)
-
         elif self.task == "Regression":
             if "mse" in metrics:
                 metrics_dict["MSE"] = MeanSquaredError()
             if "mae" in metrics:
                 metrics_dict["MAE"] = MeanAbsoluteError()
+        
+        if self.result_plot_setting in ["val", "all"]:
+            if self.task == "Classification":
+                self.val_conf_mat = ConfusionMatrix(num_classes=num_classes)
+            elif self.task == "Regression":
+                self.val_pred_list = []
+                self.val_label_list = []
+        if self.result_plot_setting == "all":
+            if self.task == "Classification":
+                self.train_conf_mat = ConfusionMatrix(num_classes=num_classes)
+            elif self.task == "Regression":
+                self.train_pred_list = []
+                self.train_label_list = []
 
         metrics = MetricCollection(metrics_dict)
         self.train_metrics = metrics.clone(prefix="train_")
@@ -278,7 +287,10 @@ class BaseModel(L.LightningModule):
             self.train_metrics.update(y_hat, y)
 
         if hasattr(self, "train_conf_mat"):
-            self.train_conf_mat.update(y_hat, y)
+            self.train_conf_mat.update(y_hat, y)     
+        if hasattr(self, "train_pred_list"):
+            self.train_pred_list.extend(y_hat)
+            self.train_label_list.extend(y)
 
         return loss
 
@@ -318,6 +330,9 @@ class BaseModel(L.LightningModule):
 
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.update(y_hat, y)
+        if hasattr(self, "val_pred_list"):
+            self.val_pred_list.extend(y_hat)
+            self.val_label_list.extend(y)
 
     def on_validation_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
@@ -334,15 +349,20 @@ class BaseModel(L.LightningModule):
                 sync_dist=True if self.trainer.num_devices > 1 else False,
             )
 
-            """if hasattr(self, "val_conf_mat"):
-                self.val_conf_mat.save_state(self, "val")
-                self.val_conf_mat.reset()"""
-
             self.val_metrics.reset()
 
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.save_state(self, "val")
             self.val_conf_mat.reset()
+        if hasattr(self, "val_pred_list"):       
+            data = [[x, y] for (x, y) in zip(self.val_label_list, self.val_pred_list)]
+            table = wandb.Table(data=data, columns = ["Ground Truth", "Prediction"])
+            wandb.log({"Val Scatterplot" : wandb.plot.scatter(table, "Ground Truth", "Prediction", "Validation Scatterplot")})
+            # reset
+            self.val_pred_list = []
+            self.val_label_list = []
+        
+
 
     def on_train_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
@@ -360,15 +380,18 @@ class BaseModel(L.LightningModule):
                 sync_dist=True if self.trainer.num_devices > 1 else False,
             )
 
-            """if hasattr(self, "train_conf_mat"):
-                self.train_conf_mat.save_state(self, "train")
-                self.train_conf_mat.reset()"""
-
             self.train_metrics.reset()
 
         if hasattr(self, "train_conf_mat"):
             self.train_conf_mat.save_state(self, "train")
             self.train_conf_mat.reset()
+        if hasattr(self, "train_pred_list"):       
+            data = [[x, y] for (x, y) in zip(self.train_label_list, self.train_pred_list)]
+            table = wandb.Table(data=data, columns = ["Ground Truth", "Prediction"])
+            wandb.log({"Train Scatterplot" : wandb.plot.scatter(table, "Ground Truth", "Prediction", "Train Scatterplot")})
+            # reset
+            self.train_pred_list = []
+            self.train_label_list = []
 
     def on_train_start(self):
         from models.resnet import BasicBlock, Bottleneck

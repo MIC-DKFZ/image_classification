@@ -146,13 +146,14 @@ class ResNet(BaseModel):
     def __init__(self, arch, block, layers,
                  width_per_group=64, replace_stride_with_dilation=None,
                  norm_layer=None, output_stride=8, num_classes=10, hypparams={}):
-        super(ResNet, self).__init__(hypparams)
+        super(ResNet, self).__init__(**hypparams)
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
 
+        self.cifar_size = hypparams["cifar_size"]
         # Shakedrop
-        if self.dataset in ['CIFAR10', 'CIFAR100']:
+        if self.cifar_size:
             n = int(np.sum(layers[:-1]))
         else:
             n = int(np.sum(layers))
@@ -173,7 +174,7 @@ class ResNet(BaseModel):
             raise ValueError("replace_stride_with_dilation should be None "
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
 
-        if self.dataset == 'imagenet':
+        if not self.cifar_size:
             self.layer0 = nn.Sequential(
                 nn.Conv2d(3, self.inplanes, kernel_size=3, stride=2, padding=1, bias=False),
                 norm_layer(self.inplanes),
@@ -193,7 +194,7 @@ class ResNet(BaseModel):
             strides = [1, 2, 2, 2]
         # n_channels = [64, 128, 256, 512]
 
-        elif self.dataset in ['CIFAR10', 'CIFAR100', 'svhn']:
+        else:
             # for training cifar, change the kernel_size=7 -> kernel_size=3 with stride=1
             self.layer0 = nn.Sequential(
                 # nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False),
@@ -212,9 +213,6 @@ class ResNet(BaseModel):
                 print('INFO:PyTorch: Using output_stride {} on cifar10'.format(output_stride))
                 strides = [1, 1, 2, 1]
 
-        else:
-            raise NotImplementedError
-
         self.layer1 = self._make_layer(block, inplanes_origin, layers[0], stride=strides[0])
         self.layer2 = self._make_layer(block, inplanes_origin * 2, layers[1], stride=strides[1],
                                        dilate=replace_stride_with_dilation[0])
@@ -225,8 +223,8 @@ class ResNet(BaseModel):
         # If dataset is cifar, do not use layer4 because the size of the feature map is too small.
         # The original paper of resnet set total stride=8 with less channels.
         self.layer4 = None
-        if 'imagenet' in self.dataset:
-            print('INFO:PyTorch: Using layer4 for ImageNet Training')
+        if not self.cifar_size:
+            #print('INFO:PyTorch: Using layer4 for ImageNet Training')
             self.layer4 = self._make_layer(block, inplanes_origin * 8, layers[3], stride=strides[3],
                                            dilate=replace_stride_with_dilation[2])
             inplanes_now = inplanes_origin * 8
@@ -308,5 +306,17 @@ def _resnet(arch, block, layers, **kwargs):
 def WRN2810(**kwargs):
 
     return _resnet('wide_resnet28_10', BasicBlock, [4, 4, 4, 4],
-                   width_per_group=64, **kwargs)
+                   width_per_group=64, num_classes=kwargs["num_classes"], 
+                   hypparams=kwargs)#, **kwargs)
 
+'''class WRN2810(BaseModel):
+
+    def __init__(self, **kwargs):
+        super(WRN2810, self).__init__(**kwargs)
+
+        self.model = _resnet('wide_resnet28_10', BasicBlock, [4, 4, 4, 4],
+                   width_per_group=64, num_classes=kwargs["num_classes"], hypparams=kwargs)
+
+    def forward(self, x):
+        out = self.model(x)
+        return out'''

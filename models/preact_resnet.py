@@ -103,7 +103,7 @@ class PreActBottleneck(nn.Module):
 
 class PreActResNet(BaseModel):
     def __init__(self, block, num_blocks, num_classes=10, hypparams={}):
-        super(PreActResNet, self).__init__(hypparams)
+        super(PreActResNet, self).__init__(**hypparams)
         self.in_planes = 64
 
         # shakedrop
@@ -139,37 +139,52 @@ class PreActResNet(BaseModel):
         out = F.avg_pool2d(out, 4)
 
         out = F.dropout(out, p=self.resnet_dropout, training=self.training)
-
+        
         out = out.view(out.size(0), -1)
         out = self.linear(out)
 
         return out
 
 
-def PreActResNet18(num_classes, hypparams):
-    if not hypparams['bottleneck']:
-        return PreActResNet(PreActBlock, [2,2,2,2], num_classes=num_classes, hypparams=hypparams)
-
-
-def PreActResNet34(num_classes, hypparams):
-    if not hypparams['bottleneck']:
-        return PreActResNet(PreActBlock, [3,4,6,3], num_classes=num_classes, hypparams=hypparams)
-
-
-def PreActResNet50(num_classes, hypparams):
-    if hypparams['bottleneck']:
-        return PreActResNet(PreActBottleneck, [3,4,6,3], num_classes=num_classes, hypparams=hypparams)
+def PreActResNet18(**kwargs):
+    if not kwargs['cifar_size']:
+        raise NotImplementedError
+    if not kwargs['bottleneck']:
+        return PreActResNet(PreActBlock, [2,2,2,2], num_classes=kwargs['num_classes'], hypparams=kwargs)
     else:
-        return PreActResNet(PreActBlock, [4, 6, 10, 5], num_classes=num_classes, hypparams=hypparams)
+        raise NotImplementedError
 
 
-def PreActResNet101(num_classes, hypparams):
-    if hypparams['bottleneck']:
-        return PreActResNet(PreActBottleneck, [3,4,23,3], num_classes=num_classes, hypparams=hypparams)
-
-
-def PreActResNet152(num_classes, hypparams):
-    if hypparams['bottleneck']:
-        return PreActResNet(PreActBottleneck, [3,8,36,3], num_classes=num_classes, hypparams=hypparams)
+def PreActResNet34(**kwargs):
+    if not kwargs['cifar_size']:
+        raise NotImplementedError
+    if not kwargs['bottleneck']:
+        return PreActResNet(PreActBlock, [3,4,6,3], num_classes=kwargs['num_classes'], hypparams=kwargs)
     else:
-        return PreActResNet(PreActBlock, [4, 13, 55, 4], num_classes=num_classes, hypparams=hypparams)
+        raise NotImplementedError
+
+
+def PreActResNet50(**kwargs):
+    if not kwargs['cifar_size']:
+        raise NotImplementedError
+    if kwargs['bottleneck']:
+        return PreActResNet(PreActBottleneck, [3,4,6,3], num_classes=kwargs['num_classes'], hypparams=kwargs)
+    else:
+        return PreActResNet(PreActBlock, [4, 6, 10, 5], num_classes=kwargs['num_classes'], hypparams=kwargs)
+
+
+def PreActResNet101(**kwargs):
+    if not kwargs['cifar_size']:
+        raise NotImplementedError
+    if kwargs['bottleneck']:
+        return PreActResNet(PreActBottleneck, [3,4,23,3], num_classes=kwargs['num_classes'], hypparams=kwargs)
+    else:
+        raise NotImplementedError
+
+def PreActResNet152(**kwargs):
+    if not kwargs['cifar_size']:
+        raise NotImplementedError
+    if kwargs['bottleneck']:
+        return PreActResNet(PreActBottleneck, [3,8,36,3], num_classes=kwargs['num_classes'], hypparams=kwargs)
+    else:
+        return PreActResNet(PreActBlock, [4, 13, 55, 4], num_classes=kwargs['num_classes'], hypparams=kwargs)
