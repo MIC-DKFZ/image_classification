@@ -1,33 +1,62 @@
-import torch
-import torch.nn as nn
-import numpy as np
-
 import math
 import warnings
-import time
-import os
-from torch.optim.lr_scheduler import _LRScheduler
-
-import pytorch_lightning as pl
-from torchmetrics import Accuracy, F1Score, Precision, Recall, MeanAbsoluteError, MeanSquaredError, MetricCollection, AUROC
-from pytorch_lightning.callbacks import Callback
-from datasets.cifar import CIFAR10, CIFAR100, Cifar10Albumentation, Cifar100Albumentation
-from datasets.imagenet import ImageNet
-from regularization.sam import SAM
-from madgrad import MADGRAD
-from timm.optim import RMSpropTF
-from augmentation.mixup import mixup_data, mixup_criterion
-from metrics.conf_mat import ConfusionMatrix
 
 import lightning as L
+import torch
+import torch.nn as nn
 import wandb
+from madgrad import MADGRAD
+from timm.optim import RMSpropTF
+from torch.optim.lr_scheduler import _LRScheduler
+from torchmetrics import (
+    AUROC,
+    Accuracy,
+    F1Score,
+    MeanAbsoluteError,
+    MeanSquaredError,
+    MetricCollection,
+    Precision,
+    Recall,
+)
+
+from augmentation.mixup import mixup_criterion, mixup_data
+from metrics.conf_mat import ConfusionMatrix
+from regularization.sam import SAM
 
 
 class BaseModel(L.LightningModule):
-    def __init__(self, task, metric_computation_mode, result_plot, metrics, num_classes, name,
-                 lr, weight_decay, optimizer, nesterov, sam, adaptive_sam, scheduler, T_max, warmstart, epochs,
-                 mixup, mixup_alpha, label_smoothing, stochastic_depth, resnet_dropout, squeeze_excitation, apply_shakedrop, 
-                 undecay_norm, zero_init_residual, input_dim, input_channels, *args, **kwargs):
+    def __init__(
+        self,
+        task,
+        metric_computation_mode,
+        result_plot,
+        metrics,
+        num_classes,
+        name,
+        lr,
+        weight_decay,
+        optimizer,
+        nesterov,
+        sam,
+        adaptive_sam,
+        scheduler,
+        T_max,
+        warmstart,
+        epochs,
+        mixup,
+        mixup_alpha,
+        label_smoothing,
+        stochastic_depth,
+        resnet_dropout,
+        squeeze_excitation,
+        apply_shakedrop,
+        undecay_norm,
+        zero_init_residual,
+        input_dim,
+        input_channels,
+        *args,
+        **kwargs
+    ):
         super(BaseModel, self).__init__()
 
         # Task
@@ -85,7 +114,7 @@ class BaseModel(L.LightningModule):
                 metrics_dict["MSE"] = MeanSquaredError()
             if "mae" in metrics:
                 metrics_dict["MAE"] = MeanAbsoluteError()
-        
+
         if self.result_plot_setting in ["val", "all"]:
             if self.task == "Classification":
                 self.val_conf_mat = ConfusionMatrix(num_classes=num_classes)
@@ -105,7 +134,7 @@ class BaseModel(L.LightningModule):
 
         # Training Args
         self.name = name
-        #self.batch_size = batch_size
+        # self.batch_size = batch_size
         self.lr = lr
         self.weight_decay = weight_decay
         self.optimizer = optimizer
@@ -116,11 +145,10 @@ class BaseModel(L.LightningModule):
         self.T_max = T_max
         self.warmstart = warmstart
         self.epochs = epochs
-        
 
         # Regularization techniques
         self.mixup = mixup
-        self.mixup_alpha = mixup_alpha # 0.2
+        self.mixup_alpha = mixup_alpha  # 0.2
         self.label_smoothing = label_smoothing  # 0.1
         self.stochastic_depth = stochastic_depth  # 0.1 (with higher resolution maybe 0.2)
         self.resnet_dropout = resnet_dropout  # 0.5
@@ -134,71 +162,6 @@ class BaseModel(L.LightningModule):
         self.input_channels = input_channels
         self.num_classes = num_classes
 
-        '''os.makedirs(self.data_dir, exist_ok=True)
-        self.download = False if any(os.scandir(self.data_dir)) else True
-
-        ################################################################################################################
-        # dataset specific
-        if self.dataset.startswith("CIFAR"):
-            self.mean, self.std = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-            from augmentation.policies.cifar import (
-                get_baseline,
-                get_auto_augmentation,
-                get_rand_augmentation,
-                get_album,
-                test_transform,
-                get_baseline_cutout,
-            )
-
-            # according to https://arxiv.org/pdf/1708.04552v2.pdf a smaller cutout size should be used for more classes
-            cutout_size = 16 if self.dataset == "CIFAR10" else 8
-
-            if self.aug == "baseline":
-                self.transform_train = get_baseline(self.mean, self.std)
-
-            elif self.aug == "baseline_cutout":
-                self.transform_train = get_baseline_cutout(self.mean, self.std, cutout_size)
-
-            elif self.aug == "autoaugment":
-                self.transform_train = get_auto_augmentation(self.mean, self.std, cutout_size)
-
-            elif self.aug == "randaugment":
-                self.transform_train = get_rand_augmentation(self.mean, self.std, cutout_size)
-
-            elif self.aug == "album":
-                # Albumentation pipeline
-                self.transform_train = get_album(self.mean, self.std)
-
-            self.test_transform = test_transform(self.mean, self.std)
-
-        elif self.dataset == "Imagenet":
-            self.mean, self.std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
-            from augmentation.policies.imagenet import (
-                get_baseline,
-                test_transform,
-                get_auto_augmentation,
-                get_baseline_cutout,
-                get_rand_augmentation,
-            )
-
-            cutout_size = 112
-
-            if self.aug == "baseline":
-                self.transform_train = get_baseline(self.mean, self.std)
-
-            elif self.aug == "baseline_cutout":
-                self.transform_train = get_baseline_cutout(self.mean, self.std, cutout_size)
-
-            elif self.aug == "autoaugment":
-                self.transform_train = get_auto_augmentation(self.mean, self.std)
-
-            elif self.aug == "randaugment":
-                self.transform_train = get_rand_augmentation(self.mean, self.std)
-
-            self.test_transform = test_transform(self.mean, self.std)'''
-
-        ################################################################################################################
-
         # switch to manual optimization for Sharpness Aware Minimization
         if self.sam:
             self.automatic_optimization = False
@@ -208,12 +171,6 @@ class BaseModel(L.LightningModule):
             self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
         elif self.task == "Regression":
             self.criterion = nn.MSELoss()
-
-        # Inference
-        #self.softmax = nn.Softmax(dim=1)
-
-        # Seed
-        #self.seed = seed
 
     def forward(self, x):
         pass
@@ -263,7 +220,7 @@ class BaseModel(L.LightningModule):
             on_step=False,
             on_epoch=True,
             prog_bar=True,
-            sync_dist=True if self.trainer.num_devices > 1 else False,
+            sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
         )
 
         if torch.isnan(y_hat).any():
@@ -281,13 +238,13 @@ class BaseModel(L.LightningModule):
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
-                sync_dist=True if self.trainer.num_devices > 1 else False,
+                sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
         elif self.metric_computation_mode == "epochwise":
             self.train_metrics.update(y_hat, y)
 
         if hasattr(self, "train_conf_mat"):
-            self.train_conf_mat.update(y_hat, y)     
+            self.train_conf_mat.update(y_hat, y)
         if hasattr(self, "train_pred_list"):
             self.train_pred_list.extend(y_hat)
             self.train_label_list.extend(y)
@@ -308,7 +265,7 @@ class BaseModel(L.LightningModule):
             on_step=False,
             on_epoch=True,
             prog_bar=True,
-            sync_dist=True if self.trainer.num_devices > 1 else False,
+            sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
         )
 
         # save metrics
@@ -323,7 +280,7 @@ class BaseModel(L.LightningModule):
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
-                sync_dist=True if self.trainer.num_devices > 1 else False,
+                sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
         elif self.metric_computation_mode == "epochwise":
             self.val_metrics.update(y_hat, y)
@@ -346,7 +303,7 @@ class BaseModel(L.LightningModule):
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
-                sync_dist=True if self.trainer.num_devices > 1 else False,
+                sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
 
             self.val_metrics.reset()
@@ -354,15 +311,15 @@ class BaseModel(L.LightningModule):
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.save_state(self, "val")
             self.val_conf_mat.reset()
-        if hasattr(self, "val_pred_list"):       
+        if hasattr(self, "val_pred_list"):
             data = [[x, y] for (x, y) in zip(self.val_label_list, self.val_pred_list)]
-            table = wandb.Table(data=data, columns = ["Ground Truth", "Prediction"])
-            wandb.log({"Val Scatterplot" : wandb.plot.scatter(table, "Ground Truth", "Prediction", "Validation Scatterplot")})
+            table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
+            wandb.log(
+                {"Val Scatterplot": wandb.plot.scatter(table, "Ground Truth", "Prediction", "Validation Scatterplot")}
+            )
             # reset
             self.val_pred_list = []
             self.val_label_list = []
-        
-
 
     def on_train_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
@@ -377,7 +334,7 @@ class BaseModel(L.LightningModule):
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
-                sync_dist=True if self.trainer.num_devices > 1 else False,
+                sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
 
             self.train_metrics.reset()
@@ -385,19 +342,23 @@ class BaseModel(L.LightningModule):
         if hasattr(self, "train_conf_mat"):
             self.train_conf_mat.save_state(self, "train")
             self.train_conf_mat.reset()
-        if hasattr(self, "train_pred_list"):       
+        if hasattr(self, "train_pred_list"):
             data = [[x, y] for (x, y) in zip(self.train_label_list, self.train_pred_list)]
-            table = wandb.Table(data=data, columns = ["Ground Truth", "Prediction"])
-            wandb.log({"Train Scatterplot" : wandb.plot.scatter(table, "Ground Truth", "Prediction", "Train Scatterplot")})
+            table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
+            wandb.log(
+                {"Train Scatterplot": wandb.plot.scatter(table, "Ground Truth", "Prediction", "Train Scatterplot")}
+            )
             # reset
             self.train_pred_list = []
             self.train_label_list = []
 
     def on_train_start(self):
-        from models.resnet import BasicBlock, Bottleneck
-        from models.wide_resnet import BasicBlock as Wide_BasicBlock, Bottleneck as Wide_Bottleneck
-        from models.pyramidnet import BasicBlock as BasicBlock_pyramid, Bottleneck as Bottleneck_pyramid
         from models.preact_resnet import PreActBlock, PreActBottleneck
+        from models.pyramidnet import BasicBlock as BasicBlock_pyramid
+        from models.pyramidnet import Bottleneck as Bottleneck_pyramid
+        from models.resnet import BasicBlock, Bottleneck
+        from models.wide_resnet import BasicBlock as Wide_BasicBlock
+        from models.wide_resnet import Bottleneck as Wide_Bottleneck
 
         # TODO: disable weight init if model is pretrained once pretrained models are enabled
         print("Initializing weights")
@@ -452,14 +413,21 @@ class BaseModel(L.LightningModule):
                         norm_params += [p]
                     else:
                         model_params += [p]
-            params = [{"params": model_params}, {"params": norm_params, "weight_decay": 0}]
+            params = [
+                {"params": model_params},
+                {"params": norm_params, "weight_decay": 0},
+            ]
         else:
             params = self.parameters()
 
         if not self.sam:
             if self.optimizer == "SGD":
                 optimizer = torch.optim.SGD(
-                    params, lr=self.lr, momentum=0.9, weight_decay=self.weight_decay, nesterov=self.nesterov
+                    params,
+                    lr=self.lr,
+                    momentum=0.9,
+                    weight_decay=self.weight_decay,
+                    nesterov=self.nesterov,
                 )
             elif self.optimizer == "Adam":
                 optimizer = torch.optim.Adam(params, lr=self.lr, weight_decay=self.weight_decay)
@@ -544,121 +512,6 @@ class BaseModel(L.LightningModule):
 
             return [optimizer], [scheduler]
 
-    '''def train_dataloader(self):
-        if self.dataset == "CIFAR10":
-            if self.aug == "album":
-                trainset = Cifar10Albumentation(
-                    root=self.data_dir, train=True, download=self.download, transform=self.transform_train
-                )
-            else:
-                trainset = CIFAR10(
-                    root=self.data_dir, train=True, download=self.download, transform=self.transform_train
-                )
-
-        elif self.dataset == "CIFAR100":
-            if self.aug == "album":
-                trainset = Cifar100Albumentation(
-                    root=self.data_dir, train=True, download=self.download, transform=self.transform_train
-                )
-            else:
-                trainset = CIFAR100(
-                    root=self.data_dir, train=True, download=self.download, transform=self.transform_train
-                )
-
-        elif self.dataset == "Imagenet":
-            # path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original" TODO
-
-            trainset = ImageNet(root=self.data_dir, split="train", transform=self.transform_train)
-
-        if not self.random_batches:
-            trainloader = DataLoader(
-                trainset,
-                batch_size=self.batch_size,
-                shuffle=True,
-                num_workers=self.num_workers,
-                pin_memory=True,
-                worker_init_fn=seed_worker,
-                persistent_workers=True,
-            )
-
-        else:
-            print("RandomSampler with replacement is used!")
-            random_sampler = RandomSampler(trainset, replacement=True, num_samples=len(trainset))
-            trainloader = DataLoader(
-                trainset,
-                batch_size=self.batch_size,
-                num_workers=self.num_workers,
-                pin_memory=True,
-                worker_init_fn=seed_worker,
-                persistent_workers=True,
-                sampler=random_sampler,
-            )
-
-        return trainloader
-
-    def val_dataloader(self):
-        if self.dataset == "CIFAR10":
-            testset = CIFAR10(root=self.data_dir, train=False, download=self.download, transform=self.test_transform)
-
-        elif self.dataset == "CIFAR100":
-            testset = CIFAR100(root=self.data_dir, train=False, download=self.download, transform=self.test_transform)
-
-        elif self.dataset == "Imagenet":
-            # path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original" TODO
-            testset = ImageNet(root=self.data_dir, split="val", transform=self.test_transform)
-
-        testloader = DataLoader(
-            testset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            pin_memory=True,
-            worker_init_fn=seed_worker,
-            persistent_workers=True,
-        )
-
-        return testloader'''
-
-
-'''class TimerCallback(Callback):
-    def __init__(self, epochs, num_gpus):
-        self.num_gpus = num_gpus
-        if self.num_gpus > 0:
-            self.start = torch.cuda.Event(enable_timing=True)
-            self.end = torch.cuda.Event(enable_timing=True)
-        self.epochs = epochs
-        self.epoch_times = []
-
-    def on_train_epoch_start(self, trainer, pl_module):
-        if trainer.current_epoch == 0:  # ignore first epoch
-            pass
-        else:
-            if self.num_gpus == 0:
-                self.start_cpu = time.time()
-            else:
-                self.start.record()
-
-    def on_train_epoch_end(self, trainer, pl_module):  # , outputs):
-        if trainer.current_epoch == 0:
-            pass
-        else:
-            if self.num_gpus == 0:
-                end = time.time()
-                elapsed_time = end - self.start_cpu
-            else:
-                self.end.record()
-                torch.cuda.synchronize()
-                elapsed_time = self.start.elapsed_time(self.end) / 1000  # transform to seconds
-            # print(elapsed_time)
-            self.epoch_times.append(elapsed_time)
-        if trainer.current_epoch == self.epochs - 1:
-            avg_epoch_time = np.mean(self.epoch_times)
-            self.log("avg_epoch_time", avg_epoch_time)
-            print("Average time per train epoch in seconds: ", avg_epoch_time)'''
-
-
-
-
 
 class CosineAnnealingLR_Warmstart(_LRScheduler):
     """
@@ -677,7 +530,8 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
     def get_lr(self):
         if not self._get_lr_called_within_step:
             warnings.warn(
-                "To get the last learning rate computed by the scheduler, please use `get_last_lr()`.", UserWarning
+                "To get the last learning rate computed by the scheduler, please use `get_last_lr()`.",
+                UserWarning,
             )
 
         # Warmstart

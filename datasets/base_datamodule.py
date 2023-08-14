@@ -1,14 +1,24 @@
-from lightning.pytorch import LightningDataModule
-from torch.utils.data import DataLoader, RandomSampler
-import numpy as np
-import torch
 import random
 from pathlib import Path
 
+import numpy as np
+import torch
+from lightning.pytorch import LightningDataModule
+from torch.utils.data import DataLoader, RandomSampler
+
 
 class BaseDataModule(LightningDataModule):
-    def __init__(self, data_root_dir, name, batch_size, train_transforms, test_transforms, random_batches, 
-                 num_workers, prepare_data_per_node):
+    def __init__(
+        self,
+        data_root_dir,
+        name,
+        batch_size,
+        train_transforms,
+        test_transforms,
+        random_batches,
+        num_workers,
+        prepare_data_per_node,
+    ):
         super(BaseDataModule, self).__init__()
 
         self.root = Path(data_root_dir) / name
@@ -18,15 +28,14 @@ class BaseDataModule(LightningDataModule):
         self.random_batches = random_batches
         self.num_workers = num_workers
         self.prepare_data_per_node = prepare_data_per_node
-    
+
     def prepare_data(self) -> None:
         return super().prepare_data()
-    
+
     def setup(self, stage: str) -> None:
         pass
-    
-    def train_dataloader(self):
 
+    def train_dataloader(self):
         if not self.random_batches:
             trainloader = DataLoader(
                 self.train_dataset,
@@ -40,7 +49,11 @@ class BaseDataModule(LightningDataModule):
 
         else:
             print("RandomSampler with replacement is used!")
-            random_sampler = RandomSampler(self.train_dataset, replacement=True, num_samples=len(self.train_dataset))
+            random_sampler = RandomSampler(
+                self.train_dataset,
+                replacement=True,
+                num_samples=len(self.train_dataset),
+            )
             trainloader = DataLoader(
                 self.train_dataset,
                 batch_size=self.batch_size,
@@ -54,7 +67,6 @@ class BaseDataModule(LightningDataModule):
         return trainloader
 
     def val_dataloader(self):
-
         valloader = DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
@@ -68,7 +80,6 @@ class BaseDataModule(LightningDataModule):
         return valloader
 
     def test_dataloader(self):
-
         testloader = DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,

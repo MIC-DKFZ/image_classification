@@ -1,9 +1,11 @@
-import torchvision.transforms as transforms
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-from randaugment import RandAugment, Cutout, CIFAR10Policy
-from jsonargparse import class_from_function
 from typing import Any, Callable
+
+import albumentations as A
+import torchvision.transforms as transforms
+from albumentations.pytorch import ToTensorV2
+from jsonargparse import class_from_function
+from randaugment import CIFAR10Policy, Cutout, RandAugment
+
 from .base_transform import BaseTransform
 
 MEAN, STD = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
@@ -12,8 +14,8 @@ MEAN, STD = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
 class BaselineTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
         super(BaselineTransform, self).__init__()
-    def __call__(self):
 
+    def __call__(self):
         transform_train = transforms.Compose(
             [
                 transforms.RandomCrop(32, padding=4),
@@ -32,7 +34,6 @@ class BaselineCutoutTransform(BaseTransform):
         self.cutout_size = cutout_size
 
     def __call__(self):
-
         transform_train = transforms.Compose(
             [
                 transforms.RandomCrop(32, padding=4),
@@ -52,7 +53,6 @@ class AutoAugmentTransform(BaseTransform):
         self.cutout_size = cutout_size
 
     def __call__(self):
-
         transform_train = transforms.Compose(
             [
                 transforms.RandomCrop(32, padding=4),
@@ -78,7 +78,6 @@ class RandAugmentTransform(BaseTransform):
         self.cutout_size = cutout_size
 
     def __call__(self):
-
         transform_train = transforms.Compose(
             [
                 transforms.RandomCrop(32, padding=4),
@@ -103,7 +102,6 @@ class AlbumAugmentTransform(BaseTransform):
         super(AlbumAugmentTransform, self).__init__()
 
     def __call__(self):
-
         transform_train = A.Compose(
             [
                 A.InvertImg(always_apply=False, p=0.2),
@@ -134,7 +132,13 @@ class AlbumAugmentTransform(BaseTransform):
                     mask_value=None,
                 ),
                 A.Rotate(
-                    always_apply=False, p=0.2, limit=(-30, 30), interpolation=1, border_mode=4, value=None, mask_value=None
+                    always_apply=False,
+                    p=0.2,
+                    limit=(-30, 30),
+                    interpolation=1,
+                    border_mode=4,
+                    value=None,
+                    mask_value=None,
                 ),
                 A.HorizontalFlip(always_apply=False, p=0.2),
                 A.ShiftScaleRotate(
@@ -152,7 +156,13 @@ class AlbumAugmentTransform(BaseTransform):
                 A.Equalize(always_apply=False, p=0.2, mode="cv", by_channels=True),
                 A.InvertImg(always_apply=False, p=0.2),
                 A.Rotate(
-                    always_apply=False, p=0.2, limit=(-30, 30), interpolation=1, border_mode=4, value=None, mask_value=None
+                    always_apply=False,
+                    p=0.2,
+                    limit=(-30, 30),
+                    interpolation=1,
+                    border_mode=4,
+                    value=None,
+                    mask_value=None,
                 ),
                 A.ShiftScaleRotate(
                     always_apply=False,
@@ -187,12 +197,12 @@ class AlbumAugmentTransform(BaseTransform):
 
         return transform_train
 
- 
+
 class TestTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
         super(TestTransform, self).__init__()
-    def __call__(self):
 
+    def __call__(self):
         transform_test = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -202,7 +212,8 @@ class TestTransform(BaseTransform):
 
         return transform_test
 
-'''def get_baseline() -> transforms.Compose:
+
+"""def get_baseline() -> transforms.Compose:
 
     transform_train = transforms.Compose(
         [
@@ -376,4 +387,4 @@ get_baseline_class = class_from_function(get_baseline)
 get_baseline_cutout_class = class_from_function(get_baseline_cutout)
 get_auto_augmentation_class = class_from_function(get_auto_augmentation)
 get_rand_augmentation_class = class_from_function(get_rand_augmentation)
-get_album_class = class_from_function(get_album)'''
+get_album_class = class_from_function(get_album)"""

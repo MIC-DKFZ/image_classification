@@ -1,4 +1,5 @@
 from torchvision.datasets import ImageNet
+
 from .base_datamodule import BaseDataModule
 
 
@@ -7,7 +8,6 @@ class ImagenetDataModule(BaseDataModule):
         super(ImagenetDataModule, self).__init__(**params)
 
     def setup(self, stage: str):
-
         if "albumentations" in str(self.train_transforms.__class__):
             raise NotImplementedError
         else:

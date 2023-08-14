@@ -1,29 +1,38 @@
-'''
+"""
 Original PyramidNet Implementation from https://github.com/dyhan0920/PyramidNet-PyTorch/blob/master/PyramidNet.py
 extended and modified to support stochastic depth, additional dropout, squeeze-excitation and shake drop
-'''
+"""
 
+import math
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-import numpy as np
+from timm.models.layers import DropPath, create_attn
 
 from base_model import BaseModel
 from regularization.shakedrop import ShakeDrop
-from timm.models.layers import DropPath, create_attn
 
 
 def conv3x3(in_planes, out_planes, stride=1):
     "3x3 convolution with padding"
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
 
 
 class BasicBlock(nn.Module):
     outchannel_ratio = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, stochastic_depth=0.0, apply_se=False, p_shakedrop=None):
+    def __init__(
+        self,
+        inplanes,
+        planes,
+        stride=1,
+        downsample=None,
+        stochastic_depth=0.0,
+        apply_se=False,
+        p_shakedrop=None,
+    ):
         super(BasicBlock, self).__init__()
         self.bn1 = nn.BatchNorm2d(inplanes)
         self.conv1 = conv3x3(inplanes, planes, stride)
@@ -40,12 +49,13 @@ class BasicBlock(nn.Module):
         self.apply_se = apply_se
         outplanes = planes * self.outchannel_ratio
         if self.apply_se:
-            self.se = create_attn('se', outplanes, reduction_ratio=0.25)  # ratio from https://arxiv.org/pdf/2103.07579.pdf
+            self.se = create_attn(
+                "se", outplanes, reduction_ratio=0.25
+            )  # ratio from https://arxiv.org/pdf/2103.07579.pdf
 
         self.shake_drop = ShakeDrop(p_shakedrop) if p_shakedrop else None
 
     def forward(self, x):
-
         out = self.bn1(x)
         out = self.conv1(out)
         out = self.bn2(out)
@@ -62,7 +72,8 @@ class BasicBlock(nn.Module):
 
         h0 = x if not self.downsample else self.downsample(x)
         pad_zero = torch.autograd.Variable(
-            torch.zeros(h0.size(0), h.size(1) - h0.size(1), h0.size(2), h0.size(3)).float()).cuda()
+            torch.zeros(h0.size(0), h.size(1) - h0.size(1), h0.size(2), h0.size(3)).float()
+        ).cuda()
         h0 = torch.cat([h0, pad_zero], dim=1)
 
         return h + h0
@@ -71,15 +82,28 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     outchannel_ratio = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, stochastic_depth=0.0, apply_se=False, p_shakedrop=None):
+    def __init__(
+        self,
+        inplanes,
+        planes,
+        stride=1,
+        downsample=None,
+        stochastic_depth=0.0,
+        apply_se=False,
+        p_shakedrop=None,
+    ):
         super(Bottleneck, self).__init__()
         self.bn1 = nn.BatchNorm2d(inplanes)
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, (planes * 1), kernel_size=3, stride=stride,
-                               padding=1, bias=False)
+        self.conv2 = nn.Conv2d(planes, (planes * 1), kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn3 = nn.BatchNorm2d((planes * 1))
-        self.conv3 = nn.Conv2d((planes * 1), planes * Bottleneck.outchannel_ratio, kernel_size=1, bias=False)
+        self.conv3 = nn.Conv2d(
+            (planes * 1),
+            planes * Bottleneck.outchannel_ratio,
+            kernel_size=1,
+            bias=False,
+        )
         self.bn4 = nn.BatchNorm2d(planes * Bottleneck.outchannel_ratio)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
@@ -91,11 +115,12 @@ class Bottleneck(nn.Module):
         self.apply_se = apply_se
         outplanes = planes * self.outchannel_ratio
         if self.apply_se:
-            self.se = create_attn('se', outplanes, reduction_ratio=0.25)  # ratio from https://arxiv.org/pdf/2103.07579.pdf
+            self.se = create_attn(
+                "se", outplanes, reduction_ratio=0.25
+            )  # ratio from https://arxiv.org/pdf/2103.07579.pdf
         self.shake_drop = ShakeDrop(p_shakedrop) if p_shakedrop else None
 
     def forward(self, x):
-
         out = self.bn1(x)
         out = self.conv1(out)
 
@@ -118,14 +143,14 @@ class Bottleneck(nn.Module):
 
         h0 = x if not self.downsample else self.downsample(x)
         pad_zero = torch.autograd.Variable(
-            torch.zeros(h0.size(0), h.size(1) - h0.size(1), h0.size(2), h0.size(3)).float()).cuda()
+            torch.zeros(h0.size(0), h.size(1) - h0.size(1), h0.size(2), h0.size(3)).float()
+        ).cuda()
         h0 = torch.cat([h0, pad_zero], dim=1)
 
         return h + h0
 
 
 class PyramidNet(BaseModel):
-
     def __init__(self, depth, alpha, bottleneck=False, num_classes=10, hypparams={}):
         super(PyramidNet, self).__init__(**hypparams)
         self.cifar_size = hypparams["cifar_size"]
@@ -143,12 +168,19 @@ class PyramidNet(BaseModel):
             if self.apply_shakedrop:
                 self.ps_shakedrop = [1 - (1.0 - (0.5 / (3 * n)) * (i + 1)) for i in range(3 * n)]
             else:
-                self.ps_shakedrop = [None for _ in range(3*n)]
+                self.ps_shakedrop = [None for _ in range(3 * n)]
 
             self.addrate = alpha / (3 * n * 1.0)
 
             self.input_featuremap_dim = self.inplanes
-            self.conv1 = nn.Conv2d(3, self.input_featuremap_dim, kernel_size=3, stride=1, padding=1, bias=False)
+            self.conv1 = nn.Conv2d(
+                3,
+                self.input_featuremap_dim,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False,
+            )
             self.bn1 = nn.BatchNorm2d(self.input_featuremap_dim)
 
             self.featuremap_dim = self.input_featuremap_dim
@@ -163,9 +195,22 @@ class PyramidNet(BaseModel):
             self.fc = nn.Linear(self.final_featuremap_dim, num_classes)
 
         else:
-            blocks = {18: BasicBlock, 34: BasicBlock, 50: Bottleneck, 101: Bottleneck, 152: Bottleneck, 200: Bottleneck}
-            layers = {18: [2, 2, 2, 2], 34: [3, 4, 6, 3], 50: [3, 4, 6, 3], 101: [3, 4, 23, 3], 152: [3, 8, 36, 3],
-                      200: [3, 24, 36, 3]}
+            blocks = {
+                18: BasicBlock,
+                34: BasicBlock,
+                50: Bottleneck,
+                101: Bottleneck,
+                152: Bottleneck,
+                200: Bottleneck,
+            }
+            layers = {
+                18: [2, 2, 2, 2],
+                34: [3, 4, 6, 3],
+                50: [3, 4, 6, 3],
+                101: [3, 4, 23, 3],
+                152: [3, 8, 36, 3],
+                200: [3, 24, 36, 3],
+            }
 
             if layers.get(depth) is None:
                 if bottleneck:
@@ -176,7 +221,7 @@ class PyramidNet(BaseModel):
                     temp_cfg = int((depth - 2) / 8)
 
                 layers[depth] = [temp_cfg, temp_cfg, temp_cfg, temp_cfg]
-                print('=> the layer configuration for each stage is set to', layers[depth])
+                print("=> the layer configuration for each stage is set to", layers[depth])
 
             n = int(np.sum(layers[depth]))
             self.u_idx = 0
@@ -189,7 +234,14 @@ class PyramidNet(BaseModel):
             self.addrate = alpha / (sum(layers[depth]) * 1.0)
 
             self.input_featuremap_dim = self.inplanes
-            self.conv1 = nn.Conv2d(3, self.input_featuremap_dim, kernel_size=7, stride=2, padding=3, bias=False)
+            self.conv1 = nn.Conv2d(
+                3,
+                self.input_featuremap_dim,
+                kernel_size=7,
+                stride=2,
+                padding=3,
+                bias=False,
+            )
             self.bn1 = nn.BatchNorm2d(self.input_featuremap_dim)
             self.relu = nn.ReLU(inplace=True)
             self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -209,7 +261,7 @@ class PyramidNet(BaseModel):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
+                m.weight.data.normal_(0, math.sqrt(2.0 / n))
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
@@ -221,16 +273,30 @@ class PyramidNet(BaseModel):
 
         layers = []
         self.featuremap_dim = self.featuremap_dim + self.addrate
-        layers.append(block(self.input_featuremap_dim, int(round(self.featuremap_dim)), stride, downsample,
-                            stochastic_depth=self.stochastic_depth, apply_se=self.se,
-                            p_shakedrop=self.ps_shakedrop[self.u_idx]))
+        layers.append(
+            block(
+                self.input_featuremap_dim,
+                int(round(self.featuremap_dim)),
+                stride,
+                downsample,
+                stochastic_depth=self.stochastic_depth,
+                apply_se=self.se,
+                p_shakedrop=self.ps_shakedrop[self.u_idx],
+            )
+        )
         self.u_idx += 1
         for i in range(1, block_depth):
             temp_featuremap_dim = self.featuremap_dim + self.addrate
             layers.append(
-                block(int(round(self.featuremap_dim)) * block.outchannel_ratio, int(round(temp_featuremap_dim)), 1,
-                      stochastic_depth=self.stochastic_depth, apply_se=self.se,
-                      p_shakedrop=self.ps_shakedrop[self.u_idx]))
+                block(
+                    int(round(self.featuremap_dim)) * block.outchannel_ratio,
+                    int(round(temp_featuremap_dim)),
+                    1,
+                    stochastic_depth=self.stochastic_depth,
+                    apply_se=self.se,
+                    p_shakedrop=self.ps_shakedrop[self.u_idx],
+                )
+            )
             self.featuremap_dim = temp_featuremap_dim
             self.u_idx += 1
         self.input_featuremap_dim = int(round(self.featuremap_dim)) * block.outchannel_ratio
@@ -279,11 +345,20 @@ class PyramidNet(BaseModel):
 
 
 def PyramidNet110(**kwargs):
-    return PyramidNet(depth=110, alpha=270, bottleneck=kwargs['bottleneck'],
-                      num_classes=kwargs['num_classes'], hypparams=kwargs)
+    return PyramidNet(
+        depth=110,
+        alpha=270,
+        bottleneck=kwargs["bottleneck"],
+        num_classes=kwargs["num_classes"],
+        hypparams=kwargs,
+    )
 
 
 def PyramidNet272(**kwargs):
-    return PyramidNet(depth=272, alpha=200, bottleneck=kwargs['bottleneck'],
-                      num_classes=kwargs['num_classes'], hypparams=kwargs)
-
+    return PyramidNet(
+        depth=272,
+        alpha=200,
+        bottleneck=kwargs["bottleneck"],
+        num_classes=kwargs["num_classes"],
+        hypparams=kwargs,
+    )

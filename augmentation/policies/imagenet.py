@@ -1,7 +1,7 @@
 import torchvision.transforms as transforms
-from randaugment import RandAugment, Cutout, ImageNetPolicy
-from .base_transform import BaseTransform
+from randaugment import Cutout, ImageNetPolicy, RandAugment
 
+from .base_transform import BaseTransform
 
 MEAN, STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
 
@@ -9,8 +9,8 @@ MEAN, STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
 class BaselineTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
         super(BaselineTransform, self).__init__()
-    def __call__(self):
 
+    def __call__(self):
         transform_train = transforms.Compose(
             [
                 transforms.RandomResizedCrop(224),
@@ -22,13 +22,13 @@ class BaselineTransform(BaseTransform):
 
         return transform_train
 
+
 class BaselineCutoutTransform(BaseTransform):
     def __init__(self, cutout_size: int, *args, **kwargs):
         super(BaselineCutoutTransform, self).__init__()
         self.cutout_size = cutout_size
 
     def __call__(self):
-
         transform_train = transforms.Compose(
             [
                 transforms.RandomResizedCrop(224),
@@ -40,14 +40,13 @@ class BaselineCutoutTransform(BaseTransform):
         )
 
         return transform_train
-    
+
 
 class AutoAugmentTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
         super(AutoAugmentTransform, self).__init__()
 
     def __call__(self):
-
         transform_train = transforms.Compose(
             [
                 transforms.RandomResizedCrop(224),
@@ -59,13 +58,13 @@ class AutoAugmentTransform(BaseTransform):
         )
 
         return transform_train
-    
+
+
 class RandAugmentTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
         super(RandAugmentTransform, self).__init__()
 
     def __call__(self):
-
         transform_train = transforms.Compose(
             [
                 transforms.RandomResizedCrop(224),
@@ -82,8 +81,8 @@ class RandAugmentTransform(BaseTransform):
 class TestTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
         super(TestTransform, self).__init__()
-    def __call__(self):
 
+    def __call__(self):
         transform_test = transforms.Compose(
             [
                 transforms.Resize(256),
@@ -95,7 +94,8 @@ class TestTransform(BaseTransform):
 
         return transform_test
 
-'''def get_baseline(mean, std):
+
+"""def get_baseline(mean, std):
     transform_train = transforms.Compose(
         [
             transforms.RandomResizedCrop(224),
@@ -165,4 +165,4 @@ def test_transform(mean, std):
     )
 
     return transform_test
-'''
+"""

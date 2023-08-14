@@ -2,11 +2,11 @@
 VGG Implementation from https://github.com/kuangliu/pytorch-cifar/blob/master/models/vgg.py
 """
 
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-import pytorch_lightning as pl
-from base_model import BaseModel
 
+from base_model import BaseModel
 
 cfg = {
     "VGG11": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
@@ -21,7 +21,7 @@ class VGG(BaseModel):
         super(VGG, self).__init__(**kwargs)
 
         self.features = self._make_layers(cfg[vgg_name])
-        self.classifier = nn.Linear(512, kwargs['num_classes'])
+        self.classifier = nn.Linear(512, kwargs["num_classes"])
 
     def forward(self, x):
         out = self.features(x)

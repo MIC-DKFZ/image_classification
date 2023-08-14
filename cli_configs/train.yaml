@@ -18,8 +18,8 @@ seed: False
 
 model:
   optimizer: SGD
-  sam: False
-  adaptive_sam: False
+  sam: False  # set trainer.precision=32 if you use sam
+  adaptive_sam: False  # set trainer.precision=32 if you use sam
   lr: 0.01
   nesterov: False
   scheduler: CosineAnneal
@@ -71,7 +71,7 @@ trainer:
       auto_insert_metric_name: True
   devices: 1
   accelerator: 'gpu'
-  sync_batchnorm: False
+  sync_batchnorm: False  # set to True if you use multiple GPUs
   enable_checkpointing: False
   max_epochs: 100
   benchmark: True
