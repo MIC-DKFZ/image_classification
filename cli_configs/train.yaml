@@ -51,6 +51,8 @@ data:
     num_workers: 12
     prepare_data_per_node: False
   num_classes: ???
+  cv:
+    k: 1  # 1=no Cross Validation
 
 metrics:
   - 'acc'

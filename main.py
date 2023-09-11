@@ -2,6 +2,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import hydra
+import wandb
 from hydra.utils import instantiate
 from lightning.pytorch import seed_everything
 from omegaconf import OmegaConf
@@ -19,9 +20,12 @@ def main(cfg):
         cfg.trainer.deterministic = True
 
     # setup logger
-    Path(
-        "./main.log"
-    ).unlink()  # gets automatically created, however logs are available in Weights and Biases so we do not need to log twice
+    try:
+        Path(
+            "./main.log"
+        ).unlink()  # gets automatically created, however logs are available in Weights and Biases so we do not need to log twice
+    except:
+        pass
     log_path = Path(cfg.trainer.logger.save_dir)
     log_path.mkdir(parents=True, exist_ok=True)
     cfg.trainer.logger.group = str(uuid4())
@@ -33,29 +37,35 @@ def main(cfg):
             i for i in cfg.trainer.callbacks if i["_target_"] != "lightning.pytorch.callbacks.ModelCheckpoint"
         ]
 
-    # instantiate trainer, model and dataset
     print(OmegaConf.to_yaml(cfg))
-    trainer = instantiate(cfg.trainer)
-    model = instantiate(cfg.model)
-    dataset = instantiate(cfg.data).module
 
-    # log hypperparams
-    cfg_dict = OmegaConf.to_container(cfg, resolve=True)
-    cfg_dict["model"].pop("_target_")
-    cfg_dict["model"]["model"] = cfg_dict["model"].pop("name")
-    trainer.logger.log_hyperparams(cfg_dict["model"])
-    cfg_dict["data"]["module"].pop("_target_")
-    cfg_dict["data"]["module"]["train_transforms"] = ".".join(
-        cfg_dict["data"]["module"]["train_transforms"]["_target_"].split(".")[-2:]
-    )
-    cfg_dict["data"]["module"]["test_transforms"] = ".".join(
-        cfg_dict["data"]["module"]["test_transforms"]["_target_"].split(".")[-2:]
-    )
-    cfg_dict["data"]["module"].pop("name")
-    trainer.logger.log_hyperparams(cfg_dict["data"]["module"])
+    # in case of Cross Validation loop over the folds (default is 1 (no Cross Validation))
+    for k in range(cfg.data.cv.k):
+        cfg.data.module.fold = k
 
-    # start fitting
-    trainer.fit(model, dataset)
+        # instantiate trainer, model and dataset
+        trainer = instantiate(cfg.trainer)
+        model = instantiate(cfg.model)
+        dataset = instantiate(cfg.data).module
+
+        # log hypperparams
+        cfg_dict = OmegaConf.to_container(cfg, resolve=True)
+        cfg_dict["model"].pop("_target_")
+        cfg_dict["model"]["model"] = cfg_dict["model"].pop("name")
+        trainer.logger.log_hyperparams(cfg_dict["model"])
+        cfg_dict["data"]["module"].pop("_target_")
+        cfg_dict["data"]["module"]["train_transforms"] = ".".join(
+            cfg_dict["data"]["module"]["train_transforms"]["_target_"].split(".")[-2:]
+        )
+        cfg_dict["data"]["module"]["test_transforms"] = ".".join(
+            cfg_dict["data"]["module"]["test_transforms"]["_target_"].split(".")[-2:]
+        )
+        cfg_dict["data"]["module"].pop("name")
+        trainer.logger.log_hyperparams(cfg_dict["data"]["module"])
+
+        # start fitting
+        trainer.fit(model, dataset)
+        wandb.finish()
 
 
 if __name__ == "__main__":

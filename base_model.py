@@ -70,42 +70,42 @@ class BaseModel(L.LightningModule):
         if self.task == "Classification":
             if "acc" in metrics:
                 metrics_dict["Accuracy"] = Accuracy(
-                    task="binary" if num_classes == 2 else "multiclass",
+                    task="multiclass",
                     num_classes=num_classes,
                 )
             if "f1" in metrics:
                 metrics_dict["F1"] = F1Score(
                     average="macro",
                     num_classes=num_classes,
-                    task="binary" if num_classes == 2 else "multiclass",
+                    task="multiclass",
                 )
             if "f1_per_class" in metrics:
                 metrics_dict["F1_per_class"] = F1Score(
                     average=None,
                     num_classes=num_classes,
-                    task="binary" if num_classes == 2 else "multiclass",
+                    task="multiclass",
                 )
             if "pr" in metrics:
                 metrics_dict["Precision"] = Precision(
                     average="macro",
                     num_classes=num_classes,
-                    task="binary" if num_classes == 2 else "multiclass",
+                    task="multiclass",
                 )
                 metrics_dict["Recall"] = Recall(
                     average="macro",
                     num_classes=num_classes,
-                    task="binary" if num_classes == 2 else "multiclass",
+                    task="multiclass",
                 )
             if "top5acc" in metrics:
                 metrics_dict["Accuracy_top5"] = Accuracy(
-                    task="binary" if num_classes == 2 else "multiclass",
+                    task="multiclass",
                     num_classes=num_classes,
                     top_k=5,
                 )
             if "auroc" in metrics:
                 metrics_dict["AUROC"] = AUROC(
                     average="macro",
-                    task="binary" if num_classes == 2 else "multiclass",
+                    task="multiclass",
                     num_classes=num_classes,
                 )
 
