@@ -41,7 +41,8 @@ def main(cfg):
 
     # in case of Cross Validation loop over the folds (default is 1 (no Cross Validation))
     for k in range(cfg.data.cv.k):
-        cfg.data.module.fold = k
+        if cfg.data.cv.k > 1:
+            cfg.data.module.fold = k
 
         # instantiate trainer, model and dataset
         trainer = instantiate(cfg.trainer)
