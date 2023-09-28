@@ -6,6 +6,7 @@ import wandb
 from hydra.utils import instantiate
 from lightning.pytorch import seed_everything
 from omegaconf import OmegaConf
+import torch
 
 from parsing_utils import make_omegaconf_resolvers
 
@@ -47,6 +48,8 @@ def main(cfg):
         # instantiate trainer, model and dataset
         trainer = instantiate(cfg.trainer)
         model = instantiate(cfg.model)
+        if cfg.model.compile:
+            model = torch.compile(model, mode="reduce-overhead")
         dataset = instantiate(cfg.data).module
 
         # log hypperparams
