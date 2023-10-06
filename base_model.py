@@ -567,8 +567,8 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
 
 
 class ModelConstructor(BaseModel):
-    def __init__(self, model, hypparams):
-        super(ModelConstructor, self).__init__(**hypparams)
+    def __init__(self, model, **kwargs):
+        super(ModelConstructor, self).__init__(**kwargs)
         self.model = model
 
     def forward(self, x):

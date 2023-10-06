@@ -65,13 +65,13 @@ class PosterRegressionDataModule(BaseDataModule):
     def setup(self, stage: str):
         albumentations = "albumentations" in str(self.train_transforms.__class__)
         self.train_dataset = PosterRegressionData(
-            self.root,
+            self.data_path,
             split="train",
             transform=self.train_transforms,
             albumentation=albumentations,
         )
         self.val_dataset = PosterRegressionData(
-            self.root,
+            self.data_path,
             split="val",
             transform=self.test_transforms,
             albumentation=albumentations,

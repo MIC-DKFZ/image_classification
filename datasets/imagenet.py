@@ -11,9 +11,9 @@ class ImagenetDataModule(BaseDataModule):
         if "albumentations" in str(self.train_transforms.__class__):
             raise NotImplementedError
         else:
-            self.train_dataset = ImageNet(self.root, split="train", transform=self.train_transforms)
+            self.train_dataset = ImageNet(self.data_path, split="train", transform=self.train_transforms)
 
         if "albumentations" in str(self.test_transforms.__class__):
             raise NotImplementedError
         else:
-            self.val_dataset = ImageNet(self.root, split="val", transform=self.test_transforms)
+            self.val_dataset = ImageNet(self.data_path, split="val", transform=self.test_transforms)

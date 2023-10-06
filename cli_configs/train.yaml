@@ -20,7 +20,7 @@ model:
   optimizer: SGD
   sam: False  # set trainer.precision=32 if you use sam
   adaptive_sam: False  # set trainer.precision=32 if you use sam
-  lr: 0.01
+  lr: 0.1
   nesterov: False
   scheduler: CosineAnneal
   T_max: ${trainer.max_epochs}
@@ -76,7 +76,7 @@ trainer:
   accelerator: 'gpu'
   sync_batchnorm: False  # set to True if you use multiple GPUs
   enable_checkpointing: False
-  max_epochs: 100
+  max_epochs: 200
   benchmark: True
   deterministic: False
   precision: '16-mixed'

@@ -15,6 +15,7 @@ from parsing_utils import make_omegaconf_resolvers
 def main(cfg):
     make_omegaconf_resolvers()
 
+    # seeding
     if cfg.seed:
         seed_everything(cfg.seed)
         cfg.trainer.benchmark = False
@@ -30,6 +31,10 @@ def main(cfg):
     log_path = Path(cfg.trainer.logger.save_dir)
     log_path.mkdir(parents=True, exist_ok=True)
     cfg.trainer.logger.group = str(uuid4())
+
+    # add sync_batchnorm if multiple GPUs are used
+    if cfg.trainer.devices > 1 and cfg.trainer.accelerator == "gpu":
+        cfg.trainer.sync_batchnorm = True
 
     # remove callbacks that are not enabled
     cfg.trainer.callbacks = [i for i in cfg.trainer.callbacks.values() if i]
