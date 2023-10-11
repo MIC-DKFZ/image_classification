@@ -21,16 +21,17 @@ You can also integrate your own model and/or dataset and benefit from the featur
 Results of experiments on CIFAR-10 comparing different architectures in different training settings are shown below. \
 Everything can be run via the Command Line Interface and with Hydra config files. Logging is accomplished by Weights&Biases. \
 Training uses mixed precision, torch.compile and `torch.backends.cudnn.benchmark=True` by default to increase training speed. \
-Best results are achieved with a PyramidNet using RandAugment augmentation, Shakedrop and Mixup.
-It yields 0.986 Test Accuracy on CIFAR-10 and 0.875 Test Accuracy on CIFAR-100. \
-Detailed results and used configurations can be seen in [CIFAR Results](#cifar-results).
+Detailed CIFAR results and used configurations can be seen in [CIFAR Results](#cifar-results).
+Best performance is achieved with a PyramidNet using RandAugment augmentation, Shakedrop and Mixup.
+It yields 0.986 Test Accuracy on CIFAR-10 and 0.875 Test Accuracy on CIFAR-100.
+
 
 
 # Table of Contents
 
 * [How to run](#how-to-run)
   * [Requirements](#requirements)
-  * [General Usage & Hydra config files](#general-usage-&-hydra-config-files)
+  * [General Usage & Hydra config files](#general-usage--hydra-config-files)
   * [Available models and parameters](#available-models-and-parameters)
     * [Models](#models)
     * [Training Settings](#training-settings)
@@ -39,7 +40,6 @@ Detailed results and used configurations can be seen in [CIFAR Results](#cifar-r
   * [Logging](#logging)
 * [Including custom pytorch models](#including-custom-pytorch-models)
 * [Including other datasets](#including-other-datasets)
-* [Add custom augmentations](#add-custom-augmentations)
 * [CIFAR Results](#cifar-results)
 
 
@@ -105,33 +105,16 @@ defaults:
   - data: cifar10   # training on CIFAR-10
 ```
 
-
-
-<!---Everything in this repository can be run by executing the ```main.py``` script with corresponding arguments.
-In order to train a model, one needs to specify the path to the directory that contains the datasets (```data_dir```) and the
-path to the directory where logs should be saved (```exp_dir```). You can e.g. train on CIFAR10/CIFAR100 or Imagenet.
-If the specified dataset is not found in the specified ```data_dir```, it will be automatically downloaded (178 MB for CIFAR). Imagenet cannot be downloaded automatically, please see [Imagenet Download](https://image-net.org/challenges/LSVRC/2012/2012-downloads.php) for access.
-
-See [Including custom datasets](#including-other-datasets) for instructions about using your own data. This repository also handles regression problems. For that simply add the ```--regression``` flag, it will use the MSE Loss instead of Cross Entropy.
-Here is an example of the command line for training a ResNet34 on CIFAR10:
-
-```shell
-python main.py ResNet34 --data CIFAR10 --data_dir "Path/to/data" --exp_dir "Path/to/logs"
-```
-
-By default, no checkpoints are saved! If you want to save the trained model you can use the ```--save_model``` flag. 
-The model checkpoint will then be saved in the ```exp_dir``` along with the logs. You can adapt the name of the 
-file by specifying ```--chpt_name "your-file-name"```. By default, the model is trained on one GPU. You can adapt 
-this by setting e.g. ```--gpu_count 2``` to train on multiple GPUs using ddp strategy. If you want to use the CPU instead, set ```--gpu_count 0```.
-Use the ```--suppress_progress_bar``` flag for not showing the progress bar during training. By default, only model accuracy is tracked. You can specify other metrics by adding them in the command line. Set ```--metrics acc f1 pr top5acc``` for tracking Accuracy, F1-Score, Precision & Recall and the Top-5 Accuracy. For regression ```--metrics mse mae``` are available.--->
-
 ## Available models and parameters
 
-### Models
-#
+If you want to include your own model please see [Including custom models](#including-custom-pytorch-models) for instructions. See [Including custom datasets](#including-other-datasets) for instructions on using your own datasets.
 
-If you want to include your own model please see [Including custom models](#including-custom-pytorch-models) for instructions.
-The following models are available out of the box:
+The following models and parameters are available out of the box:
+<details><summary>
+
+### Models
+</summary>
+
 * [EfficientNetV2](https://arxiv.org/pdf/2104.00298.pdf)
    * ```model=efficientnetv2```
    --------------------
@@ -202,14 +185,16 @@ The following models are available out of the box:
   * VGG19 (uses batch norm, does not include the fully connected layers at the end)
     * ```model._target_=models.dynamic_vgg.VGG19```
   
-
+</details>
 
 #
-### Training Settings
-#
+
+<details>
+<summary>
+Training Settings
+</summary>
 
 By default, the following training settings are used:
-
 * Epochs: 200 | ```trainer.max_epochs=200```
 * Batch Size: 128 | ```data.module.batch_size=128```
   * If you set the number of GPUs > 1, your effective batch size becomes num_gpus * batch_size
@@ -240,14 +225,14 @@ By default, the following training settings are used:
 * Number of GPUs | ```trainer.devices=1```
   * If > 1 training will be executed on multiple GPUs following ddp strategy, ```sync_batchnorm``` will be automatically enabled
   * For CPU training set ```trainer.accelerator=CPU```
+</details>
 
-<!--
-Run ```
-python main.py -h``` for a description of all possible parameters.
--->
 #
-### Data Settings
-#
+
+<details>
+<summary>
+Data Settings
+</summary>
 
 Additionally, you can adapt the following parameters to your data.
 * Dataset | ```data=cifar10```
@@ -275,21 +260,16 @@ Additionally, you can adapt the following parameters to your data.
 * Very small images | ```model.cifar_size=True```
   * At the moment only available for ResNets and VGGs
   * If used, more lightweight architectures designed for smaller images like CIFAR are used
-
+</details>
 
 #
-### Regularization Techniques
-#
+
+<details>
+<summary>
+Regularization Techniques
+</summary>
 
 Moreover, there are several additional techniques available that are all disabled by default. 
-<!--
-In order to enable e.g. a WideResNet 28-10
-with mixup, stochastic depth, label smoothing and a Cosine Annealing scheduler with a warmstart of 10 epochs you can run:
-
-```shell
-python main.py WRN2810 --scheduler CosineAnneal --warmstart 10 --mixup --stochastic_depth 0.1 --label_smoothing 0.1
-```
--->
 The following techniques are available for all models:
 * [Label Smoothing](https://www.cv-foundation.org/openaccess/content_cvpr_2016/papers/Szegedy_Rethinking_the_Inception_CVPR_2016_paper.pdf) | ```model.label_smoothing=0.1```
     * Reduces overfitting and overconfidence by mixing the labels with the uniform distribution
@@ -342,6 +322,8 @@ The following techniques can only be used with ResNet-like models (including Pyr
 * [Bottleneck](https://arxiv.org/pdf/1512.03385.pdf) | ```model.bottleneck=True```
     * Using bottleneck building blocks instead of basic building blocks
     * Parameter: bool
+</details>
+
 
 #
 ## Logging
