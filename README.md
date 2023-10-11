@@ -189,9 +189,9 @@ The following models and parameters are available out of the box:
 
 #
 
-<details>
-<summary>
-Training Settings
+<details><summary>
+
+### Training Settings
 </summary>
 
 By default, the following training settings are used:
@@ -229,9 +229,9 @@ By default, the following training settings are used:
 
 #
 
-<details>
-<summary>
-Data Settings
+<details><summary>
+
+### Data Settings
 </summary>
 
 Additionally, you can adapt the following parameters to your data.
@@ -264,9 +264,9 @@ Additionally, you can adapt the following parameters to your data.
 
 #
 
-<details>
-<summary>
-Regularization Techniques
+<details><summary>
+
+### Regularization Techniques
 </summary>
 
 Moreover, there are several additional techniques available that are all disabled by default. 
