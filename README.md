@@ -31,7 +31,7 @@ It yields 0.986 Test Accuracy on CIFAR-10 and 0.875 Test Accuracy on CIFAR-100.
 
 * [How to run](#how-to-run)
   * [Requirements](#requirements)
-  * [General Usage & Hydra config files](#general-usage-hydra-config-files)
+  * [General Usage & Hydra config files](#general-usage--hydra-config-files)
   * [Available models and parameters](#available-models-and-parameters)
     * [Models](#models)
     * [Training Settings](#training-settings)
