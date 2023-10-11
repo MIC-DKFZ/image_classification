@@ -1,193 +1,166 @@
-import torch
-import torch.nn as nn
-import numpy as np
-import random
 import math
 import warnings
-import time
-import os
-from torch.optim.lr_scheduler import _LRScheduler
-from torch.utils.data import DataLoader, RandomSampler
-import pytorch_lightning as pl
-from torchmetrics import Accuracy, F1Score, Precision, Recall, MeanAbsoluteError, MeanSquaredError, MetricCollection, AUROC
-from pytorch_lightning.callbacks import Callback
-from datasets.cifar import CIFAR10, CIFAR100, Cifar10Albumentation, Cifar100Albumentation
-from datasets.imagenet import ImageNet
-from regularization.sam import SAM
+
+import lightning as L
+import torch
+import torch.nn as nn
+import wandb
 from madgrad import MADGRAD
 from timm.optim import RMSpropTF
-from augmentation.mixup import mixup_data, mixup_criterion
+from torch.optim.lr_scheduler import _LRScheduler
+from torchmetrics import (
+    AUROC,
+    Accuracy,
+    F1Score,
+    MeanAbsoluteError,
+    MeanSquaredError,
+    MetricCollection,
+    Precision,
+    Recall,
+)
+
+from augmentation.mixup import mixup_criterion, mixup_data
 from metrics.conf_mat import ConfusionMatrix
+from regularization.sam import SAM
 
 
-class BaseModel(pl.LightningModule):
-    def __init__(self, hypparams):
+class BaseModel(L.LightningModule):
+    def __init__(
+        self,
+        task,
+        metric_computation_mode,
+        result_plot,
+        metrics,
+        num_classes,
+        name,
+        lr,
+        weight_decay,
+        optimizer,
+        nesterov,
+        sam,
+        adaptive_sam,
+        scheduler,
+        T_max,
+        warmstart,
+        epochs,
+        mixup,
+        mixup_alpha,
+        label_smoothing,
+        stochastic_depth,
+        resnet_dropout,
+        squeeze_excitation,
+        apply_shakedrop,
+        undecay_norm,
+        zero_init_residual,
+        input_dim,
+        input_channels,
+        *args,
+        **kwargs
+    ):
         super(BaseModel, self).__init__()
 
         # Task
-        self.task = "Classification" if not hypparams["regression"] else "Regression"
+        self.task = task
 
         # Metrics
-        self.metric_computation_mode = hypparams["metric_computation_mode"]
-        self.confmat_setting = hypparams["confmat"]
+        self.metric_computation_mode = metric_computation_mode
+        self.result_plot_setting = result_plot
         metrics_dict = {}
 
         if self.task == "Classification":
-            if "acc" in hypparams["metrics"]:
+            if "acc" in metrics:
                 metrics_dict["Accuracy"] = Accuracy(
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
-                    num_classes=hypparams["num_classes"],
+                    task="multiclass",
+                    num_classes=num_classes,
                 )
-            if "f1" in hypparams["metrics"]:
+            if "f1" in metrics:
                 metrics_dict["F1"] = F1Score(
                     average="macro",
-                    num_classes=hypparams["num_classes"],
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=num_classes,
+                    task="multiclass",
                 )
-            if "f1_per_class" in hypparams["metrics"]:
+            if "f1_per_class" in metrics:
                 metrics_dict["F1_per_class"] = F1Score(
                     average=None,
-                    num_classes=hypparams["num_classes"],
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=num_classes,
+                    task="multiclass",
                 )
-            if "pr" in hypparams["metrics"]:
+            if "pr" in metrics:
                 metrics_dict["Precision"] = Precision(
                     average="macro",
-                    num_classes=hypparams["num_classes"],
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=num_classes,
+                    task="multiclass",
                 )
                 metrics_dict["Recall"] = Recall(
                     average="macro",
-                    num_classes=hypparams["num_classes"],
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
+                    num_classes=num_classes,
+                    task="multiclass",
                 )
-            if "top5acc" in hypparams["metrics"]:
+            if "top5acc" in metrics:
                 metrics_dict["Accuracy_top5"] = Accuracy(
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
-                    num_classes=hypparams["num_classes"],
+                    task="multiclass",
+                    num_classes=num_classes,
                     top_k=5,
                 )
-            if "auroc" in hypparams["metrics"]:
+            if "auroc" in metrics:
                 metrics_dict["AUROC"] = AUROC(
                     average="macro",
-                    task="binary" if hypparams["num_classes"] == 2 else "multiclass",
-                    num_classes=hypparams["num_classes"],
+                    task="multiclass",
+                    num_classes=num_classes,
                 )
 
-            if self.confmat_setting in ["val", "all"]:
-                self.val_conf_mat = ConfusionMatrix(num_classes=hypparams["num_classes"])
-            if self.confmat_setting == "all":
-                self.train_conf_mat = ConfusionMatrix(num_classes=hypparams["num_classes"])
-
         elif self.task == "Regression":
-            if "mse" in hypparams["metrics"]:
+            if "mse" in metrics:
                 metrics_dict["MSE"] = MeanSquaredError()
-            if "mae" in hypparams["metrics"]:
+            if "mae" in metrics:
                 metrics_dict["MAE"] = MeanAbsoluteError()
+
+        if self.result_plot_setting in ["val", "all"]:
+            if self.task == "Classification":
+                self.val_conf_mat = ConfusionMatrix(num_classes=num_classes)
+            elif self.task == "Regression":
+                self.val_pred_list = []
+                self.val_label_list = []
+        if self.result_plot_setting == "all":
+            if self.task == "Classification":
+                self.train_conf_mat = ConfusionMatrix(num_classes=num_classes)
+            elif self.task == "Regression":
+                self.train_pred_list = []
+                self.train_label_list = []
 
         metrics = MetricCollection(metrics_dict)
         self.train_metrics = metrics.clone(prefix="train_")
         self.val_metrics = metrics.clone(prefix="val_")
 
         # Training Args
-        self.name = hypparams["name"]
-        self.batch_size = hypparams["batch_size"]
-        self.lr = hypparams["lr"]
-        self.weight_decay = hypparams["weight_decay"]
-        self.optimizer = hypparams["optimizer"]
-        self.nesterov = hypparams["nesterov"]
-        self.sam = hypparams["sam"]
-        self.adaptive_sam = hypparams["adaptive_sam"]
-        self.scheduler = hypparams["scheduler"]
-        self.T_max = hypparams["T_max"]
-        self.warmstart = hypparams["warmstart"]
-        self.epochs = hypparams["epochs"]
-        self.random_batches = hypparams["random_batches"]
+        self.name = name
+        # self.batch_size = batch_size
+        self.lr = lr
+        self.weight_decay = weight_decay
+        self.optimizer = optimizer
+        self.nesterov = nesterov
+        self.sam = sam
+        self.adaptive_sam = adaptive_sam
+        self.scheduler = scheduler
+        self.T_max = T_max
+        self.warmstart = warmstart
+        self.epochs = epochs
 
         # Regularization techniques
-        self.aug = hypparams["augmentation"]
-        self.mixup = hypparams["mixup"]
-        self.mixup_alpha = hypparams["mixup_alpha"]  # 0.2
-        self.label_smoothing = hypparams["label_smoothing"]  # 0.1
-        self.stochastic_depth = hypparams["stochastic_depth"]  # 0.1 (with higher resolution maybe 0.2)
-        self.resnet_dropout = hypparams["resnet_dropout"]  # 0.5
-        self.se = hypparams["squeeze_excitation"]
-        self.apply_shakedrop = hypparams["shakedrop"]
-        self.undecay_norm = hypparams["undecay_norm"]
-        self.zero_init_residual = hypparams["zero_init_residual"]
+        self.mixup = mixup
+        self.mixup_alpha = mixup_alpha  # 0.2
+        self.label_smoothing = label_smoothing  # 0.1
+        self.stochastic_depth = stochastic_depth  # 0.1 (with higher resolution maybe 0.2)
+        self.resnet_dropout = resnet_dropout  # 0.5
+        self.se = squeeze_excitation
+        self.apply_shakedrop = apply_shakedrop
+        self.undecay_norm = undecay_norm
+        self.zero_init_residual = zero_init_residual
 
         # Data and Dataloading
-        self.data_dir = hypparams["data_dir"]
-        self.dataset = hypparams["dataset"]
-        self.num_workers = hypparams["num_workers"]
-        self.input_dim = hypparams["input_dim"]
-        self.input_channels = hypparams["input_channels"]
-        self.num_classes = hypparams["num_classes"]
-
-        os.makedirs(self.data_dir, exist_ok=True)
-        self.download = False if any(os.scandir(self.data_dir)) else True
-
-        ################################################################################################################
-        # dataset specific
-        if self.dataset.startswith("CIFAR"):
-            self.mean, self.std = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-            from augmentation.policies.cifar import (
-                get_baseline,
-                get_auto_augmentation,
-                get_rand_augmentation,
-                get_album,
-                test_transform,
-                get_baseline_cutout,
-            )
-
-            # according to https://arxiv.org/pdf/1708.04552v2.pdf a smaller cutout size should be used for more classes
-            cutout_size = 16 if self.dataset == "CIFAR10" else 8
-
-            if self.aug == "baseline":
-                self.transform_train = get_baseline(self.mean, self.std)
-
-            elif self.aug == "baseline_cutout":
-                self.transform_train = get_baseline_cutout(self.mean, self.std, cutout_size)
-
-            elif self.aug == "autoaugment":
-                self.transform_train = get_auto_augmentation(self.mean, self.std, cutout_size)
-
-            elif self.aug == "randaugment":
-                self.transform_train = get_rand_augmentation(self.mean, self.std, cutout_size)
-
-            elif self.aug == "album":
-                # Albumentation pipeline
-                self.transform_train = get_album(self.mean, self.std)
-
-            self.test_transform = test_transform(self.mean, self.std)
-
-        elif self.dataset == "Imagenet":
-            self.mean, self.std = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
-            from augmentation.policies.imagenet import (
-                get_baseline,
-                test_transform,
-                get_auto_augmentation,
-                get_baseline_cutout,
-                get_rand_augmentation,
-            )
-
-            cutout_size = 112
-
-            if self.aug == "baseline":
-                self.transform_train = get_baseline(self.mean, self.std)
-
-            elif self.aug == "baseline_cutout":
-                self.transform_train = get_baseline_cutout(self.mean, self.std, cutout_size)
-
-            elif self.aug == "autoaugment":
-                self.transform_train = get_auto_augmentation(self.mean, self.std)
-
-            elif self.aug == "randaugment":
-                self.transform_train = get_rand_augmentation(self.mean, self.std)
-
-            self.test_transform = test_transform(self.mean, self.std)
-
-        ################################################################################################################
+        self.input_dim = input_dim
+        self.input_channels = input_channels
+        self.num_classes = num_classes
 
         # switch to manual optimization for Sharpness Aware Minimization
         if self.sam:
@@ -198,12 +171,6 @@ class BaseModel(pl.LightningModule):
             self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
         elif self.task == "Regression":
             self.criterion = nn.MSELoss()
-
-        # Inference
-        self.softmax = nn.Softmax(dim=1)
-
-        # Seed
-        self.seed = hypparams["seed"]
 
     def forward(self, x):
         pass
@@ -253,7 +220,7 @@ class BaseModel(pl.LightningModule):
             on_step=False,
             on_epoch=True,
             prog_bar=True,
-            sync_dist=True if self.trainer.num_devices > 1 else False,
+            sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
         )
 
         if torch.isnan(y_hat).any():
@@ -271,13 +238,16 @@ class BaseModel(pl.LightningModule):
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
-                sync_dist=True if self.trainer.num_devices > 1 else False,
+                sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
         elif self.metric_computation_mode == "epochwise":
             self.train_metrics.update(y_hat, y)
 
         if hasattr(self, "train_conf_mat"):
             self.train_conf_mat.update(y_hat, y)
+        if hasattr(self, "train_pred_list"):
+            self.train_pred_list.extend(y_hat)
+            self.train_label_list.extend(y)
 
         return loss
 
@@ -295,7 +265,7 @@ class BaseModel(pl.LightningModule):
             on_step=False,
             on_epoch=True,
             prog_bar=True,
-            sync_dist=True if self.trainer.num_devices > 1 else False,
+            sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
         )
 
         # save metrics
@@ -310,13 +280,16 @@ class BaseModel(pl.LightningModule):
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
-                sync_dist=True if self.trainer.num_devices > 1 else False,
+                sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
         elif self.metric_computation_mode == "epochwise":
             self.val_metrics.update(y_hat, y)
 
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.update(y_hat, y)
+        if hasattr(self, "val_pred_list"):
+            self.val_pred_list.extend(y_hat)
+            self.val_label_list.extend(y)
 
     def on_validation_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
@@ -330,18 +303,23 @@ class BaseModel(pl.LightningModule):
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
-                sync_dist=True if self.trainer.num_devices > 1 else False,
+                sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
-
-            """if hasattr(self, "val_conf_mat"):
-                self.val_conf_mat.save_state(self, "val")
-                self.val_conf_mat.reset()"""
 
             self.val_metrics.reset()
 
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.save_state(self, "val")
             self.val_conf_mat.reset()
+        if hasattr(self, "val_pred_list"):
+            data = [[x, y] for (x, y) in zip(self.val_label_list, self.val_pred_list)]
+            table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
+            wandb.log(
+                {"Val Scatterplot": wandb.plot.scatter(table, "Ground Truth", "Prediction", "Validation Scatterplot")}
+            )
+            # reset
+            self.val_pred_list = []
+            self.val_label_list = []
 
     def on_train_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
@@ -356,24 +334,31 @@ class BaseModel(pl.LightningModule):
                 on_step=False,
                 on_epoch=True,
                 prog_bar=True,
-                sync_dist=True if self.trainer.num_devices > 1 else False,
+                sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
-
-            """if hasattr(self, "train_conf_mat"):
-                self.train_conf_mat.save_state(self, "train")
-                self.train_conf_mat.reset()"""
 
             self.train_metrics.reset()
 
         if hasattr(self, "train_conf_mat"):
             self.train_conf_mat.save_state(self, "train")
             self.train_conf_mat.reset()
+        if hasattr(self, "train_pred_list"):
+            data = [[x, y] for (x, y) in zip(self.train_label_list, self.train_pred_list)]
+            table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
+            wandb.log(
+                {"Train Scatterplot": wandb.plot.scatter(table, "Ground Truth", "Prediction", "Train Scatterplot")}
+            )
+            # reset
+            self.train_pred_list = []
+            self.train_label_list = []
 
     def on_train_start(self):
-        from models.resnet import BasicBlock, Bottleneck
-        from models.wide_resnet import BasicBlock as Wide_BasicBlock, Bottleneck as Wide_Bottleneck
-        from models.pyramidnet import BasicBlock as BasicBlock_pyramid, Bottleneck as Bottleneck_pyramid
         from models.preact_resnet import PreActBlock, PreActBottleneck
+        from models.pyramidnet import BasicBlock as BasicBlock_pyramid
+        from models.pyramidnet import Bottleneck as Bottleneck_pyramid
+        from models.resnet import BasicBlock, Bottleneck
+        from models.wide_resnet import BasicBlock as Wide_BasicBlock
+        from models.wide_resnet import Bottleneck as Wide_Bottleneck
 
         # TODO: disable weight init if model is pretrained once pretrained models are enabled
         print("Initializing weights")
@@ -394,6 +379,7 @@ class BaseModel(pl.LightningModule):
         # Zero-initialize the last BN in each residual branch,
         # so that the residual branch starts with zeros, and each residual block behaves like an identity.
         # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
+        # TODO
         if self.zero_init_residual:
             if "PreAct" in self.name:
                 for m in self.modules():
@@ -427,14 +413,21 @@ class BaseModel(pl.LightningModule):
                         norm_params += [p]
                     else:
                         model_params += [p]
-            params = [{"params": model_params}, {"params": norm_params, "weight_decay": 0}]
+            params = [
+                {"params": model_params},
+                {"params": norm_params, "weight_decay": 0},
+            ]
         else:
             params = self.parameters()
 
         if not self.sam:
             if self.optimizer == "SGD":
                 optimizer = torch.optim.SGD(
-                    params, lr=self.lr, momentum=0.9, weight_decay=self.weight_decay, nesterov=self.nesterov
+                    params,
+                    lr=self.lr,
+                    momentum=0.9,
+                    weight_decay=self.weight_decay,
+                    nesterov=self.nesterov,
                 )
             elif self.optimizer == "Adam":
                 optimizer = torch.optim.Adam(params, lr=self.lr, weight_decay=self.weight_decay)
@@ -519,129 +512,6 @@ class BaseModel(pl.LightningModule):
 
             return [optimizer], [scheduler]
 
-    def train_dataloader(self):
-        if self.dataset == "CIFAR10":
-            if self.aug == "album":
-                trainset = Cifar10Albumentation(
-                    root=self.data_dir, train=True, download=self.download, transform=self.transform_train
-                )
-            else:
-                trainset = CIFAR10(
-                    root=self.data_dir, train=True, download=self.download, transform=self.transform_train
-                )
-
-        elif self.dataset == "CIFAR100":
-            if self.aug == "album":
-                trainset = Cifar100Albumentation(
-                    root=self.data_dir, train=True, download=self.download, transform=self.transform_train
-                )
-            else:
-                trainset = CIFAR100(
-                    root=self.data_dir, train=True, download=self.download, transform=self.transform_train
-                )
-
-        elif self.dataset == "Imagenet":
-            # path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original" TODO
-
-            trainset = ImageNet(root=self.data_dir, split="train", transform=self.transform_train)
-
-        if not self.random_batches:
-            trainloader = DataLoader(
-                trainset,
-                batch_size=self.batch_size,
-                shuffle=True,
-                num_workers=self.num_workers,
-                pin_memory=True,
-                worker_init_fn=seed_worker,
-                persistent_workers=True,
-            )
-
-        else:
-            print("RandomSampler with replacement is used!")
-            random_sampler = RandomSampler(trainset, replacement=True, num_samples=len(trainset))
-            trainloader = DataLoader(
-                trainset,
-                batch_size=self.batch_size,
-                num_workers=self.num_workers,
-                pin_memory=True,
-                worker_init_fn=seed_worker,
-                persistent_workers=True,
-                sampler=random_sampler,
-            )
-
-        return trainloader
-
-    def val_dataloader(self):
-        if self.dataset == "CIFAR10":
-            testset = CIFAR10(root=self.data_dir, train=False, download=self.download, transform=self.test_transform)
-
-        elif self.dataset == "CIFAR100":
-            testset = CIFAR100(root=self.data_dir, train=False, download=self.download, transform=self.test_transform)
-
-        elif self.dataset == "Imagenet":
-            # path_to_imagenet = "/mnt/de2aec88-1b8c-41ee-9977-13e3c6e297a9/imagenet/original" TODO
-            testset = ImageNet(root=self.data_dir, split="val", transform=self.test_transform)
-
-        testloader = DataLoader(
-            testset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            pin_memory=True,
-            worker_init_fn=seed_worker,
-            persistent_workers=True,
-        )
-
-        return testloader
-
-
-class TimerCallback(Callback):
-    def __init__(self, epochs, num_gpus):
-        self.num_gpus = num_gpus
-        if self.num_gpus > 0:
-            self.start = torch.cuda.Event(enable_timing=True)
-            self.end = torch.cuda.Event(enable_timing=True)
-        self.epochs = epochs
-        self.epoch_times = []
-
-    def on_train_epoch_start(self, trainer, pl_module):
-        if trainer.current_epoch == 0:  # ignore first epoch
-            pass
-        else:
-            if self.num_gpus == 0:
-                self.start_cpu = time.time()
-            else:
-                self.start.record()
-
-    def on_train_epoch_end(self, trainer, pl_module):  # , outputs):
-        if trainer.current_epoch == 0:
-            pass
-        else:
-            if self.num_gpus == 0:
-                end = time.time()
-                elapsed_time = end - self.start_cpu
-            else:
-                self.end.record()
-                torch.cuda.synchronize()
-                elapsed_time = self.start.elapsed_time(self.end) / 1000  # transform to seconds
-            # print(elapsed_time)
-            self.epoch_times.append(elapsed_time)
-        if trainer.current_epoch == self.epochs - 1:
-            avg_epoch_time = np.mean(self.epoch_times)
-            self.log("avg_epoch_time", avg_epoch_time)
-            print("Average time per train epoch in seconds: ", avg_epoch_time)
-
-
-def seed_worker(worker_id):
-    """
-    https://pytorch.org/docs/stable/notes/randomness.html#dataloader
-    to fix https://tanelp.github.io/posts/a-bug-that-plagues-thousands-of-open-source-ml-projects/
-    ensures different random numbers each batch with each worker every epoch while keeping reproducibility
-    """
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
-
 
 class CosineAnnealingLR_Warmstart(_LRScheduler):
     """
@@ -660,7 +530,8 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
     def get_lr(self):
         if not self._get_lr_called_within_step:
             warnings.warn(
-                "To get the last learning rate computed by the scheduler, please use `get_last_lr()`.", UserWarning
+                "To get the last learning rate computed by the scheduler, please use `get_last_lr()`.",
+                UserWarning,
             )
 
         # Warmstart
@@ -696,8 +567,8 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
 
 
 class ModelConstructor(BaseModel):
-    def __init__(self, model, hypparams):
-        super(ModelConstructor, self).__init__(hypparams)
+    def __init__(self, model, **kwargs):
+        super(ModelConstructor, self).__init__(**kwargs)
         self.model = model
 
     def forward(self, x):

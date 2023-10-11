@@ -1,6 +1,6 @@
-'''
+"""
 Shake Drop from https://github.com/owruby/shake-drop_pytorch/blob/master/models/shakedrop.py
-'''
+"""
 
 import torch
 import torch.nn as nn
@@ -8,12 +8,11 @@ from torch.autograd import Variable
 
 
 class ShakeDropFunction(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, x, training=True, p_drop=0.5, alpha_range=[-1, 1]):
         if training:
             gate = torch.cuda.FloatTensor([0]).bernoulli_(1 - p_drop)
-            #print('Forward gate: ', gate)
+            # print('Forward gate: ', gate)
             ctx.save_for_backward(gate)
             if gate.item() == 0:
                 alpha = torch.cuda.FloatTensor(x.size(0)).uniform_(*alpha_range)
@@ -27,7 +26,7 @@ class ShakeDropFunction(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         gate = ctx.saved_tensors[0]
-        #print('Gate: ', gate)
+        # print('Gate: ', gate)
         if gate.item() == 0:
             beta = torch.cuda.FloatTensor(grad_output.size(0)).uniform_(0, 1)
             beta = beta.view(beta.size(0), 1, 1, 1).expand_as(grad_output)
@@ -38,7 +37,6 @@ class ShakeDropFunction(torch.autograd.Function):
 
 
 class ShakeDrop(nn.Module):
-
     def __init__(self, p_drop=0.5, alpha_range=[-1, 1]):
         super(ShakeDrop, self).__init__()
         self.p_drop = p_drop

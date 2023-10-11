@@ -1,18 +1,16 @@
+import lightning.pytorch as pl
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
+from matplotlib.figure import Figure
 from torchmetrics import Metric
 from torchmetrics.utilities.data import _bincount
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-import pytorch_lightning as pl
 
 
 class ConfusionMatrix(Metric):
-
     full_state_update = False
 
     def __init__(self, num_classes: int, labels: list = None) -> None:
-
         """
         Create an empty confusion matrix
         Parameters
@@ -125,10 +123,14 @@ class ConfusionMatrix(Metric):
         for logger in trainer.loggers if hasattr(trainer, "loggers") else [trainer.logger]:
             if isinstance(logger, pl.loggers.tensorboard.TensorBoardLogger):
                 logger.experiment.add_figure(
-                    "{}_ConfusionMatrix_normalized/ConfusionMatrix".format(split), figure_norm, trainer.current_epoch
+                    "{}_ConfusionMatrix_normalized/ConfusionMatrix".format(split),
+                    figure_norm,
+                    trainer.current_epoch,
                 )
                 logger.experiment.add_figure(
-                    "{}_ConfusionMatrix_absolute/ConfusionMatrix".format(split), figure, trainer.current_epoch
+                    "{}_ConfusionMatrix_absolute/ConfusionMatrix".format(split),
+                    figure,
+                    trainer.current_epoch,
                 )
             elif isinstance(logger, pl.loggers.mlflow.MLFlowLogger):
                 logger.experiment.log_figure(
@@ -143,8 +145,12 @@ class ConfusionMatrix(Metric):
                 )
             elif isinstance(logger, pl.loggers.wandb.WandbLogger):
                 logger.log_image(
-                    key="{}_ConfusionMatrix_normalized".format(split), images=[figure_norm], step=trainer.current_epoch
+                    key="{}_ConfusionMatrix_normalized".format(split),
+                    images=[figure_norm],
+                    step=trainer.current_epoch,
                 )
                 logger.log_image(
-                    key="{}_ConfusionMatrix_absolute".format(split), images=[figure], step=trainer.current_epoch
+                    key="{}_ConfusionMatrix_absolute".format(split),
+                    images=[figure],
+                    step=trainer.current_epoch,
                 )

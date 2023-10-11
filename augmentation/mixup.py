@@ -3,13 +3,13 @@ Reference:
 https://github.com/mzhaoshuai/Divide-and-Co-training/blob/main/model/mixup.py
 """
 
-import torch
 import numpy as np
+import torch
 
 
 @torch.no_grad()
 def mixup_data(x, y, alpha=1.0, use_cuda=True):
-    '''Returns mixed inputs, pairs of targets, and lambda'''
+    """Returns mixed inputs, pairs of targets, and lambda"""
     if alpha > 0:
         lam = np.random.beta(alpha, alpha)
     else:

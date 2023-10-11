@@ -1,0 +1,98 @@
+defaults:
+  - _self_
+  - env: local
+  - model: resnet
+  - data: cifar10
+
+hydra:
+  output_subdir: null
+  job:
+    chdir: False
+  run:
+    dir: .
+
+override hydra/hydra_logging: disable
+override hydra/job_logging: disable
+
+seed: False
+
+model:
+  optimizer: SGD
+  sam: False  # set trainer.precision=32 if you use sam
+  adaptive_sam: False  # set trainer.precision=32 if you use sam
+  lr: 0.1
+  nesterov: False
+  scheduler: CosineAnneal
+  T_max: ${trainer.max_epochs}
+  warmstart: 0
+  mixup: False
+  mixup_alpha: 0.2
+  weight_decay: 5e-4
+  undecay_norm: False
+  label_smoothing: 0.0
+  stochastic_depth: False
+  resnet_dropout: 0.0
+  squeeze_excitation: False
+  apply_shakedrop: False
+  zero_init_residual: False
+  input_dim: 2
+  input_channels: 3
+  task: 'Classification'
+  metric_computation_mode: 'epochwise'
+  result_plot: 'val'
+  num_classes: ${data.num_classes}
+  metrics: ${metrics}
+  epochs: ${trainer.max_epochs}
+  name: ${model_name_extractor:${model._target_}}
+  compile: True
+    
+data:
+  module:
+    random_batches: False
+    num_workers: 12
+    prepare_data_per_node: False
+  num_classes: ???
+  cv:
+    k: 1  # 1=no Cross Validation
+
+metrics:
+  - 'acc'
+  - 'f1'
+
+trainer:
+  _target_: lightning.pytorch.Trainer
+  callbacks: 
+    progressbar:
+      _target_: lightning.pytorch.callbacks.RichProgressBar
+    lr_monitor:
+      _target_: lightning.pytorch.callbacks.LearningRateMonitor
+      logging_interval: epoch
+    checkpoint:
+      _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      dirpath: ${exp_dir}/${data.module.name}/checkpoints
+      filename: '{epoch}-{val_loss:.2f}'
+      auto_insert_metric_name: True
+  devices: 1
+  accelerator: 'gpu'
+  sync_batchnorm: False  # set to True if you use multiple GPUs
+  enable_checkpointing: False
+  max_epochs: 200
+  benchmark: True
+  deterministic: False
+  precision: '16-mixed'
+  enable_progress_bar: True
+  strategy: 'ddp'
+  logger: 
+    _target_: lightning.pytorch.loggers.WandbLogger
+    save_dir: ${exp_dir}/${data.module.name}
+    offline: False
+    project: ${data.module.name}
+    group: 
+  num_sanity_val_steps: 0
+  # Some usefull trainer parameters for debugging
+  #limit_train_batches: 0.1
+  #limit_val_batches: 0.5
+  #limit_test_batches: 0.25
+  #accumulate_grad_batches: 2
+
+

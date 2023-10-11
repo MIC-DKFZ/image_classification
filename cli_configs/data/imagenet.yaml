@@ -1,0 +1,21 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.imagenet.ImagenetDataModule
+    name: ILSVRC_2012
+    data_root_dir: /home/s522r/network_drives/E132-Projekte/Projects/Helmholtz_Imaging_ACVL/misc/imagenet
+    batch_size: 128
+    train_transforms: 
+      _target_: augmentation.policies.imagenet.RandAugmentTransform
+    test_transforms: 
+      _target_: augmentation.policies.imagenet.TestTransform
+
+  num_classes: 1000
+
+model:
+  task: 'Classification'
+  cifar_size: False
+
+trainer:
+  logger:
+    project: Imagenet1K

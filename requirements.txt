@@ -1,12 +1,11 @@
---find-links https://download.pytorch.org/whl/cu113/torch_stable.html
-torch>=1.13.1+cu116
-torchvision>=0.14.1+cu116
+torch>=2.0.1
+torchvision>=0.15.2
 numpy>=1.23.5
-pytorch-lightning==1.8.6
+pytorch-lightning[extra]==2.0.2
 torchmetrics==0.11.0
 timm>=0.6.12
 argparse>=1.4.0
-mlflow>=2.1.1
+wandb>=0.15.8
 albumentations>=1.3.0
 randaugment>=1.0.2
 pillow>=9.3.0
@@ -15,3 +14,4 @@ madgrad>=1.2
 git+https://github.com/MIC-DKFZ/dynamic-network-architectures.git
 rich>=12.6.0
 matplotlib>=3.6.2
+hydra-core>=1.3.2
