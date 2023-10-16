@@ -3,7 +3,6 @@ from typing import Any, Callable
 import albumentations as A
 import torchvision.transforms as transforms
 from albumentations.pytorch import ToTensorV2
-from jsonargparse import class_from_function
 from randaugment import CIFAR10Policy, Cutout, RandAugment
 
 from .base_transform import BaseTransform
