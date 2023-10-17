@@ -1,6 +1,6 @@
 import torchvision.transforms as transforms
-from randaugment import Cutout, ImageNetPolicy, RandAugment
 
+from ..randaugment import Cutout, ImageNetPolicy, RandAugment
 from .base_transform import BaseTransform
 
 MEAN, STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)

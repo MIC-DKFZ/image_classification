@@ -3,8 +3,8 @@ from typing import Any, Callable
 import albumentations as A
 import torchvision.transforms as transforms
 from albumentations.pytorch import ToTensorV2
-from randaugment import CIFAR10Policy, Cutout, RandAugment
 
+from ..randaugment import CIFAR10Policy, Cutout, RandAugment
 from .base_transform import BaseTransform
 
 MEAN, STD = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
