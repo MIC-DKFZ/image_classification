@@ -69,7 +69,7 @@ trainer:
       logging_interval: epoch
     checkpoint:
       _target_: lightning.pytorch.callbacks.ModelCheckpoint
-      dirpath: ${exp_dir}/${data.module.name}/checkpoints
+      dirpath: ${exp_dir}/${data.module.name}/checkpoints/${trainer.logger.group}/${data.module.fold}/
       filename: '{epoch}-{val_loss:.2f}'
       auto_insert_metric_name: True
   devices: 1
