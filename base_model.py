@@ -54,6 +54,7 @@ class BaseModel(L.LightningModule):
         zero_init_residual,
         input_dim,
         input_channels,
+        pretrained,
         *args,
         **kwargs
     ):
@@ -145,12 +146,15 @@ class BaseModel(L.LightningModule):
         self.T_max = T_max
         self.warmstart = warmstart
         self.epochs = epochs
+        self.pretrained = pretrained
 
         # Regularization techniques
         self.mixup = mixup
         self.mixup_alpha = mixup_alpha  # 0.2
         self.label_smoothing = label_smoothing  # 0.1
-        self.stochastic_depth = stochastic_depth  # 0.1 (with higher resolution maybe 0.2)
+        self.stochastic_depth = (
+            stochastic_depth  # 0.1 (with higher resolution maybe 0.2)
+        )
         self.resnet_dropout = resnet_dropout  # 0.5
         self.se = squeeze_excitation
         self.apply_shakedrop = apply_shakedrop
@@ -200,7 +204,11 @@ class BaseModel(L.LightningModule):
 
             # second forward-backward pass
             if self.mixup:
-                self.manual_backward(mixup_criterion(self.criterion, self(inputs), targets_a, targets_b, lam))
+                self.manual_backward(
+                    mixup_criterion(
+                        self.criterion, self(inputs), targets_a, targets_b, lam
+                    )
+                )
             else:
                 if self.num_classes == 1:
                     self.manual_backward(self.criterion(self(x).view(-1), y))
@@ -231,7 +239,9 @@ class BaseModel(L.LightningModule):
             metrics_res = self.train_metrics(y_hat, y)
             if "train_F1_per_class" in metrics_res.keys():
                 for i, value in enumerate(metrics_res["train_F1_per_class"]):
-                    metrics_res["train_F1_class_{}".format(i)] = value if not torch.isnan(value) else 0.0
+                    metrics_res["train_F1_class_{}".format(i)] = (
+                        value if not torch.isnan(value) else 0.0
+                    )
                 del metrics_res["train_F1_per_class"]
             self.log_dict(
                 metrics_res,
@@ -273,7 +283,9 @@ class BaseModel(L.LightningModule):
             metrics_res = self.val_metrics(y_hat, y)
             if "val_F1_per_class" in metrics_res.keys():
                 for i, value in enumerate(metrics_res["val_F1_per_class"]):
-                    metrics_res["val_F1_class_{}".format(i)] = value if not torch.isnan(value) else 0.0
+                    metrics_res["val_F1_class_{}".format(i)] = (
+                        value if not torch.isnan(value) else 0.0
+                    )
                 del metrics_res["val_F1_per_class"]
             self.log_dict(
                 metrics_res,
@@ -296,7 +308,9 @@ class BaseModel(L.LightningModule):
             metrics_res = self.val_metrics.compute()
             if "val_F1_per_class" in metrics_res.keys():
                 for i, value in enumerate(metrics_res["val_F1_per_class"]):
-                    metrics_res["val_F1_class_{}".format(i)] = value if not torch.isnan(value) else 0.0
+                    metrics_res["val_F1_class_{}".format(i)] = (
+                        value if not torch.isnan(value) else 0.0
+                    )
                 del metrics_res["val_F1_per_class"]
             self.log_dict(
                 metrics_res,
@@ -315,7 +329,11 @@ class BaseModel(L.LightningModule):
             data = [[x, y] for (x, y) in zip(self.val_label_list, self.val_pred_list)]
             table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
             wandb.log(
-                {"Val Scatterplot": wandb.plot.scatter(table, "Ground Truth", "Prediction", "Validation Scatterplot")}
+                {
+                    "Val Scatterplot": wandb.plot.scatter(
+                        table, "Ground Truth", "Prediction", "Validation Scatterplot"
+                    )
+                }
             )
             # reset
             self.val_pred_list = []
@@ -326,7 +344,9 @@ class BaseModel(L.LightningModule):
             metrics_res = self.train_metrics.compute()
             if "train_F1_per_class" in metrics_res.keys():
                 for i, value in enumerate(metrics_res["train_F1_per_class"]):
-                    metrics_res["train_F1_class_{}".format(i)] = value if not torch.isnan(value) else 0.0
+                    metrics_res["train_F1_class_{}".format(i)] = (
+                        value if not torch.isnan(value) else 0.0
+                    )
                 del metrics_res["train_F1_per_class"]
 
             self.log_dict(
@@ -343,10 +363,16 @@ class BaseModel(L.LightningModule):
             self.train_conf_mat.save_state(self, "train")
             self.train_conf_mat.reset()
         if hasattr(self, "train_pred_list"):
-            data = [[x, y] for (x, y) in zip(self.train_label_list, self.train_pred_list)]
+            data = [
+                [x, y] for (x, y) in zip(self.train_label_list, self.train_pred_list)
+            ]
             table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
             wandb.log(
-                {"Train Scatterplot": wandb.plot.scatter(table, "Ground Truth", "Prediction", "Train Scatterplot")}
+                {
+                    "Train Scatterplot": wandb.plot.scatter(
+                        table, "Ground Truth", "Prediction", "Train Scatterplot"
+                    )
+                }
             )
             # reset
             self.train_pred_list = []
@@ -360,47 +386,51 @@ class BaseModel(L.LightningModule):
         from models.wide_resnet import BasicBlock as Wide_BasicBlock
         from models.wide_resnet import Bottleneck as Wide_Bottleneck
 
-        # TODO: disable weight init if model is pretrained once pretrained models are enabled
-        print("Initializing weights")
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-                # nn.init.xavier_uniform_(m.weight, gain=np.sqrt(2))
-                if m.bias is not None:
+        if not self.pretrained:
+            print("Initializing weights")
+            for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    nn.init.kaiming_normal_(
+                        m.weight, mode="fan_out", nonlinearity="relu"
+                    )
+                    # nn.init.xavier_uniform_(m.weight, gain=np.sqrt(2))
+                    if m.bias is not None:
+                        nn.init.constant_(m.bias, 0)
+                elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm, nn.SyncBatchNorm)):
+                    nn.init.constant_(m.weight, 1)
                     nn.init.constant_(m.bias, 0)
-            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm, nn.SyncBatchNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, std=1e-3)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+                elif isinstance(m, nn.Linear):
+                    nn.init.normal_(m.weight, std=1e-3)
+                    if m.bias is not None:
+                        nn.init.constant_(m.bias, 0)
 
-        # Zero-initialize the last BN in each residual branch,
-        # so that the residual branch starts with zeros, and each residual block behaves like an identity.
-        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
-        # TODO
-        if self.zero_init_residual:
-            if "PreAct" in self.name:
-                for m in self.modules():
-                    if isinstance(m, PreActBottleneck):
-                        nn.init.constant_(m.conv3.weight, 0)
-                    elif isinstance(m, PreActBlock):
-                        nn.init.constant_(m.conv2.weight, 0)
+            # Zero-initialize the last BN in each residual branch,
+            # so that the residual branch starts with zeros, and each residual block behaves like an identity.
+            # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
+            # TODO
+            if self.zero_init_residual:
+                if "PreAct" in self.name:
+                    for m in self.modules():
+                        if isinstance(m, PreActBottleneck):
+                            nn.init.constant_(m.conv3.weight, 0)
+                        elif isinstance(m, PreActBlock):
+                            nn.init.constant_(m.conv2.weight, 0)
 
-            elif "ResNet" in self.name or "WRN" in self.name:
-                for m in self.modules():
-                    if isinstance(m, Bottleneck) or isinstance(m, Wide_Bottleneck):
-                        nn.init.constant_(m.bn3.weight, 0)
-                    elif isinstance(m, BasicBlock) or isinstance(m, Wide_BasicBlock):
-                        nn.init.constant_(m.bn2.weight, 0)
+                elif "ResNet" in self.name or "WRN" in self.name:
+                    for m in self.modules():
+                        if isinstance(m, Bottleneck) or isinstance(m, Wide_Bottleneck):
+                            nn.init.constant_(m.bn3.weight, 0)
+                        elif isinstance(m, BasicBlock) or isinstance(
+                            m, Wide_BasicBlock
+                        ):
+                            nn.init.constant_(m.bn2.weight, 0)
 
-            elif "Pyramid" in self.name:
-                for m in self.modules():
-                    if isinstance(m, Bottleneck_pyramid):
-                        nn.init.constant_(m.bn4.weight, 0)
-                    elif isinstance(m, BasicBlock_pyramid):
-                        nn.init.constant_(m.bn3.weight, 0)
+                elif "Pyramid" in self.name:
+                    for m in self.modules():
+                        if isinstance(m, Bottleneck_pyramid):
+                            nn.init.constant_(m.bn4.weight, 0)
+                        elif isinstance(m, BasicBlock_pyramid):
+                            nn.init.constant_(m.bn3.weight, 0)
 
     def configure_optimizers(self):
         # leave bias and params of batch norm undecayed as in https://arxiv.org/pdf/1812.01187.pdf (Bag of tricks)
@@ -430,13 +460,21 @@ class BaseModel(L.LightningModule):
                     nesterov=self.nesterov,
                 )
             elif self.optimizer == "Adam":
-                optimizer = torch.optim.Adam(params, lr=self.lr, weight_decay=self.weight_decay)
+                optimizer = torch.optim.Adam(
+                    params, lr=self.lr, weight_decay=self.weight_decay
+                )
             elif self.optimizer == "AdamW":
-                optimizer = torch.optim.AdamW(params, lr=self.lr, weight_decay=self.weight_decay)
+                optimizer = torch.optim.AdamW(
+                    params, lr=self.lr, weight_decay=self.weight_decay
+                )
             elif self.optimizer == "Rmsprop":
-                optimizer = RMSpropTF(params, lr=self.lr, weight_decay=self.weight_decay)
+                optimizer = RMSpropTF(
+                    params, lr=self.lr, weight_decay=self.weight_decay
+                )
             elif self.optimizer == "Madgrad":
-                optimizer = MADGRAD(params, lr=self.lr, momentum=0.9, weight_decay=self.weight_decay)
+                optimizer = MADGRAD(
+                    params, lr=self.lr, momentum=0.9, weight_decay=self.weight_decay
+                )
 
         else:
             # ASAM paper suggests 10x larger rho for adaptive SAM than in normal SAM
@@ -500,15 +538,23 @@ class BaseModel(L.LightningModule):
             return [optimizer]
         else:
             if self.scheduler == "CosineAnneal" and self.warmstart == 0:
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.T_max)
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    optimizer, T_max=self.T_max
+                )
             elif self.scheduler == "CosineAnneal" and self.warmstart > 0:
-                scheduler = CosineAnnealingLR_Warmstart(optimizer, T_max=self.T_max, warmstart=self.warmstart)
+                scheduler = CosineAnnealingLR_Warmstart(
+                    optimizer, T_max=self.T_max, warmstart=self.warmstart
+                )
             elif self.scheduler == "Step":
                 # decays every 1/4 epochs
-                scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.epochs // 4, gamma=0.1)
+                scheduler = torch.optim.lr_scheduler.StepLR(
+                    optimizer, step_size=self.epochs // 4, gamma=0.1
+                )
             elif self.scheduler == "MultiStep":
                 # decays lr with 0.1 after half of epochs and 3/4 of epochs
-                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [self.epochs // 2, self.epochs * 3 // 4])
+                scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer, [self.epochs // 2, self.epochs * 3 // 4]
+                )
 
             return [optimizer], [scheduler]
 
@@ -519,13 +565,17 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
     for the amount of specified warmup epochs as described in https://arxiv.org/pdf/1706.02677.pdf
     """
 
-    def __init__(self, optimizer, T_max, eta_min=0, last_epoch=-1, verbose=False, warmstart=0):
+    def __init__(
+        self, optimizer, T_max, eta_min=0, last_epoch=-1, verbose=False, warmstart=0
+    ):
         self.T_max = T_max - warmstart  # do not consider warmstart epochs for T_max
         self.eta_min = eta_min
         self.warmstart = warmstart
         self.T = 0
 
-        super(CosineAnnealingLR_Warmstart, self).__init__(optimizer, last_epoch, verbose)
+        super(CosineAnnealingLR_Warmstart, self).__init__(
+            optimizer, last_epoch, verbose
+        )
 
     def get_lr(self):
         if not self._get_lr_called_within_step:
@@ -537,7 +587,10 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
         # Warmstart
         if self.last_epoch < self.warmstart:
             addrates = [(lr / (self.warmstart + 1)) for lr in self.base_lrs]
-            updated_lr = [addrates[i] * (self.last_epoch + 1) for i, group in enumerate(self.optimizer.param_groups)]
+            updated_lr = [
+                addrates[i] * (self.last_epoch + 1)
+                for i, group in enumerate(self.optimizer.param_groups)
+            ]
 
             return updated_lr
 
@@ -547,8 +600,13 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
                 return self.base_lrs
             elif (self.T - 1 - self.T_max) % (2 * self.T_max) == 0:
                 updated_lr = [
-                    group["lr"] + (base_lr - self.eta_min) * (1 - math.cos(math.pi / self.T_max)) / 2
-                    for base_lr, group in zip(self.base_lrs, self.optimizer.param_groups)
+                    group["lr"]
+                    + (base_lr - self.eta_min)
+                    * (1 - math.cos(math.pi / self.T_max))
+                    / 2
+                    for base_lr, group in zip(
+                        self.base_lrs, self.optimizer.param_groups
+                    )
                 ]
 
                 self.T += 1

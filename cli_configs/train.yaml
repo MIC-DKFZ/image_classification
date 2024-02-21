@@ -44,7 +44,8 @@ model:
   metrics: ${metrics}
   epochs: ${trainer.max_epochs}
   name: ${model_name_extractor:${model._target_}}
-  compile: True
+  compile: False
+  pretrained: False
     
 data:
   module:
