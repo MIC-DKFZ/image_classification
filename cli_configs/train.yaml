@@ -5,7 +5,7 @@ defaults:
   - data: cifar10
 
 hydra:
-  output_subdir: null
+  output_subdir: ${exp_dir}/${data.module.name}/checkpoints/${make_group_name:}
   job:
     chdir: False
   run:
@@ -52,6 +52,7 @@ data:
     random_batches: False
     num_workers: 12
     prepare_data_per_node: False
+    fold: ???
   num_classes: ???
   cv:
     k: 1  # 1=no Cross Validation
@@ -70,7 +71,7 @@ trainer:
       logging_interval: epoch
     checkpoint:
       _target_: lightning.pytorch.callbacks.ModelCheckpoint
-      dirpath: ${exp_dir}/${data.module.name}/checkpoints/${trainer.logger.group}/${data.module.fold}/
+      dirpath: ???
       filename: '{epoch}-{val_loss:.2f}'
       auto_insert_metric_name: True
   devices: 1
@@ -88,12 +89,10 @@ trainer:
     save_dir: ${exp_dir}/${data.module.name}
     offline: False
     project: ${data.module.name}
-    group: 
+    group: ???
   num_sanity_val_steps: 0
   # Some usefull trainer parameters for debugging
   #limit_train_batches: 0.1
   #limit_val_batches: 0.5
   #limit_test_batches: 0.25
   #accumulate_grad_batches: 2
-
-

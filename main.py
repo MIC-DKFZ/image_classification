@@ -1,5 +1,6 @@
 from pathlib import Path
 from uuid import uuid4
+import os
 
 import hydra
 import wandb
@@ -13,8 +14,6 @@ from parsing_utils import make_omegaconf_resolvers
 
 @hydra.main(version_base=None, config_path="./cli_configs", config_name="train")
 def main(cfg):
-    make_omegaconf_resolvers()
-
     # seeding
     if cfg.seed:
         seed_everything(cfg.seed)
@@ -30,7 +29,10 @@ def main(cfg):
         pass
     log_path = Path(cfg.trainer.logger.save_dir)
     log_path.mkdir(parents=True, exist_ok=True)
-    cfg.trainer.logger.group = str(uuid4())
+    # cfg.trainer.logger.group = str(uuid4())
+
+    uid = hydra.core.hydra_config.HydraConfig.get().output_subdir.split("/")[-1]
+    cfg.trainer.logger.group = uid
 
     # add sync_batchnorm if multiple GPUs are used
     if cfg.trainer.devices > 1 and cfg.trainer.accelerator == "gpu":
@@ -40,7 +42,9 @@ def main(cfg):
     cfg.trainer.callbacks = [i for i in cfg.trainer.callbacks.values() if i]
     if not cfg.trainer["enable_checkpointing"]:
         cfg.trainer.callbacks = [
-            i for i in cfg.trainer.callbacks if i["_target_"] != "lightning.pytorch.callbacks.ModelCheckpoint"
+            i
+            for i in cfg.trainer.callbacks
+            if i["_target_"] != "lightning.pytorch.callbacks.ModelCheckpoint"
         ]
 
     print(OmegaConf.to_yaml(cfg))
@@ -49,6 +53,19 @@ def main(cfg):
     for k in range(cfg.data.cv.k):
         if cfg.data.cv.k > 1:
             cfg.data.module.fold = k
+        else:
+            cfg.data.module.fold = "0"
+
+        if cfg.trainer["enable_checkpointing"]:
+            for i in cfg.trainer.callbacks:
+                if i["_target_"] == "lightning.pytorch.callbacks.ModelCheckpoint":
+                    i["dirpath"] = os.path.join(
+                        str(cfg.exp_dir),
+                        str(cfg.data.module.name),
+                        "checkpoints",
+                        uid,
+                        str(cfg.data.module.fold),
+                    )
 
         # instantiate trainer, model and dataset
         trainer = instantiate(cfg.trainer)
@@ -78,4 +95,5 @@ def main(cfg):
 
 
 if __name__ == "__main__":
+    make_omegaconf_resolvers()
     main()

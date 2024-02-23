@@ -18,6 +18,8 @@ class BaseDataModule(LightningDataModule):
         random_batches,
         num_workers,
         prepare_data_per_node,
+        *args,
+        **kwargs
     ):
         super(BaseDataModule, self).__init__()
 
