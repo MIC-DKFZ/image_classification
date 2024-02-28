@@ -1,0 +1,17 @@
+hydra:
+  output_subdir: null
+  job:
+    chdir: False
+  run:
+    dir: .
+
+override hydra/hydra_logging: disable
+override hydra/job_logging: disable
+
+exp_dir: ???  # path to the directory containing the hydra configs and fold directories
+fold: null  # if no fold is given, an ensemble of all available folds will be used (if only one fold is available this can be ignored)
+pred_dir: null
+
+metrics:
+  - 'acc'
+  - 'f1'

@@ -302,6 +302,17 @@ class BaseModel(L.LightningModule):
         if hasattr(self, "val_pred_list"):
             self.val_pred_list.extend(y_hat)
             self.val_label_list.extend(y)
+    
+    def predict_step(self, batch, batch_idx):
+        
+        x, y = batch
+        y_hat = self(x)
+
+        if self.num_classes == 1:
+            y_hat = y_hat.view(-1)
+        
+        #self.predictions.append(y_hat)
+        return y, y_hat
 
     def on_validation_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":

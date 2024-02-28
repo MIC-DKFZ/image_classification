@@ -93,6 +93,19 @@ class BaseDataModule(LightningDataModule):
         )
 
         return testloader
+    
+    def predict_dataloader(self):
+        predictloader = DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            worker_init_fn=seed_worker,
+            persistent_workers=True,
+        )
+
+        return predictloader
 
 
 def seed_worker(worker_id):

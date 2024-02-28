@@ -52,7 +52,7 @@ data:
     random_batches: False
     num_workers: 12
     prepare_data_per_node: False
-    fold: ???
+    fold: null
   num_classes: ???
   cv:
     k: 1  # 1=no Cross Validation

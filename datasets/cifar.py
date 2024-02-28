@@ -47,8 +47,12 @@ class CIFAR10DataModule(BaseDataModule):
             self.val_dataset = Cifar10Albumentation(
                 self.data_path, train=False, transform=self.test_transforms, download=True
             )
+            self.test_dataset = Cifar10Albumentation(
+                self.data_path, train=False, transform=self.test_transforms, download=True
+            )
         else:
             self.val_dataset = CIFAR10(self.data_path, train=False, transform=self.test_transforms, download=True)
+            self.test_dataset = CIFAR10(self.data_path, train=False, transform=self.test_transforms, download=True)
 
 
 class CIFAR100DataModule(BaseDataModule):
@@ -67,5 +71,9 @@ class CIFAR100DataModule(BaseDataModule):
             self.val_dataset = Cifar100Albumentation(
                 self.data_path, train=False, transform=self.test_transforms, download=True
             )
+            self.test_dataset = Cifar100Albumentation(
+                self.data_path, train=False, transform=self.test_transforms, download=True
+            )
         else:
             self.val_dataset = CIFAR100(self.data_path, train=False, transform=self.test_transforms, download=True)
+            self.test_dataset = CIFAR100(self.data_path, train=False, transform=self.test_transforms, download=True)
