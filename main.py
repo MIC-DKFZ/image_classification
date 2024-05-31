@@ -71,7 +71,7 @@ def main(cfg):
         trainer = instantiate(cfg.trainer)
         model = instantiate(cfg.model)
         if cfg.model.compile:
-            model = torch.compile(model, mode="reduce-overhead")
+            model = torch.compile(model, mode="default")
         dataset = instantiate(cfg.data).module
 
         # log hypperparams
