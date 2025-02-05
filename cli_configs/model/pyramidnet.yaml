@@ -1,0 +1,2 @@
+_target_: models.pyramidnet.PyramidNet110
+bottleneck: True

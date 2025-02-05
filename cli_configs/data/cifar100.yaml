@@ -1,0 +1,17 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.cifar.CIFAR100DataModule
+    data_dir: 'CIFAR10'
+    batch_size: 128
+    train_transforms: 
+      _target_: augmentation.policies.cifar.RandAugmentTransform
+      cutout_size: 8
+    test_transforms: 
+      _target_: augmentation.policies.cifar.TestTransform
+
+  num_classes: 100
+
+model:
+  task: 'Classification'
+  cifar_size: True
