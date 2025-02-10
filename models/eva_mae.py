@@ -9,7 +9,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch._dynamo import OptimizedModule
 import torch.distributed as dist
 from einops import rearrange
-
+from peft import get_peft_model, LoraConfig, TaskType
 from base_model import BaseModel
 from models.classification_head import ClassificationHead
 
@@ -125,10 +125,33 @@ class Eva_MAE(BaseModel):
 
             if hypparams["finetune_method"] == "full":
                 pass
+            
             elif hypparams["finetune_method"] == "linear_probing":
                 # fully freeze encoder
                 for param in self.eva_encoder.parameters():
                     param.requires_grad = False
+            
+            elif hypparams["finetune_method"] == "lora":
+                # Apply LoRA to attention layers
+
+                lora_config = LoraConfig(
+                    #task_type=TaskType.IMAGE_CLASSIFICATION,
+                    r=8,  # LoRA rank
+                    lora_alpha=32,  # Scaling factor
+                    lora_dropout=0.1,
+                    target_modules=["attn.qkv", "attn.proj"]
+                )
+
+                self.eva_encoder.eva = get_peft_model(self.eva_encoder.eva, lora_config)
+
+                # Freeze all layers except LoRA-adapted ones
+                for param in self.eva_encoder.parameters():
+                    param.requires_grad = False
+
+                for name, param in self.eva_encoder.eva.named_parameters():
+                    if "lora" in name:
+                        param.requires_grad = True
+
             else:
                 raise NotImplementedError
 
