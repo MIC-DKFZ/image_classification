@@ -45,10 +45,10 @@ AUROC: 0.752
 #### RSNA Spine
 `python main.py env=cluster model=eva_mae data=rsna_spine trainer.devices=2 model.pretrained=False`
 
-F1:
-Average Precision:
-Balanced Accuracy:
-AUROC:
+F1: 0.613
+Average Precision: 0.642
+Balanced Accuracy: 0.613
+AUROC: 0.651
 
 
 
