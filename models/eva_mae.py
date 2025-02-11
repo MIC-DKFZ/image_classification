@@ -129,8 +129,12 @@ class Eva_MAE(BaseModel):
 
             elif hypparams["finetune_method"] == "linear_probing":
                 # fully freeze encoder
-                for param in self.eva_encoder.parameters():
-                    param.requires_grad = False
+                for n, param in self.eva_encoder.named_parameters():
+
+                    if not hypparams["load_cls_token"] and "cls_token" in n:
+                        param.requires_grad = True  # make cls_token trainable if it's not loaded from pretrained weights
+                    else:
+                        param.requires_grad = False
 
             elif hypparams["finetune_method"] == "lora":
                 # Apply LoRA to attention layers
