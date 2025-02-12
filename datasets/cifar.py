@@ -35,45 +35,99 @@ class CIFAR10DataModule(BaseDataModule):
     def __init__(self, **params):
         super(CIFAR10DataModule, self).__init__(**params)
 
+        self.train_transforms = self.train_transforms()
+        self.test_transforms = self.test_transforms()
+
     def setup(self, stage: str):
         if "albumentations" in str(self.train_transforms.__class__):
             self.train_dataset = Cifar10Albumentation(
-                self.data_path, train=True, transform=self.train_transforms, download=True
+                self.data_path,
+                train=True,
+                transform=self.train_transforms,
+                download=True,
             )
         else:
-            self.train_dataset = CIFAR10(self.data_path, train=True, transform=self.train_transforms, download=True)
+            self.train_dataset = CIFAR10(
+                self.data_path,
+                train=True,
+                transform=self.train_transforms,
+                download=True,
+            )
 
         if "albumentations" in str(self.test_transforms.__class__):
             self.val_dataset = Cifar10Albumentation(
-                self.data_path, train=False, transform=self.test_transforms, download=True
+                self.data_path,
+                train=False,
+                transform=self.test_transforms,
+                download=True,
             )
             self.test_dataset = Cifar10Albumentation(
-                self.data_path, train=False, transform=self.test_transforms, download=True
+                self.data_path,
+                train=False,
+                transform=self.test_transforms,
+                download=True,
             )
         else:
-            self.val_dataset = CIFAR10(self.data_path, train=False, transform=self.test_transforms, download=True)
-            self.test_dataset = CIFAR10(self.data_path, train=False, transform=self.test_transforms, download=True)
+            self.val_dataset = CIFAR10(
+                self.data_path,
+                train=False,
+                transform=self.test_transforms,
+                download=True,
+            )
+            self.test_dataset = CIFAR10(
+                self.data_path,
+                train=False,
+                transform=self.test_transforms,
+                download=True,
+            )
 
 
 class CIFAR100DataModule(BaseDataModule):
     def __init__(self, **params):
         super(CIFAR100DataModule, self).__init__(**params)
 
+        self.train_transforms = self.train_transforms()
+        self.test_transforms = self.test_transforms()
+
     def setup(self, stage: str):
         if "albumentations" in str(self.train_transforms.__class__):
             self.train_dataset = Cifar100Albumentation(
-                self.data_path, train=True, transform=self.train_transforms, download=True
+                self.data_path,
+                train=True,
+                transform=self.train_transforms,
+                download=True,
             )
         else:
-            self.train_dataset = CIFAR100(self.data_path, train=True, transform=self.train_transforms, download=True)
+            self.train_dataset = CIFAR100(
+                self.data_path,
+                train=True,
+                transform=self.train_transforms,
+                download=True,
+            )
 
         if "albumentations" in str(self.test_transforms.__class__):
             self.val_dataset = Cifar100Albumentation(
-                self.data_path, train=False, transform=self.test_transforms, download=True
+                self.data_path,
+                train=False,
+                transform=self.test_transforms,
+                download=True,
             )
             self.test_dataset = Cifar100Albumentation(
-                self.data_path, train=False, transform=self.test_transforms, download=True
+                self.data_path,
+                train=False,
+                transform=self.test_transforms,
+                download=True,
             )
         else:
-            self.val_dataset = CIFAR100(self.data_path, train=False, transform=self.test_transforms, download=True)
-            self.test_dataset = CIFAR100(self.data_path, train=False, transform=self.test_transforms, download=True)
+            self.val_dataset = CIFAR100(
+                self.data_path,
+                train=False,
+                transform=self.test_transforms,
+                download=True,
+            )
+            self.test_dataset = CIFAR100(
+                self.data_path,
+                train=False,
+                transform=self.test_transforms,
+                download=True,
+            )

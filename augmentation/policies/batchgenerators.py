@@ -48,7 +48,7 @@ def get_training_transforms(
     rotation_for_DA: RandomScalar,
     # deep_supervision_scales: Union[List, Tuple, None],
     mirror_axes: Tuple[int, ...],
-    do_dummy_2d_data_aug: False,
+    do_dummy_2d_data_aug: bool = False,
     # use_mask_for_norm: List[bool] = None,
     # is_cascaded: bool = False,
     # foreground_labels: Union[Tuple[int, ...], List[int]] = None,
