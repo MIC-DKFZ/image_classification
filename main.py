@@ -13,7 +13,7 @@ from parsing_utils import make_omegaconf_resolvers
 
 @hydra.main(version_base=None, config_path="./cli_configs", config_name="train")
 def main(cfg):
-
+    wandb.init(entity='synergy_unit', project='FM_adaptation_classification')
     # seeding
     if cfg.seed:
         seed_everything(cfg.seed)

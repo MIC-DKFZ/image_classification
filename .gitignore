@@ -20,6 +20,7 @@ eggs/
 lib/
 lib64/
 parts/
+wandb/
 sdist/
 var/
 *.egg-info/
