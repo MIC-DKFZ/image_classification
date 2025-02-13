@@ -1,8 +1,8 @@
 defaults:
   - _self_
   - env: local
-  - model: resnet
-  - data: cifar10
+  - model: timm
+  - data: imagenet
 
 output_subdir: ${exp_dir}/${data.module.name}/checkpoints/${make_group_name:}
 hydra:
@@ -18,10 +18,10 @@ override hydra/job_logging: disable
 seed: False
 
 model:
-  optimizer: SGD
+  optimizer: AdamW
   sam: False  # set trainer.precision=32 if you use sam
   adaptive_sam: False  # set trainer.precision=32 if you use sam
-  lr: 0.1
+  lr: 0.00001
   nesterov: False
   scheduler: CosineAnneal
   T_max: ${trainer.max_epochs}

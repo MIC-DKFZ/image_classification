@@ -1,4 +1,7 @@
 _target_: models.timm.TimmModel
-type: timm/convnext_small.fb_in22k
+type: timm/eva02_large_patch14_448.mim_m38m_ft_in22k #timm/convnext_small.fb_in22k
 pretrained: True
-
+finetune_method: lora
+lora_rank: 6
+lora_alpha: 32
+lora_dropout: 0.1

@@ -67,7 +67,7 @@ class RandAugmentTransform(BaseTransform):
     def __call__(self):
         transform_train = transforms.Compose(
             [
-                transforms.RandomResizedCrop(224),
+                transforms.RandomResizedCrop(448),
                 transforms.RandomHorizontalFlip(),
                 RandAugment(),
                 transforms.ToTensor(),
@@ -85,8 +85,8 @@ class TestTransform(BaseTransform):
     def __call__(self):
         transform_test = transforms.Compose(
             [
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
+                #transforms.Resize(256),
+                transforms.CenterCrop(448),
                 transforms.ToTensor(),
                 transforms.Normalize(MEAN, STD),
             ]
