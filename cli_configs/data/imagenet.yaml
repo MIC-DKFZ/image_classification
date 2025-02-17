@@ -3,9 +3,9 @@ data:
   module:
     _target_: datasets.imagenet.ImagenetDataModule
     name: ILSVRC_2012
-    data_root_dir: /home/d246a/network_drives/E132-Projekte/Projects/Helmholtz_Imaging_ACVL/misc/imagenet/ILSVRC_2012 #/dkfz/cluster/gpu/data/OE0441/s522r/ILSVRC_2012
+    data_root_dir: /dkfz/cluster/gpu/data/OE0441/s522r/ILSVRC_2012 #/home/d246a/network_drives/E132-Projekte/Projects/Helmholtz_Imaging_ACVL/misc/imagenet/ILSVRC_2012
     batch_size: 2
-    data_fraction: 0.6
+    data_fraction: 1.0
     train_transforms: 
       _target_: augmentation.policies.imagenet.RandAugmentTransform
     test_transforms: 
