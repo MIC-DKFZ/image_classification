@@ -121,25 +121,30 @@ class Eva_MAE(BaseModel):
                 handle_input_shape_mismatch=hypparams[
                     "pretraining_input_shape_mismatch"
                 ],
+                load_cls_token=hypparams["load_cls_token"],
             )
 
             if hypparams["finetune_method"] == "full":
                 pass
-            
+
             elif hypparams["finetune_method"] == "linear_probing":
                 # fully freeze encoder
-                for param in self.eva_encoder.parameters():
-                    param.requires_grad = False
-            
+                for n, param in self.eva_encoder.named_parameters():
+
+                    if not hypparams["load_cls_token"] and "cls_token" in n:
+                        param.requires_grad = True  # make cls_token trainable if it's not loaded from pretrained weights
+                    else:
+                        param.requires_grad = False
+
             elif hypparams["finetune_method"] == "lora":
                 # Apply LoRA to attention layers
 
                 lora_config = LoraConfig(
-                    #task_type=TaskType.IMAGE_CLASSIFICATION,
+                    # task_type=TaskType.IMAGE_CLASSIFICATION,
                     r=8,  # LoRA rank
                     lora_alpha=32,  # Scaling factor
                     lora_dropout=0.1,
-                    target_modules=["attn.qkv", "attn.proj"]
+                    target_modules=["attn.qkv", "attn.proj"],
                 )
 
                 self.eva_encoder.eva = get_peft_model(self.eva_encoder.eva, lora_config)
@@ -173,6 +178,7 @@ def load_pretrained_weights(
     eva_model,
     pretrained_weights_file,
     handle_input_shape_mismatch="interpolate",
+    load_cls_token=True,
     verbose=True,
 ):
 
@@ -231,6 +237,9 @@ def load_pretrained_weights(
     skip_strings_in_pretrained = [".seg_layers."]
     skip_strings_in_pretrained.append(".decoder.")
     skip_strings_in_pretrained.append("up_projection")
+
+    if not load_cls_token:
+        skip_strings_in_pretrained.append("eva.cls_token")
 
     # verify that all but the segmentation layers have the same shape
     for key, _ in model_dict.items():

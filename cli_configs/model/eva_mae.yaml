@@ -19,3 +19,4 @@ classification_head_dropout: 0.2
 token_aggregation_method: cls_token
 pretraining_input_shape_mismatch: interpolate
 finetune_method: full
+load_cls_token: True
