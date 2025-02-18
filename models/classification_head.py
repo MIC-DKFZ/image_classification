@@ -23,12 +23,13 @@ class ClassificationHead(nn.Module):
 
     def forward(self, x):
 
-        if self.patch_aggregation_method == "cls_token":
-            x = x[:, 0]
-        elif self.patch_aggregation_method == "avg":
-            x = x[:, 1:].mean(dim=1)
-        elif self.patch_aggregation_method == "sum":
-            x = x[:, 1:].sum(dim=1)
+        if self.patch_aggregation_method is not None:
+            if self.patch_aggregation_method == "cls_token":
+                x = x[:, 0]
+            elif self.patch_aggregation_method == "avg":
+                x = x[:, 1:].mean(dim=1)
+            elif self.patch_aggregation_method == "sum":
+                x = x[:, 1:].sum(dim=1)
 
         x = self.fc(x)
 

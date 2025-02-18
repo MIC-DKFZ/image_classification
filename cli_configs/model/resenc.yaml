@@ -1,0 +1,11 @@
+# @package _global_
+model:
+  _target_: models.resenc.ResEncoder_Classifier
+  pretrained: True
+  chpt_path: null
+  classification_head_dropout: 0.2
+  finetune_method: full
+  token_aggregation_method: null
+
+trainer:
+  strategy: 'ddp_find_unused_parameters_true'
