@@ -1,0 +1,43 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.abide.AbideDataModule
+    name: ABIDE
+    data_root_dir: /dkfz/cluster/gpu/data/OE0441/s522r/rocket_wp5/Dataset301_ABIDE
+    batch_size: 2
+    train_transforms: 
+      _target_: augmentation.policies.batchgenerators.get_training_transforms
+      patch_size: ${data.patch_size}
+      rotation_for_DA: 0.523599
+      mirror_axes: [0,1,2]
+      do_dummy_2d_data_aug: False
+    test_transforms: null
+  cv:
+    k: 5
+
+  num_classes: 2
+  patch_size: [160, 192, 224]
+
+model:
+  task: 'Classification'
+  cifar_size: False
+  input_channels: 1
+  input_dim: 3
+  input_shape: ${data.patch_size}
+  optimizer: AdamW
+  lr: 0.0001
+  warmstart: 20
+  weight_decay: 1e-2
+
+
+trainer:
+  logger:
+    project: ABIDE
+  accumulate_grad_batches: 48
+  max_epochs: 200
+
+metrics:
+  - 'f1'
+  - 'balanced_acc'
+  - 'ap'
+  - 'auroc'
