@@ -30,6 +30,8 @@ class ClassificationHead(nn.Module):
                 x = x[:, 1:].mean(dim=1)
             elif self.patch_aggregation_method == "sum":
                 x = x[:, 1:].sum(dim=1)
+            elif self.patch_aggregation_method == "avg_no_cls_token":
+                x = x.mean(dim=1)
 
         x = self.fc(x)
 

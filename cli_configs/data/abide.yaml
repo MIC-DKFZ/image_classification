@@ -4,7 +4,7 @@ data:
     _target_: datasets.abide.AbideDataModule
     name: ABIDE
     data_root_dir: /dkfz/cluster/gpu/data/OE0441/s522r/rocket_wp5/Dataset301_ABIDE
-    batch_size: 2
+    batch_size: 4
     train_transforms: 
       _target_: augmentation.policies.batchgenerators.get_training_transforms
       patch_size: ${data.patch_size}
