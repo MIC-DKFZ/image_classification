@@ -78,11 +78,12 @@ trainer:
       dirpath: ???
       filename: '{epoch}-{val_loss:.2f}'
       auto_insert_metric_name: True
+      save_last: True
   devices: 1
   accelerator: 'gpu'
   sync_batchnorm: False  # set to True if you use multiple GPUs
-  enable_checkpointing: False
-  max_epochs: 200
+  enable_checkpointing: True
+  max_epochs: 100
   benchmark: True
   deterministic: False
   precision: '16-mixed'
