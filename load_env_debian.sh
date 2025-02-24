@@ -11,8 +11,9 @@ export CPATH=/usr/local/lib:$CPATH
 export PATH=/usr/local/cuda-${CUDA}/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda-${CUDA}/lib64:$LD_LIBRARY_PATH
 export CUDA_HOME=/usr/local/cuda-${CUDA}
-module load GCC/14.1.0
-module load binutils/2.42
+
+#module load GCC/14.1.0
+#module load binutils/2.42
 . ~/.bashrc
 conda activate ${CONDA_ENV}
 
