@@ -21,4 +21,4 @@ export CUDA_CACHE_DISABLE=1
 export OMP_NUM_THREADS=1
 
 export DATASET_LOCATION=/dkfz/cluster/gpu/data/OE0441/s522r/ILSVRC_2012
-export EXPERIMENT_LOCATION=/dkfz/cluste r/gpu/checkpoints/OE0441/d246a
+export EXPERIMENT_LOCATION=/dkfz/cluster/gpu/checkpoints/OE0441/d246a
