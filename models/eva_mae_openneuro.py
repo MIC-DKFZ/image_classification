@@ -193,6 +193,7 @@ def load_pretrained_weights(
         saved_model = torch.load(pretrained_weights_file, weights_only=False)
 
     pretrained_dict = saved_model["network_weights"]
+    pretrained_dict = {k.replace("encoder.", ""): v for k, v in pretrained_dict.items()}
 
     if isinstance(eva_model, DDP):
         mod = eva_model.module
@@ -207,6 +208,10 @@ def load_pretrained_weights(
 
     # adjust pos_embed if necessary
     if handle_input_shape_mismatch == "interpolate":
+
+        """import IPython
+
+        IPython.embed()"""
 
         pretrained_pos_embed = pretrained_dict["eva.pos_embed"]
         model_pos_embed_shape = model_dict["eva.pos_embed"].shape
