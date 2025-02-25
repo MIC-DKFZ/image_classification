@@ -209,10 +209,6 @@ def load_pretrained_weights(
     # adjust pos_embed if necessary
     if handle_input_shape_mismatch == "interpolate":
 
-        """import IPython
-
-        IPython.embed()"""
-
         pretrained_pos_embed = pretrained_dict["eva.pos_embed"]
         model_pos_embed_shape = model_dict["eva.pos_embed"].shape
         # Separate the class token and patch tokens

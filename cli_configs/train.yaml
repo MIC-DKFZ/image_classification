@@ -26,6 +26,7 @@ model:
   scheduler: CosineAnneal
   T_max: ${trainer.max_epochs}
   warmstart: 0
+  warmstart2: 0
   mixup: False
   mixup_alpha: 0.2
   weight_decay: 5e-4
