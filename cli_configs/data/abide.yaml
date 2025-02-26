@@ -33,7 +33,7 @@ model:
 trainer:
   logger:
     project: ABIDE
-  accumulate_grad_batches: 48
+  accumulate_grad_batches: 96
   max_epochs: 200
 
 metrics:
