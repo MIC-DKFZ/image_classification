@@ -34,6 +34,7 @@ class BaseModel(L.LightningModule):
         metrics,
         num_classes,
         name,
+        finetune_method,
         lr,
         weight_decay,
         optimizer,
@@ -44,6 +45,9 @@ class BaseModel(L.LightningModule):
         T_max,
         warmstart,
         epochs,
+        lora_rank,
+        lora_alpha,
+        lora_dropout,
         mixup,
         mixup_alpha,
         label_smoothing,
@@ -163,6 +167,10 @@ class BaseModel(L.LightningModule):
 
         # Training Args
         self.name = name
+        self.finetune_method = finetune_method
+        self.lora_rank = lora_rank
+        self.lora_alpha = lora_alpha
+        self.lora_dropout = lora_dropout
         # self.batch_size = batch_size
         self.lr = lr
         self.weight_decay = weight_decay
@@ -261,8 +269,8 @@ class BaseModel(L.LightningModule):
         self.log(
             "train_loss",
             loss,
-            on_step=False,
-            on_epoch=True,
+            on_step=True,
+            on_epoch=False,
             prog_bar=True,
             sync_dist=True,
         )
