@@ -51,6 +51,7 @@ model:
   classification_head_dropout: 0.0
   token_aggregation_method: cls_token
   pretrained: False
+  finetune_method: full
     
 data:
   module:

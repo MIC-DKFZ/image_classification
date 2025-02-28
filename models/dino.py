@@ -19,6 +19,7 @@ class DinoV2Model(BaseModel):
             hypparams["num_classes"],
             dropout=hypparams["classification_head_dropout"],
             patch_aggregation_method=hypparams["token_aggregation_method"],
+            cls_token_available=hypparams["cls_token_available"],
         )
 
     def forward(self, x):

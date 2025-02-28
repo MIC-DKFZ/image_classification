@@ -16,7 +16,8 @@ rope_kwargs: null
 pretrained: True
 chpt_path: null
 classification_head_dropout: 0.2
-token_aggregation_method: avg_no_cls_token
+token_aggregation_method: avg
 pretraining_input_shape_mismatch: interpolate
 finetune_method: full
 load_cls_token: False
+cls_token_available: False
