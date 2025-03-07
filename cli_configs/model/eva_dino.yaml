@@ -1,0 +1,32 @@
+# @package _global_
+model:
+  _target_: models.eva_dino.Eva_Dino
+  embed_dim: 864
+  depth: 24
+  num_heads: 12
+  num_reg_tokens: 0
+  use_rot_pos_emb: True
+  use_abs_pos_emb: True
+  mlp_ratio: 2.666666
+  drop_path_rate: 0.2
+  drop_path_scale: True
+  proj_drop_rate: 0.0
+  attn_drop_rate: 0.2
+  global_crops_size: 96
+  local_crops_size: ${model.input_shape}
+  patch_size: 8
+  qkv_bias: True
+  qkv_fused: False
+  swiglu_mlp: True
+  scale_mlp: True
+  scale_attn_inner: False
+  dynamic_img_size: False
+  pretrained: True
+  chpt_path: null
+  classification_head_dropout: 0.2
+  token_aggregation_method: cls_token
+  finetune_method: full
+  cls_token_available: True
+
+trainer:
+  strategy: 'ddp_find_unused_parameters_true'
