@@ -32,6 +32,7 @@ model:
   scheduler: CosineAnneal
   T_max: ${trainer.max_epochs}
   warmstart: 0
+  warmstart2: 0
   mixup: False
   mixup_alpha: 0.2
   weight_decay: 5e-4
@@ -58,6 +59,7 @@ model:
   pretrained: False
     
 data:
+  feature_dir: /home/j211b/git/classification_downstream/precomputed_features
   module:
     random_batches: False
     num_workers: 12
@@ -103,7 +105,7 @@ trainer:
     group: ???
   num_sanity_val_steps: 0
   accumulate_grad_batches: 1
-  log_every_n_steps: 100
+  log_every_n_steps: 200
   # Some useful trainer parameters for debugging
   #limit_train_batches: 0.1
   #limit_val_batches: 0.5
@@ -113,3 +115,4 @@ trainer:
 wandb:
   entity: synergy_unit
   project: FM_adaptation_classification
+  group: null

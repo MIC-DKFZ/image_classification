@@ -44,6 +44,7 @@ class BaseModel(L.LightningModule):
         scheduler,
         T_max,
         warmstart,
+        warmstart2,
         epochs,
         lora_rank,
         lora_alpha,
@@ -181,6 +182,7 @@ class BaseModel(L.LightningModule):
         self.scheduler = scheduler
         self.T_max = T_max
         self.warmstart = warmstart
+        self.warmstart2 = warmstart2
         self.epochs = epochs
         self.pretrained = pretrained
 
@@ -490,7 +492,17 @@ class BaseModel(L.LightningModule):
                             nn.init.constant_(m.bn3.weight, 0)
 
     def configure_optimizers(self):
-        # leave bias and params of batch norm undecayed as in https://arxiv.org/pdf/1812.01187.pdf (Bag of tricks)
+        # Full-FT requires special setup
+        if self.finetune_method == "full_warmup":
+            assert self.scheduler == "CosineAnneal"
+            assert not self.sam
+            # Separate encoder and cls_head parameters. Assumes the properties
+            # "encoder_params" and "cls_head_params" to be defined in the model class!
+            encoder_params = self.encoder_params
+            cls_head_params = self.cls_head_params
+        
+        # leave bias and params of batch norm undecayed as in
+        # https://arxiv.org/pdf/1812.01187.pdf (Bag of tricks)
         if self.undecay_norm:
             model_params = []
             norm_params = []
@@ -505,96 +517,73 @@ class BaseModel(L.LightningModule):
                 {"params": norm_params, "weight_decay": 0},
             ]
         else:
-            params = self.parameters()
+            # Pass only those parameters to the optimizer that require gradients
+            params = [p for p in self.parameters() if p.requires_grad]
+        
+        # Set the optimizer and prepare the optimizer kwargs
+        optimizer_kwargs = {
+            "lr": self.lr,
+            "weight_decay": self.weight_decay,
+        }
+        if self.optimizer == "SGD":
+            base_optimizer = torch.optim.SGD
+            optimizer_kwargs["momentum"] = 0.9
+            optimizer_kwargs["nesterov"] = self.nesterov
+        elif self.optimizer == "Adam":
+            base_optimizer = torch.optim.Adam
+        elif self.optimizer == "AdamW":
+            base_optimizer = torch.optim.AdamW
+        elif self.optimizer == "Rmsprop":
+            base_optimizer = RMSpropTF
+        elif self.optimizer == "Madgrad":
+            base_optimizer = MADGRAD
+            optimizer_kwargs["momentum"] = 0.9
+        else:
+            raise NotImplementedError
 
+        # Setup optimizer
         if not self.sam:
-            if self.optimizer == "SGD":
-                optimizer = torch.optim.SGD(
-                    params,
-                    lr=self.lr,
-                    momentum=0.9,
-                    weight_decay=self.weight_decay,
-                    nesterov=self.nesterov,
+            if self.finetune_method == "full_warmup":
+                optimizer = base_optimizer(
+                    [
+                        {
+                            "params": cls_head_params,
+                            "name": "cls_head",
+                            **optimizer_kwargs
+                        },
+                        {
+                            "params": encoder_params,
+                            "name": "encoder",
+                            **optimizer_kwargs
+                        },
+                    ]
                 )
-            elif self.optimizer == "Adam":
-                optimizer = torch.optim.Adam(
-                    params, lr=self.lr, weight_decay=self.weight_decay
-                )
-            elif self.optimizer == "AdamW":
-                optimizer = torch.optim.AdamW(
-                    params, lr=self.lr, weight_decay=self.weight_decay
-                )
-            elif self.optimizer == "Rmsprop":
-                optimizer = RMSpropTF(
-                    params, lr=self.lr, weight_decay=self.weight_decay
-                )
-            elif self.optimizer == "Madgrad":
-                optimizer = MADGRAD(
-                    params, lr=self.lr, momentum=0.9, weight_decay=self.weight_decay
-                )
+            else:
+                optimizer = base_optimizer(params, **optimizer_kwargs)
 
         else:
             # ASAM paper suggests 10x larger rho for adaptive SAM than in normal SAM
             rho = 0.5 if self.adaptive_sam else 0.05
+            optimizer = SAM(
+                params,
+                base_optimizer=base_optimizer,
+                adaptive=self.adaptive_sam,
+                rho=rho,
+                **optimizer_kwargs
+            )
 
-            if self.optimizer == "SGD":
-                base_optimizer = torch.optim.SGD
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    momentum=0.9,
-                    weight_decay=self.weight_decay,
-                    nesterov=self.nesterov,
-                    rho=rho,
-                )
-            elif self.optimizer == "Madgrad":
-                base_optimizer = MADGRAD
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    momentum=0.9,
-                    weight_decay=self.weight_decay,
-                    rho=rho,
-                )
-            elif self.optimizer == "Adam":
-                base_optimizer = torch.optim.Adam
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    weight_decay=self.weight_decay,
-                    rho=rho,
-                )
-            elif self.optimizer == "AdamW":
-                base_optimizer = torch.optim.AdamW
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    weight_decay=self.weight_decay,
-                    rho=rho,
-                )
-            elif self.optimizer == "Rmsprop":
-                base_optimizer = RMSpropTF
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    weight_decay=self.weight_decay,
-                    rho=rho,
-                )
-
+        # Setup scheduler
         if not self.scheduler:
             return [optimizer]
         else:
-            if self.scheduler == "CosineAnneal" and self.warmstart == 0:
+            if self.finetune_method == "full_warmup":
+                scheduler = CosineAnnealingLR_DoubleWarmstart(
+                    optimizer,
+                    T_max=self.T_max,
+                    warmstart1=self.warmstart,
+                    warmstart2=self.warmstart2,
+                )
+            elif self.scheduler == "CosineAnneal" and self.warmstart == 0:
                 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                     optimizer, T_max=self.T_max
                 )
@@ -678,6 +667,94 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
             ]
 
             self.T += 1
+            return updated_lr
+
+
+class CosineAnnealingLR_DoubleWarmstart(_LRScheduler):
+    """
+    CosineAnnealingLR with two consecutive warmup phases.
+
+    - Warmup 1: Increases LR from 0 to base LR, **only for `cls_head`**.
+    - Warmup 2: Increases LR from 0 to base LR, **for both `cls_head` and `encoder`**.
+    - Cosine Annealing: Decays LR **for both `cls_head` and `encoder`**.
+    """
+
+    def __init__(
+        self,
+        optimizer,
+        T_max,
+        eta_min=0,
+        last_epoch=-1,
+        verbose=False,
+        warmstart1=0,
+        warmstart2=0,
+    ):
+        self.warmstart1 = warmstart1
+        self.warmstart2 = warmstart2
+        self.eta_min = eta_min
+        self.T_max = T_max - (warmstart1 + warmstart2)  # Effective decay period
+        self.T = 0  # Internal counter
+
+        # Identify param groups: assume "cls_head" and "encoder" are named properly in optimizer param_groups
+        self.cls_head_group = None
+        self.encoder_group = None
+
+        for param_group in optimizer.param_groups:
+            if param_group.get("name") == "cls_head":
+                self.cls_head_group = param_group
+            elif param_group.get("name") == "encoder":
+                self.encoder_group = param_group
+
+        if self.cls_head_group is None:
+            raise ValueError("Optimizer must have a parameter group named 'cls_head'.")
+        if self.encoder_group is None:
+            raise ValueError("Optimizer must have a parameter group named 'encoder'.")
+
+        super(CosineAnnealingLR_DoubleWarmstart, self).__init__(
+            optimizer, last_epoch, verbose
+        )
+
+    def get_lr(self):
+        if not self._get_lr_called_within_step:
+            warnings.warn(
+                "To get the last learning rate computed by the scheduler, please use `get_last_lr()`.",
+                UserWarning,
+            )
+
+        warmup_total = self.warmstart1 + self.warmstart2
+
+        # First warmup phase (only `cls_head` is trained)
+        if self.last_epoch < self.warmstart1:
+            warmup_factor = (self.last_epoch + 1) / self.warmstart1
+            updated_lr = []
+
+            for group in self.optimizer.param_groups:
+                if group is self.cls_head_group:
+                    updated_lr.append(group["initial_lr"] * warmup_factor)
+                else:  # Keep encoder frozen
+                    updated_lr.append(0)
+
+            return updated_lr
+
+        # Second warmup phase (both `cls_head` and `encoder` are trained)
+        elif self.last_epoch < warmup_total:
+            warmup_factor = (self.last_epoch - self.warmstart1 + 1) / self.warmstart2
+            updated_lr = [
+                group["initial_lr"] * warmup_factor
+                for group in self.optimizer.param_groups
+            ]
+            return updated_lr
+
+        # Cosine annealing phase (both `cls_head` and `encoder`)
+        else:
+            epoch_cosine = self.last_epoch - warmup_total  # Shifted epoch count
+            updated_lr = [
+                self.eta_min
+                + (group["initial_lr"] - self.eta_min)
+                * 0.5
+                * (1 + math.cos(math.pi * epoch_cosine / self.T_max))
+                for group in self.optimizer.param_groups
+            ]
             return updated_lr
 
 
