@@ -1,0 +1,16 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.precomputed_features.HDF5DataModule
+    name: CIFAR100
+    model_type: dinov2_vitb14_reg
+    num_cycles: 0
+    data_fraction: 1
+    data_root_dir: /home/j211b/git/classification_downstream/precomputed_features
+    batch_size: 512
+    train_transforms:
+      _target_: augmentation.utils.DummyTransform
+    test_transforms:
+      _target_: augmentation.utils.DummyTransform
+
+  num_classes: 100

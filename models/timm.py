@@ -68,6 +68,16 @@ class TimmModel(BaseModel):
 
         else:
             raise NotImplementedError
+    
+    @property
+    def encoder_params(self):
+        return [
+            param for name, param in self.model.named_parameters() if "head" not in name
+        ]
+    
+    @property
+    def cls_head_params(self):
+        return [param for name, param in self.model.named_parameters() if "head" in name]
 
     def forward(self, x):
         return self.model(x)
