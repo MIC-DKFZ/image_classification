@@ -153,3 +153,33 @@ class TestTransform(BaseTransform):
         )
 
         return transform_test
+    
+    
+class TestTransform_dino(BaseTransform):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+
+    def __call__(self):
+        transform_test = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(MEAN, STD),
+            ])
+
+        return transform_test
+
+
+class RandAugmentTransform_dino(BaseTransform):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+
+    def __call__(self):
+        transform_test = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.RandomHorizontalFlip(),
+                RandAugment(),
+                transforms.ToTensor(),
+                transforms.Normalize(MEAN, STD),
+            ])
+
+        return transform_test

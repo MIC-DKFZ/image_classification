@@ -6,11 +6,11 @@ data:
     data_root_dir: /home/j211b/datasets/cifar100
     batch_size: 128
     data_fraction: 1.0
-    train_transforms: 
-      _target_: augmentation.policies.cifar.RandAugmentTransform
-      cutout_size: 8
-    test_transforms: 
-      _target_: augmentation.policies.cifar.TestTransform
+    train_transforms:
+      # _target_: augmentation.policies.cifar.RandAugmentTransform_dino
+      _target_: augmentation.policies.cifar.TestTransform_dino
+    test_transforms:
+      _target_: augmentation.policies.cifar.TestTransform_dino
 
   num_classes: 100
 

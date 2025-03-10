@@ -2,5 +2,8 @@ _target_: models.dino.DinoV2Model
 type: dinov2_vitb14_reg
 pretrained: True
 classification_head_dropout: 0.2
-token_aggregation_method: cls_token
-
+token_aggregation_method: avg #cls_token
+finetune_method: full
+lora_rank: 6
+lora_alpha: 32
+lora_dropout: 0.1
