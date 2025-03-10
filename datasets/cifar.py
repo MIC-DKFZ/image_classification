@@ -1,4 +1,6 @@
+import numpy as np
 from torchvision.datasets import CIFAR10, CIFAR100
+from torch.utils.data import Subset
 
 from .base_datamodule import BaseDataModule
 
@@ -35,8 +37,8 @@ class CIFAR10DataModule(BaseDataModule):
     def __init__(self, **params):
         super(CIFAR10DataModule, self).__init__(**params)
 
-        self.train_transforms = self.train_transforms()
-        self.test_transforms = self.test_transforms()
+        # self.train_transforms = self.train_transforms()
+        # self.test_transforms = self.test_transforms()
 
     def setup(self, stage: str):
         if "albumentations" in str(self.train_transforms.__class__):
@@ -53,6 +55,10 @@ class CIFAR10DataModule(BaseDataModule):
                 transform=self.train_transforms,
                 download=True,
             )
+        
+        num_samples = int(len(self.train_dataset) * self.data_fraction)
+        indices = np.random.choice(len(self.train_dataset), num_samples, replace=False)
+        self.train_dataset = Subset(self.train_dataset, indices)
 
         if "albumentations" in str(self.test_transforms.__class__):
             self.val_dataset = Cifar10Albumentation(
@@ -85,11 +91,12 @@ class CIFAR10DataModule(BaseDataModule):
 class CIFAR100DataModule(BaseDataModule):
     def __init__(self, **params):
         super(CIFAR100DataModule, self).__init__(**params)
+        self.data_fraction = params['data_fraction']
 
-        self.train_transforms = self.train_transforms()
-        self.test_transforms = self.test_transforms()
+        # self.train_transforms = self.train_transforms()
+        # self.test_transforms = self.test_transforms()
 
-    def setup(self, stage: str):
+    def setup(self, stage: str = None):
         if "albumentations" in str(self.train_transforms.__class__):
             self.train_dataset = Cifar100Albumentation(
                 self.data_path,
@@ -104,6 +111,10 @@ class CIFAR100DataModule(BaseDataModule):
                 transform=self.train_transforms,
                 download=True,
             )
+        
+        num_samples = int(len(self.train_dataset) * self.data_fraction)
+        indices = np.random.choice(len(self.train_dataset), num_samples, replace=False)
+        self.train_dataset = Subset(self.train_dataset, indices)
 
         if "albumentations" in str(self.test_transforms.__class__):
             self.val_dataset = Cifar100Albumentation(

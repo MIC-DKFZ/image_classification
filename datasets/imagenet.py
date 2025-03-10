@@ -43,7 +43,7 @@ class ImagenetDataModule(BaseDataModule):
         super(ImagenetDataModule, self).__init__(**params)
         self.data_fraction = params['data_fraction']
 
-    def setup(self, stage: str):
+    def setup(self, stage: str = None):
         if "albumentations" in str(self.train_transforms.__class__):
             raise NotImplementedError
         else:
