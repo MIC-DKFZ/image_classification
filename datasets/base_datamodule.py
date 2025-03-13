@@ -24,7 +24,7 @@ class BaseDataModule(LightningDataModule):
     ):
         super(BaseDataModule, self).__init__()
 
-        self.data_path = Path(data_root_dir)  # / name
+        self.data_path = Path(data_root_dir)
         self.batch_size = batch_size
         self.train_transforms = train_transforms()
         self.test_transforms = test_transforms()

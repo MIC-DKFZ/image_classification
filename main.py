@@ -13,7 +13,15 @@ from parsing_utils import make_omegaconf_resolvers
 
 @hydra.main(version_base=None, config_path="./cli_configs", config_name="train")
 def main(cfg):
-    wandb.init(entity=cfg.wandb.entity, project=cfg.wandb.project, group=cfg.wandb.group)
+    # Initialize w&b run. Group is set to the output directory name.
+    wandb.init(
+        # entity=cfg.wandb.entity,
+        # project=cfg.wandb.project,
+        # tags=cfg.wandb.tags,
+        group=cfg.output_subdir.split("/")[-1],
+        dir=cfg.output_subdir,
+        **cfg.wandb
+    )
     # seeding
     if cfg.seed:
         seed_everything(cfg.seed)
@@ -22,16 +30,13 @@ def main(cfg):
 
     # setup logger
     try:
-        Path(
-            "./main.log"
-        ).unlink()  # gets automatically created, however logs are available in Weights and Biases so we do not need to log twice
+        # gets automatically created, however logs are available in Weights and Biases
+        # so we do not need to log twice
+        Path("./main.log").unlink()
     except:
         pass
-    log_path = Path(cfg.trainer.logger.save_dir)
+    log_path = Path(cfg.output_subdir)
     log_path.mkdir(parents=True, exist_ok=True)
-
-    uid = cfg.output_subdir.split("/")[-1]
-    cfg.trainer.logger.group = uid
 
     # add sync_batchnorm if multiple GPUs are used
     if cfg.trainer.devices > 1 and cfg.trainer.accelerator == "gpu":
@@ -61,13 +66,7 @@ def main(cfg):
         if cfg.trainer["enable_checkpointing"]:
             for i in cfg.trainer.callbacks:
                 if i["_target_"] == "lightning.pytorch.callbacks.ModelCheckpoint":
-                    i["dirpath"] = os.path.join(
-                        str(cfg.exp_dir),
-                        str(cfg.data.module.name),
-                        "checkpoints",
-                        uid,
-                        str(cfg.data.module.fold),
-                    )
+                    i["dirpath"] = os.path.join(cfg.output_subdir, str(cfg.data.module.fold))
 
         # instantiate trainer, model and dataset
         trainer = instantiate(cfg.trainer)

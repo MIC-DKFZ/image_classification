@@ -4,7 +4,7 @@ defaults:
   - model: timm
   - data: imagenet
 
-output_subdir: ${exp_dir}/${data.module.name}/checkpoints/${make_group_name:}
+output_subdir: ${exp_dir}/${data.module.name}/${make_group_name:${model.name},${model.finetune_method}}
 hydra:
   output_subdir: ${output_subdir}
   job:
@@ -48,7 +48,7 @@ model:
   task: 'Classification'
   subtask: 'multiclass'  # 'multilabel'
   metric_computation_mode: 'epochwise'
-  result_plot: 'val'
+  result_plot: null  # 'val' for validation plots (confusion matrix)
   num_classes: ${data.num_classes}
   metrics: ${metrics}
   epochs: ${trainer.max_epochs}
@@ -59,7 +59,6 @@ model:
   pretrained: False
     
 data:
-  feature_dir: /home/j211b/git/classification_downstream/precomputed_features
   module:
     random_batches: False
     num_workers: 12
@@ -97,12 +96,13 @@ trainer:
   precision: '16-mixed'
   enable_progress_bar: True
   strategy: 'ddp'
-  logger: 
-    _target_: lightning.pytorch.loggers.WandbLogger
-    save_dir: ${exp_dir}/${data.module.name}
-    offline: False
-    project: ${data.module.name}
-    group: ???
+  logger:
+    - _target_: lightning.pytorch.loggers.WandbLogger
+      offline: False
+      save_dir: ${output_subdir}
+    - _target_: lightning.pytorch.loggers.CSVLogger
+      save_dir: ${output_subdir}
+      name: null
   num_sanity_val_steps: 0
   accumulate_grad_batches: 1
   log_every_n_steps: 200
@@ -112,7 +112,13 @@ trainer:
   #limit_test_batches: 0.25
   #gradient_clip_val: 0.5
 
+precomputed_features:
+  # num_cycles: 0
+  precision: 32
+  split: val #null
+  compression: 4
+
 wandb:
   entity: synergy_unit
   project: FM_adaptation_classification
-  group: null
+  tags: null
