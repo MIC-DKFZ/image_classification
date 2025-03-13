@@ -17,6 +17,6 @@ model:
   task: 'Classification'
   cifar_size: False
 
-trainer:
-  logger:
-    project: Imagenet1K
+#trainer:
+#  logger:
+#    project: Imagenet1K

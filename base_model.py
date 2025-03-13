@@ -46,9 +46,6 @@ class BaseModel(L.LightningModule):
         warmstart,
         warmstart2,
         epochs,
-        lora_rank,
-        lora_alpha,
-        lora_dropout,
         mixup,
         mixup_alpha,
         label_smoothing,
@@ -169,9 +166,6 @@ class BaseModel(L.LightningModule):
         # Training Args
         self.name = name
         self.finetune_method = finetune_method
-        self.lora_rank = lora_rank
-        self.lora_alpha = lora_alpha
-        self.lora_dropout = lora_dropout
         # self.batch_size = batch_size
         self.lr = lr
         self.weight_decay = weight_decay
