@@ -229,6 +229,10 @@ class BaseModel(L.LightningModule):
             if self.num_classes == 1:
                 y_hat = y_hat.view(-1)
 
+        if x.shape[0] == 1 and len(y_hat.shape) == 1:
+            # for cases where batch size is 1 and y_hat doesn't have a batch dim
+            y_hat = y_hat.unsqueeze(0)
+
         if self.sam:
             opt = self.optimizers()
 
