@@ -15,9 +15,9 @@ from parsing_utils import make_omegaconf_resolvers
 def main(cfg):
     # Initialize w&b run. Group is set to the output directory name.
     wandb.init(
-        # entity=cfg.wandb.entity,
-        # project=cfg.wandb.project,
-        # tags=cfg.wandb.tags,
+        entity=cfg.wandb.entity,
+        project=cfg.wandb.project,
+        tags=cfg.wandb.tags,
         group=cfg.output_subdir.split("/")[-1],
         dir=cfg.output_subdir,
         **cfg.wandb
