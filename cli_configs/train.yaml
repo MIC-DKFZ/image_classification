@@ -57,7 +57,7 @@ model:
     
 data:
   module:
-    random_batches: True
+    random_batches: False
     num_workers: 12
     prepare_data_per_node: False
     fold: null
