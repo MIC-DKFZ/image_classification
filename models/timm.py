@@ -32,7 +32,7 @@ class TimmModel(BaseModel):
                 r=kwargs['lora_rank'],  # LoRA rank
                 lora_alpha=kwargs['lora_alpha'],  # Scaling factor
                 lora_dropout=kwargs['lora_dropout'],
-                target_modules=["attn.proj", "attn.q_proj", "attn.v_proj", "attn.k_proj"]
+                target_modules=["attn.proj", "attn.q_proj", "attn.v_proj", "attn.k_proj", "mlp.fc1_g", "mlp.fc1_x", "mlp.norm", "mlp.fc2"]
             )
 
             self.model = get_peft_model(self.model, lora_config)
