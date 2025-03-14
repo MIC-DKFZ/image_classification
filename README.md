@@ -7,6 +7,8 @@
 - in cli_config/data adapt the data_root_dir path for mrnet and rsna_spine
 - in cli_config/env cluster and local adapt the path where to save logs
 
+- for cluster environments set the env variable EXPERIMENT_LOCATION for specifying the location where your logs should be saved
+
 ### Including different encoders
 - check models/eva_mae.py for an example on how to include different encoders
 - the load_pretrained_weights function also includes interpolation of pos embed since the image sizes differ from the patch sizes used during pretraining

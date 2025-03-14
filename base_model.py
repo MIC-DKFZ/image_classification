@@ -158,8 +158,8 @@ class BaseModel(L.LightningModule):
                 self.train_label_list = []
 
         metrics = MetricCollection(metrics_dict)
-        self.train_metrics = metrics.clone(prefix="train_")
-        self.val_metrics = metrics.clone(prefix="val_")
+        self.train_metrics = metrics.clone(prefix="Train/")
+        self.val_metrics = metrics.clone(prefix="Val/")
 
         # Training Args
         self.name = name
@@ -267,7 +267,7 @@ class BaseModel(L.LightningModule):
                 )
 
         self.log(
-            "train_loss",
+            "Train/loss",
             loss,
             on_step=False,
             on_epoch=True,
@@ -281,12 +281,12 @@ class BaseModel(L.LightningModule):
         # save metrics
         if self.metric_computation_mode == "stepwise":
             metrics_res = self.train_metrics(y_hat, y)
-            if "train_F1_per_class" in metrics_res.keys():
-                for i, value in enumerate(metrics_res["train_F1_per_class"]):
-                    metrics_res["train_F1_class_{}".format(i)] = (
+            if "Train/F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["Train/F1_per_class"]):
+                    metrics_res["Train/F1_class_{}".format(i)] = (
                         value if not torch.isnan(value) else 0.0
                     )
-                del metrics_res["train_F1_per_class"]
+                del metrics_res["Train/F1_per_class"]
             self.log_dict(
                 metrics_res,
                 on_step=False,
@@ -316,7 +316,7 @@ class BaseModel(L.LightningModule):
             y_hat, y.float() if self.subtask == "multilabel" else y
         )
         self.log(
-            "val_loss",
+            "Val/loss",
             val_loss,
             on_step=False,
             on_epoch=True,
@@ -327,12 +327,12 @@ class BaseModel(L.LightningModule):
         # save metrics
         if self.metric_computation_mode == "stepwise":
             metrics_res = self.val_metrics(y_hat, y)
-            if "val_F1_per_class" in metrics_res.keys():
-                for i, value in enumerate(metrics_res["val_F1_per_class"]):
-                    metrics_res["val_F1_class_{}".format(i)] = (
+            if "Val/F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["Val/F1_per_class"]):
+                    metrics_res["Val/F1_class_{}".format(i)] = (
                         value if not torch.isnan(value) else 0.0
                     )
-                del metrics_res["val_F1_per_class"]
+                del metrics_res["Val/F1_per_class"]
             self.log_dict(
                 metrics_res,
                 on_step=False,
@@ -363,12 +363,12 @@ class BaseModel(L.LightningModule):
     def on_validation_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
             metrics_res = self.val_metrics.compute()
-            if "val_F1_per_class" in metrics_res.keys():
-                for i, value in enumerate(metrics_res["val_F1_per_class"]):
-                    metrics_res["val_F1_class_{}".format(i)] = (
+            if "Val/F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["Val/F1_per_class"]):
+                    metrics_res["Val/F1_class_{}".format(i)] = (
                         value if not torch.isnan(value) else 0.0
                     )
-                del metrics_res["val_F1_per_class"]
+                del metrics_res["Val/F1_per_class"]
             self.log_dict(
                 metrics_res,
                 on_step=False,
@@ -399,12 +399,12 @@ class BaseModel(L.LightningModule):
     def on_train_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
             metrics_res = self.train_metrics.compute()
-            if "train_F1_per_class" in metrics_res.keys():
-                for i, value in enumerate(metrics_res["train_F1_per_class"]):
-                    metrics_res["train_F1_class_{}".format(i)] = (
+            if "Train/F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["Train/F1_per_class"]):
+                    metrics_res["Train/F1_class_{}".format(i)] = (
                         value if not torch.isnan(value) else 0.0
                     )
-                del metrics_res["train_F1_per_class"]
+                del metrics_res["Train/F1_per_class"]
 
             self.log_dict(
                 metrics_res,
