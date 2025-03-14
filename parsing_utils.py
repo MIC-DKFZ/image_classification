@@ -41,6 +41,7 @@ def make_omegaconf_resolvers():
         ),
         use_cache=True,
     )
+    OmegaConf.register_new_resolver("group_extractor", lambda s: s.split("/")[-1])
     OmegaConf.register_new_resolver(
         "model_embed_dim_extractor", _get_model_embed_dim, use_cache=True
     )
