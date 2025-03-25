@@ -13,12 +13,12 @@ from parsing_utils import make_omegaconf_resolvers
 
 @hydra.main(version_base=None, config_path="./cli_configs", config_name="train")
 def main(cfg):
-    # Initialize w&b run. Group is set to the output directory name.
-    wandb.init(
-        group=cfg.output_subdir.split("/")[-1],
-        dir=cfg.output_subdir,
-        **cfg.wandb
-    )
+    # Creating the logging directory. This has to happen before wandb.init.
+    log_path = Path(cfg.log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+    
+    wandb.init(**cfg.wandb)
+    
     # seeding
     if cfg.seed:
         seed_everything(cfg.seed)
@@ -32,8 +32,6 @@ def main(cfg):
         Path("./main.log").unlink()
     except:
         pass
-    log_path = Path(cfg.output_subdir)
-    log_path.mkdir(parents=True, exist_ok=True)
 
     # add sync_batchnorm if multiple GPUs are used
     if cfg.trainer.devices > 1 and cfg.trainer.accelerator == "gpu":
@@ -63,7 +61,7 @@ def main(cfg):
         if cfg.trainer["enable_checkpointing"]:
             for i in cfg.trainer.callbacks:
                 if i["_target_"] == "lightning.pytorch.callbacks.ModelCheckpoint":
-                    i["dirpath"] = os.path.join(cfg.output_subdir, str(cfg.data.module.fold))
+                    i["dirpath"] = os.path.join(cfg.log_dir, str(cfg.data.module.fold))
 
         # instantiate trainer, model and dataset
         trainer = instantiate(cfg.trainer)
