@@ -24,15 +24,15 @@ model:
   optimizer: AdamW
   sam: False  # set trainer.precision=32 if you use sam
   adaptive_sam: False  # set trainer.precision=32 if you use sam
-  lr: 0.00001
+  lr: 0.00002
   nesterov: False
   scheduler: CosineAnneal
   T_max: ${trainer.max_epochs}
-  warmstart: 0
+  warmstart: 2
   warmstart2: 0
   mixup: False
   mixup_alpha: 0.2
-  weight_decay: 5e-4
+  weight_decay: 0.05 #5e-4
   undecay_norm: False
   label_smoothing: 0.0
   stochastic_depth: False
@@ -87,7 +87,7 @@ trainer:
   accelerator: 'gpu'
   sync_batchnorm: False  # set to True if you use multiple GPUs
   enable_checkpointing: True
-  max_epochs: 100
+  max_epochs: 20
   benchmark: True
   deterministic: False
   precision: '16-mixed'
@@ -101,11 +101,11 @@ trainer:
       save_dir: ${output_subdir}
       name: null
   num_sanity_val_steps: 0
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 16
   #log_every_n_steps: 200
   # Some useful trainer parameters for debugging
-  limit_train_batches: 0.1
-  limit_val_batches: 0.1
+  #limit_train_batches: 0.5
+  #limit_val_batches: null
   #limit_test_batches: 0.25
   #gradient_clip_val: 0.5
 
