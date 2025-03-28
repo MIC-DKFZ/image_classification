@@ -12,10 +12,14 @@ class ClassificationHead(nn.Module):
             embed_dim (int): size of the embedding.
             num_classes (int): Number of output classes.
             dropout (float): Dropout rate applied before the output layer.
-            patch_aggregation_method (string): "cls_token" for taking the class token, "avg" or "sum"
-                                                for aggregating the individual token vectors
+            patch_aggregation_method (string): "cls_token" for taking the class token,
+                "avg" or "sum" for aggregating the individual token vectors, and "joint"
+                for combining class token and average patch token.
         """
         super(ClassificationHead, self).__init__()
+        
+        if patch_aggregation_method == "joint":
+            embed_dim *= 2
 
         self.fc = ClassifierHead(embed_dim, num_classes, "", dropout)
 
@@ -29,6 +33,8 @@ class ClassificationHead(nn.Module):
             x = x[:, 1:].mean(dim=1)
         elif self.patch_aggregation_method == "sum":
             x = x[:, 1:].sum(dim=1)
+        elif self.patch_aggregation_method == "joint":
+            x = torch.cat([x[:, 0], x[:, 1:].mean(dim=1)], dim=1)
 
         x = self.fc(x)
 
