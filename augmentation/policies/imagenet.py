@@ -62,7 +62,7 @@ class AutoAugmentTransform(BaseTransform):
 
 class RandAugmentTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
-        super(RandAugmentTransform, self).__init__()
+        super().__init__()
 
     def __call__(self):
         transform_train = transforms.Compose(
@@ -74,28 +74,25 @@ class RandAugmentTransform(BaseTransform):
                 transforms.Normalize(MEAN, STD),
             ]
         )
-
         return transform_train
 
 
 class TestTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
-        super(TestTransform, self).__init__()
+        super().__init__()
 
     def __call__(self):
         transform_test = transforms.Compose(
             [
-                #transforms.Resize(256),
                 transforms.CenterCrop(448),
                 transforms.ToTensor(),
                 transforms.Normalize(MEAN, STD),
             ]
         )
-
         return transform_test
 
 
-class RandAugmentTransform_dino(BaseTransform):
+class RandAugmentTransform_224(BaseTransform):
     def __init__(self, *args, **kwargs):
         super().__init__()
 
@@ -111,11 +108,10 @@ class RandAugmentTransform_dino(BaseTransform):
                 transforms.Normalize(MEAN, STD),
             ]
         )
-
         return transform_train
 
 
-class TestTransform_dino(BaseTransform):
+class TestTransform_224(BaseTransform):
     def __init__(self, *args, **kwargs):
         super().__init__()
 
@@ -128,5 +124,4 @@ class TestTransform_dino(BaseTransform):
                 transforms.Normalize(MEAN, STD),
             ]
         )
-
         return transform_test
