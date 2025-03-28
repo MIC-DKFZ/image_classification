@@ -14,7 +14,7 @@ class TimmModel(BaseModel):
             num_classes=kwargs["num_classes"],
         )
 
-        if kwargs["finetune_method"] == "full":
+        if "full" in kwargs["finetune_method"]:
             pass
             
         elif kwargs["finetune_method"] == "linear_probing":

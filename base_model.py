@@ -266,7 +266,7 @@ class BaseModel(L.LightningModule):
             "train_loss",
             loss,
             on_step=True,
-            on_epoch=False,
+            on_epoch=True,
             prog_bar=True,
             sync_dist=True,
         )
@@ -487,7 +487,7 @@ class BaseModel(L.LightningModule):
 
     def configure_optimizers(self):
         # Full-FT requires special setup
-        if self.finetune_method == "full_warmup":
+        if self.finetune_method == "full_sawtooth":
             assert self.scheduler == "CosineAnneal"
             assert not self.sam
             # Separate encoder and cls_head parameters. Assumes the properties
@@ -537,7 +537,7 @@ class BaseModel(L.LightningModule):
 
         # Setup optimizer
         if not self.sam:
-            if self.finetune_method == "full_warmup":
+            if self.finetune_method == "full_sawtooth":
                 optimizer = base_optimizer(
                     [
                         {
@@ -570,7 +570,7 @@ class BaseModel(L.LightningModule):
         if not self.scheduler:
             return [optimizer]
         else:
-            if self.finetune_method == "full_warmup":
+            if self.finetune_method == "full_sawtooth":
                 scheduler = CosineAnnealingLR_DoubleWarmstart(
                     optimizer,
                     T_max=self.T_max,

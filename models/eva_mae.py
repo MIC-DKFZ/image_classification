@@ -124,7 +124,7 @@ class Eva_MAE(BaseModel):
                 load_cls_token=hypparams["load_cls_token"],
             )
 
-            if hypparams["finetune_method"] == "full":
+            if "full" in hypparams["finetune_method"]:
                 pass
 
             elif hypparams["finetune_method"] == "linear_probing":

@@ -24,7 +24,7 @@ class DinoV2Model(BaseModel):
             patch_aggregation_method=kwargs["token_aggregation_method"],
         )
         
-        if self.finetune_method == "full":
+        if "full" in self.finetune_method:
             pass
             
         elif self.finetune_method == "linear_probing":
@@ -34,9 +34,9 @@ class DinoV2Model(BaseModel):
         elif self.finetune_method in ["lora", "dora"]:
             # Apply LoRA to attention layers
             lora_config = LoraConfig(
-                r=self.lora_rank,  # LoRA rank
-                lora_alpha=self.lora_alpha,  # Scaling factor
-                lora_dropout=self.lora_dropout,
+                r=kwargs["lora_rank"],  # LoRA rank
+                lora_alpha=kwargs["lora_alpha"],  # Scaling factor
+                lora_dropout=kwargs["lora_dropout"],
                 target_modules=["attn.proj", "attn.q_proj", "attn.v_proj", "attn.k_proj"],
                 use_dora=self.finetune_method == "dora",
             )
