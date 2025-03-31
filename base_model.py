@@ -8,16 +8,17 @@ import wandb
 from madgrad import MADGRAD
 from timm.optim import RMSpropTF
 from torch.optim.lr_scheduler import _LRScheduler
+import torch.nn.functional as F
 from torchmetrics import (
     AUROC,
     Accuracy,
+    AveragePrecision,
     F1Score,
     MeanAbsoluteError,
     MeanSquaredError,
     MetricCollection,
     Precision,
     Recall,
-    AveragePrecision,
 )
 
 from augmentation.mixup import mixup_criterion, mixup_data
@@ -156,6 +157,11 @@ class BaseModel(L.LightningModule):
             elif self.task == "Regression":
                 self.train_pred_list = []
                 self.train_label_list = []
+
+        self.save_preds = True if kwargs["save_preds"] else False
+        if self.save_preds:
+            self.val_pred_list = []
+            self.val_label_list = []
 
         metrics = MetricCollection(metrics_dict)
         self.train_metrics = metrics.clone(prefix="Train/")
@@ -383,15 +389,44 @@ class BaseModel(L.LightningModule):
             self.val_conf_mat.save_state(self, "val")
             self.val_conf_mat.reset()
         if hasattr(self, "val_pred_list"):
-            data = [[x, y] for (x, y) in zip(self.val_label_list, self.val_pred_list)]
-            table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
-            wandb.log(
-                {
-                    "Val Scatterplot": wandb.plot.scatter(
-                        table, "Ground Truth", "Prediction", "Validation Scatterplot"
-                    )
-                }
-            )
+            if self.task == "Regression":
+                data = [
+                    [x, y] for (x, y) in zip(self.val_label_list, self.val_pred_list)
+                ]
+                table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
+                wandb.log(
+                    {
+                        "Val Scatterplot": wandb.plot.scatter(
+                            table,
+                            "Ground Truth",
+                            "Prediction",
+                            "Validation Scatterplot",
+                        )
+                    }
+                )
+            if self.save_preds:
+                if self.task == "Classification":
+                    columns = (
+                        (["GT_" + str(i) for i in range(len(self.val_label_list[0]))])
+                        if self.subtask == "multilabel"
+                        else ["GT"]
+                    ) + ["Pred_" + str(i) for i in range(len(self.val_pred_list[0]))]
+                    data = [
+                        (
+                            (x.tolist() if self.subtask == "multilabel" else [x])
+                            + (
+                                F.softmax(y, dim=-1)
+                                if self.subtask == "multiclass"
+                                else torch.sigmoid(y)
+                            ).tolist()
+                        )
+                        for x, y in zip(self.val_label_list, self.val_pred_list)
+                    ]
+                    table = wandb.Table(data=data, columns=columns)
+                    wandb.log({"Val Predictions": table})
+                else:
+                    raise NotImplementedError
+
             # reset
             self.val_pred_list = []
             self.val_label_list = []

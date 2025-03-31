@@ -52,6 +52,7 @@ model:
   token_aggregation_method: cls_token
   pretrained: False
   finetune_method: full
+  save_preds: True
     
 data:
   module:
