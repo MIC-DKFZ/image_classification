@@ -64,6 +64,204 @@ class ResEncoder(Module):
         return x
 
 
+
+class ResEncoder_Width_B_Depth_B_BN(ResEncoder):
+    def __init__(
+        self,
+        **hypparams,
+    ):
+        super(ResEncoder, self).__init__()
+
+        self.res_unet = ResidualEncoderUNet(
+            hypparams["input_channels"],
+            n_stages=6,
+            features_per_stage=[32, 64, 128, 256, 320, 320],
+            conv_op=torch.nn.modules.conv.Conv3d,
+            kernel_sizes=[
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+            ],
+            strides=[[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]],
+            n_blocks_per_stage=[1, 3, 4, 6, 6, 6],
+            n_conv_per_stage_decoder=[1, 1, 1, 1, 1],
+            conv_bias=True,
+            norm_op=torch.nn.modules.instancenorm.BatchNorm, # <-- New
+            norm_op_kwargs={"eps": 1e-05, "affine": True},
+            dropout_op=None,
+            dropout_op_kwargs=None,
+            nonlin=torch.nn.LeakyReLU,
+            nonlin_kwargs={"inplace": True},
+            num_classes=hypparams["num_classes"],
+        )
+        self.res_unet.encoder.return_skips = False
+
+        if hypparams["pretrained"]:
+            self.res_unet = load_pretrained_weights(
+                self.res_unet,
+                hypparams["chpt_path"],
+            )
+
+            if hypparams["finetune_method"] == "full":
+                pass
+
+            elif hypparams["finetune_method"] == "linear_probing":
+                # fully freeze encoder
+                for n, param in self.res_unet.named_parameters():
+                    param.requires_grad = False
+
+
+
+class ResEncoder_Width_M_Depth_B(ResEncoder):
+    def __init__(
+        self,
+        **hypparams,
+    ):
+        super(ResEncoder, self).__init__()
+
+        self.res_unet = ResidualEncoderUNet(
+            hypparams["input_channels"],
+            n_stages=6,
+            features_per_stage=[48, 96, 192, 384, 480, 480],  # <--- New
+            conv_op=torch.nn.modules.conv.Conv3d,
+            kernel_sizes=[
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+            ],
+            strides=[[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]],
+            n_blocks_per_stage=[1, 3, 4, 6, 6, 6],
+            n_conv_per_stage_decoder=[1, 1, 1, 1, 1],
+            conv_bias=True,
+            norm_op=torch.nn.modules.instancenorm.InstanceNorm3d,
+            norm_op_kwargs={"eps": 1e-05, "affine": True},
+            dropout_op=None,
+            dropout_op_kwargs=None,
+            nonlin=torch.nn.LeakyReLU,
+            nonlin_kwargs={"inplace": True},
+            num_classes=hypparams["num_classes"],
+        )
+        self.res_unet.encoder.return_skips = False
+
+        if hypparams["pretrained"]:
+            self.res_unet = load_pretrained_weights(
+                self.res_unet,
+                hypparams["chpt_path"],
+            )
+
+            if hypparams["finetune_method"] == "full":
+                pass
+
+            elif hypparams["finetune_method"] == "linear_probing":
+                # fully freeze encoder
+                for n, param in self.res_unet.named_parameters():
+                    param.requires_grad = False
+
+
+class ResEncoder_Width_M_Depth_M(ResEncoder):
+    def __init__(
+        self,
+        **hypparams,
+    ):
+        super(ResEncoder, self).__init__()
+
+        self.res_unet = ResidualEncoderUNet(
+            hypparams["input_channels"],
+            n_stages=6,
+            features_per_stage=[48, 96, 192, 384, 480, 480],  # <--- New
+            conv_op=torch.nn.modules.conv.Conv3d,
+            kernel_sizes=[
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+            ],
+            strides=[[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]],
+            n_blocks_per_stage=[1, 4, 6, 8, 8, 8], # <--- New
+            n_conv_per_stage_decoder=[1, 1, 1, 1, 1],
+            conv_bias=True,
+            norm_op=torch.nn.modules.instancenorm.InstanceNorm3d,
+            norm_op_kwargs={"eps": 1e-05, "affine": True},
+            dropout_op=None,
+            dropout_op_kwargs=None,
+            nonlin=torch.nn.LeakyReLU,
+            nonlin_kwargs={"inplace": True},
+            num_classes=hypparams["num_classes"],
+        )
+        self.res_unet.encoder.return_skips = False
+
+        if hypparams["pretrained"]:
+            self.res_unet = load_pretrained_weights(
+                self.res_unet,
+                hypparams["chpt_path"],
+            )
+
+            if hypparams["finetune_method"] == "full":
+                pass
+
+            elif hypparams["finetune_method"] == "linear_probing":
+                # fully freeze encoder
+                for n, param in self.res_unet.named_parameters():
+                    param.requires_grad = False
+
+
+class ResEncoder_Width_B_Depth_L(ResEncoder):
+    def __init__(
+        self,
+        **hypparams,
+    ):
+        super(ResEncoder, self).__init__()
+
+        self.res_unet = ResidualEncoderUNet(
+            hypparams["input_channels"],
+            n_stages=6,
+            features_per_stage=[32, 64, 128, 256, 320, 320],
+            conv_op=torch.nn.modules.conv.Conv3d,
+            kernel_sizes=[
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+                [3, 3, 3],
+            ],
+            strides=[[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]],
+            n_blocks_per_stage=[2, 5, 6, 10, 10, 12], # <--- New
+            n_conv_per_stage_decoder=[1, 1, 1, 1, 1],
+            conv_bias=True,
+            norm_op=torch.nn.modules.instancenorm.InstanceNorm3d,
+            norm_op_kwargs={"eps": 1e-05, "affine": True},
+            dropout_op=None,
+            dropout_op_kwargs=None,
+            nonlin=torch.nn.LeakyReLU,
+            nonlin_kwargs={"inplace": True},
+            num_classes=hypparams["num_classes"],
+        )
+        self.res_unet.encoder.return_skips = False
+
+        if hypparams["pretrained"]:
+            self.res_unet = load_pretrained_weights(
+                self.res_unet,
+                hypparams["chpt_path"],
+            )
+
+            if hypparams["finetune_method"] == "full":
+                pass
+
+            elif hypparams["finetune_method"] == "linear_probing":
+                # fully freeze encoder
+                for n, param in self.res_unet.named_parameters():
+                    param.requires_grad = False
+
+
 class ResEncoder_Classifier(BaseModel):
     def __init__(
         self,
@@ -86,6 +284,123 @@ class ResEncoder_Classifier(BaseModel):
 
         return x
 
+
+
+class ResEncoder_Width_B_Depth_B_Classifier_BN(BaseModel):
+    def __init__(
+        self,
+        **hypparams,
+    ):
+        super(ResEncoder_Classifier, self).__init__(**hypparams)
+
+        self.encoder = ResEncoder_Width_B_Depth_B_BN(**hypparams)
+
+        self.cls_head = ClassificationHead(
+            320,
+            hypparams["num_classes"],
+            dropout=hypparams["classification_head_dropout"],
+            patch_aggregation_method=hypparams["token_aggregation_method"],
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.cls_head(x)
+
+        return x
+
+
+
+class ResEncoder_Width_B_Depth_B_Classifier(BaseModel):
+    def __init__(
+        self,
+        **hypparams,
+    ):
+        super(ResEncoder_Classifier, self).__init__(**hypparams)
+
+        self.encoder = ResEncoder(**hypparams)
+
+        self.cls_head = ClassificationHead(
+            320,
+            hypparams["num_classes"],
+            dropout=hypparams["classification_head_dropout"],
+            patch_aggregation_method=hypparams["token_aggregation_method"],
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.cls_head(x)
+
+        return x
+
+
+class ResEncoder_Width_M_Depth_B_Classifier(BaseModel):
+    def __init__(
+        self,
+        **hypparams,
+    ):
+        super(ResEncoder_Classifier, self).__init__(**hypparams)
+
+        self.encoder = ResEncoder_Width_M_Depth_B(**hypparams)
+
+        self.cls_head = ClassificationHead(
+            480,
+            hypparams["num_classes"],
+            dropout=hypparams["classification_head_dropout"],
+            patch_aggregation_method=hypparams["token_aggregation_method"],
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.cls_head(x)
+
+        return x
+
+
+class ResEncoder_Width_M_Depth_M_Classifier(BaseModel):
+    def __init__(
+        self,
+        **hypparams,
+    ):
+        super(ResEncoder_Classifier, self).__init__(**hypparams)
+
+        self.encoder = ResEncoder_Width_M_Depth_M(**hypparams)
+
+        self.cls_head = ClassificationHead(
+            480,
+            hypparams["num_classes"],
+            dropout=hypparams["classification_head_dropout"],
+            patch_aggregation_method=hypparams["token_aggregation_method"],
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.cls_head(x)
+
+        return x
+
+
+class ResEncoder_Width_B_Depth_L_Classifier(BaseModel):
+    def __init__(
+        self,
+        **hypparams,
+    ):
+        super(ResEncoder_Classifier, self).__init__(**hypparams)
+
+        self.encoder = ResEncoder_Width_B_Depth_L(**hypparams)
+
+        self.cls_head = ClassificationHead(
+            320,
+            hypparams["num_classes"],
+            dropout=hypparams["classification_head_dropout"],
+            patch_aggregation_method=hypparams["token_aggregation_method"],
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.cls_head(x)
+
+        return x
+    
 
 def load_pretrained_weights(
     resenc_model,
