@@ -389,47 +389,59 @@ class BaseModel(L.LightningModule):
             self.val_conf_mat.save_state(self, "val")
             self.val_conf_mat.reset()
         if hasattr(self, "val_pred_list"):
-            if self.task == "Regression":
-                data = [
-                    [x, y] for (x, y) in zip(self.val_label_list, self.val_pred_list)
-                ]
-                table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
-                wandb.log(
-                    {
-                        "Val Scatterplot": wandb.plot.scatter(
-                            table,
-                            "Ground Truth",
-                            "Prediction",
-                            "Validation Scatterplot",
-                        )
-                    }
-                )
-            if self.save_preds:
-                if self.task == "Classification":
-                    columns = (
-                        (["GT_" + str(i) for i in range(len(self.val_label_list[0]))])
-                        if self.subtask == "multilabel"
-                        else ["GT"]
-                    ) + ["Pred_" + str(i) for i in range(len(self.val_pred_list[0]))]
+            if self.trainer.is_global_zero:
+                if self.task == "Regression":
                     data = [
-                        (
-                            (x.tolist() if self.subtask == "multilabel" else [x])
-                            + (
-                                F.softmax(y, dim=-1)
-                                if self.subtask == "multiclass"
-                                else torch.sigmoid(y)
-                            ).tolist()
-                        )
-                        for x, y in zip(self.val_label_list, self.val_pred_list)
+                        [x, y]
+                        for (x, y) in zip(self.val_label_list, self.val_pred_list)
                     ]
-                    table = wandb.Table(data=data, columns=columns)
-                    wandb.log({"Val Predictions": table})
-                else:
-                    raise NotImplementedError
+                    table = wandb.Table(
+                        data=data, columns=["Ground Truth", "Prediction"]
+                    )
+                    wandb.log(
+                        {
+                            "Val Scatterplot": wandb.plot.scatter(
+                                table,
+                                "Ground Truth",
+                                "Prediction",
+                                "Validation Scatterplot",
+                            )
+                        }
+                    )
+                if self.save_preds:
 
-            # reset
-            self.val_pred_list = []
-            self.val_label_list = []
+                    if self.task == "Classification":
+                        columns = (
+                            (
+                                [
+                                    "GT_" + str(i)
+                                    for i in range(len(self.val_label_list[0]))
+                                ]
+                            )
+                            if self.subtask == "multilabel"
+                            else ["GT"]
+                        ) + [
+                            "Pred_" + str(i) for i in range(len(self.val_pred_list[0]))
+                        ]
+                        data = [
+                            (
+                                (x.tolist() if self.subtask == "multilabel" else [x])
+                                + (
+                                    F.softmax(y, dim=-1)
+                                    if self.subtask == "multiclass"
+                                    else torch.sigmoid(y)
+                                ).tolist()
+                            )
+                            for x, y in zip(self.val_label_list, self.val_pred_list)
+                        ]
+                        table = wandb.Table(data=data, columns=columns)
+                        wandb.log({"Val Predictions": table})
+                    else:
+                        raise NotImplementedError
+
+                # reset
+                self.val_pred_list = []
+                self.val_label_list = []
 
     def on_train_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
