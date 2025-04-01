@@ -394,8 +394,10 @@ class BaseModel(L.LightningModule):
             val_labels = torch.stack(self.val_label_list, dim=0).to(self.device)
             # print(len(self.val_pred_list), val_preds.shape)
             # Gather from all GPUs
-            preds_all = self.all_gather(val_preds).squeeze()
-            labels_all = self.all_gather(val_labels).squeeze()
+            preds_all = self.all_gather(val_preds)
+            preds_all = preds_all.view(-1, *preds_all.shape[2:])
+            labels_all = self.all_gather(val_labels)
+            labels_all = labels_all.view(-1, *labels_all.shape[2:])
             # print(preds_all.shape)
 
             if self.trainer.is_global_zero:
