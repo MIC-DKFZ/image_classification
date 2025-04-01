@@ -459,10 +459,10 @@ class BaseModel(L.LightningModule):
                     else:
                         raise NotImplementedError
 
-                # reset
-                self.val_preds.reset()
-                self.val_labels.reset()
-                self.val_indices.reset()
+            # reset
+            self.val_preds.reset()
+            self.val_labels.reset()
+            self.val_indices.reset()
 
     def on_train_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
