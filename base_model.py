@@ -352,8 +352,8 @@ class BaseModel(L.LightningModule):
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.update(y_hat, y)
         if hasattr(self, "val_pred_list"):
-            self.val_pred_list.extend(y_hat)
-            self.val_label_list.extend(y)
+            self.val_pred_list.extend(y_hat.detach().cpu())
+            self.val_label_list.extend(y.detach().cpu())
 
     def predict_step(self, batch, batch_idx):
 
@@ -389,12 +389,18 @@ class BaseModel(L.LightningModule):
             self.val_conf_mat.save_state(self, "val")
             self.val_conf_mat.reset()
         if hasattr(self, "val_pred_list"):
+            # Stack tensors along batch dim
+            val_preds = torch.stack(self.val_pred_list, dim=0).to(self.device)
+            val_labels = torch.stack(self.val_label_list, dim=0).to(self.device)
+            # print(len(self.val_pred_list), val_preds.shape)
+            # Gather from all GPUs
+            preds_all = self.all_gather(val_preds).squeeze()
+            labels_all = self.all_gather(val_labels).squeeze()
+            # print(preds_all.shape)
+
             if self.trainer.is_global_zero:
                 if self.task == "Regression":
-                    data = [
-                        [x, y]
-                        for (x, y) in zip(self.val_label_list, self.val_pred_list)
-                    ]
+                    data = [[x, y] for (x, y) in zip(labels_all, preds_all)]
                     table = wandb.Table(
                         data=data, columns=["Ground Truth", "Prediction"]
                     )
@@ -412,17 +418,10 @@ class BaseModel(L.LightningModule):
 
                     if self.task == "Classification":
                         columns = (
-                            (
-                                [
-                                    "GT_" + str(i)
-                                    for i in range(len(self.val_label_list[0]))
-                                ]
-                            )
+                            (["GT_" + str(i) for i in range(len(labels_all[0]))])
                             if self.subtask == "multilabel"
                             else ["GT"]
-                        ) + [
-                            "Pred_" + str(i) for i in range(len(self.val_pred_list[0]))
-                        ]
+                        ) + ["Pred_" + str(i) for i in range(len(preds_all[0]))]
                         data = [
                             (
                                 (x.tolist() if self.subtask == "multilabel" else [x])
@@ -432,7 +431,7 @@ class BaseModel(L.LightningModule):
                                     else torch.sigmoid(y)
                                 ).tolist()
                             )
-                            for x, y in zip(self.val_label_list, self.val_pred_list)
+                            for x, y in zip(labels_all, preds_all)
                         ]
                         table = wandb.Table(data=data, columns=columns)
                         wandb.log({"Val Predictions": table})
@@ -440,8 +439,8 @@ class BaseModel(L.LightningModule):
                         raise NotImplementedError
 
                 # reset
-                self.val_pred_list = []
-                self.val_label_list = []
+                self.val_pred_list.clear()
+                self.val_label_list.clear()
 
     def on_train_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
