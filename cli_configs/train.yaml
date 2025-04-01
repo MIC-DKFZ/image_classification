@@ -68,6 +68,8 @@ metrics:
   - 'acc'
   - 'f1'
 
+val_only: False
+
 trainer:
   _target_: lightning.pytorch.Trainer
   callbacks: 
