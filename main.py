@@ -110,7 +110,11 @@ def main(cfg):
         trainer.logger.log_hyperparams(cfg_dict["trainer"])
 
         # start fitting
-        trainer.fit(model, dataset)
+        if cfg_dict["val_only"]:
+            trainer.validate(model, dataset)
+        else:
+            trainer.fit(model, dataset)
+
         wandb.finish()
 
 
