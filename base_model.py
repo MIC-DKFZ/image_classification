@@ -20,6 +20,7 @@ from torchmetrics import (
     Precision,
     Recall,
 )
+from torchmetrics.aggregation import CatMetric
 
 from augmentation.mixup import mixup_criterion, mixup_data
 from metrics.conf_mat import ConfusionMatrix
@@ -160,8 +161,9 @@ class BaseModel(L.LightningModule):
 
         self.save_preds = True if kwargs["save_preds"] else False
         if self.save_preds:
-            self.val_pred_list = []
-            self.val_label_list = []
+            self.val_preds = CatMetric(dist_sync_on_step=False)
+            self.val_labels = CatMetric(dist_sync_on_step=False)
+            self.val_indices = CatMetric(dist_sync_on_step=False)
 
         metrics = MetricCollection(metrics_dict)
         self.train_metrics = metrics.clone(prefix="Train/")
@@ -351,9 +353,18 @@ class BaseModel(L.LightningModule):
 
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.update(y_hat, y)
-        if hasattr(self, "val_pred_list"):
-            self.val_pred_list.extend(y_hat.detach().cpu())
-            self.val_label_list.extend(y.detach().cpu())
+        if hasattr(self, "val_preds"):
+            """self.val_pred_list.extend(y_hat.detach().cpu())
+            self.val_label_list.extend(y.detach().cpu())"""
+            actual_batch_size = x.size(0)  # dynamic size (works for last batch)
+            start_idx = batch_idx * self.trainer.val_dataloaders.batch_size
+            idx = torch.arange(
+                start_idx, start_idx + actual_batch_size, device=self.device
+            )
+
+            self.val_preds.update(y_hat.detach())
+            self.val_labels.update(y.detach())
+            self.val_indices.update(idx)
 
     def predict_step(self, batch, batch_idx):
 
@@ -388,8 +399,8 @@ class BaseModel(L.LightningModule):
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.save_state(self, "val")
             self.val_conf_mat.reset()
-        if hasattr(self, "val_pred_list"):
-            # Stack tensors along batch dim
+        if hasattr(self, "val_preds"):
+            """# Stack tensors along batch dim
             val_preds = torch.stack(self.val_pred_list, dim=0).to(self.device)
             val_labels = torch.stack(self.val_label_list, dim=0).to(self.device)
             # print(len(self.val_pred_list), val_preds.shape)
@@ -398,9 +409,17 @@ class BaseModel(L.LightningModule):
             preds_all = preds_all.view(-1, *preds_all.shape[2:])
             labels_all = self.all_gather(val_labels)
             labels_all = labels_all.view(-1, *labels_all.shape[2:])
-            # print(preds_all.shape)
+            # print(preds_all.shape)"""
+
+            preds_all = self.val_preds.compute()  # shape: [N_total, C]
+            labels_all = self.val_labels.compute()
+            indices = self.val_indices.compute()
 
             if self.trainer.is_global_zero:
+                # Sort by original index to preserve dataset order
+                sorted_idx = torch.argsort(indices)
+                preds_all = preds_all[sorted_idx]
+                labels_all = labels_all[sorted_idx]
                 if self.task == "Regression":
                     data = [[x, y] for (x, y) in zip(labels_all, preds_all)]
                     table = wandb.Table(
@@ -441,8 +460,9 @@ class BaseModel(L.LightningModule):
                         raise NotImplementedError
 
                 # reset
-                self.val_pred_list.clear()
-                self.val_label_list.clear()
+                self.val_preds.reset()
+                self.val_labels.reset()
+                self.val_indices.reset()
 
     def on_train_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
