@@ -21,6 +21,7 @@ from torchmetrics import (
     Recall,
 )
 from torchmetrics.aggregation import CatMetric
+from metrics.balanced_accuracy import BalancedAccuracy
 
 from augmentation.mixup import mixup_criterion, mixup_data
 from metrics.conf_mat import ConfusionMatrix
@@ -86,11 +87,9 @@ class BaseModel(L.LightningModule):
                     num_labels=num_classes,
                 )
             if "balanced_acc" in metrics:
-                metrics_dict["Balanced_Accuracy"] = Accuracy(
+                metrics_dict["Balanced_Accuracy"] = BalancedAccuracy(
                     task=metric_task,
                     num_classes=num_classes,
-                    average="macro",
-                    num_labels=num_classes,
                 )
             if "f1" in metrics:
                 metrics_dict["F1"] = F1Score(
