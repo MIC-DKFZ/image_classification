@@ -1,4 +1,5 @@
 import timm
+import torch
 from base_model import BaseModel
 from peft import get_peft_model, LoraConfig, TaskType
 
@@ -68,6 +69,14 @@ class TimmModel(BaseModel):
 
         else:
             raise NotImplementedError
+        
+        if kwargs.get("classification_head_dropout", None) is not None:
+            if hasattr(self.model, "head_drop") and isinstance(self.model.head_drop, torch.nn.Dropout):
+                self.model.head_drop.p = kwargs["classification_head_dropout"]
+            if hasattr(self.model, "head"):
+                for name, module in self.model.head.named_children():
+                    if isinstance(module, torch.nn.Dropout):
+                        module.p = kwargs["classification_head_dropout"]
     
     @property
     def encoder_params(self):
