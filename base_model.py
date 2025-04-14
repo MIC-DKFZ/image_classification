@@ -19,7 +19,7 @@ from torchmetrics import (
     Recall,
     AveragePrecision,
 )
-
+from collections import defaultdict
 from augmentation.mixup import mixup_criterion, mixup_data
 from metrics.conf_mat import ConfusionMatrix
 from regularization.sam import SAM
@@ -177,6 +177,7 @@ class BaseModel(L.LightningModule):
         self.T_max = T_max
         self.warmstart = warmstart
         self.warmstart2 = warmstart2
+        self.layer_wise_lr_decay = kwargs.get("layer_wise_lr_decay", None)
         self.epochs = epochs
         self.pretrained = pretrained
 
@@ -510,6 +511,13 @@ class BaseModel(L.LightningModule):
                 {"params": model_params},
                 {"params": norm_params, "weight_decay": 0},
             ]
+        elif self.layer_wise_lr_decay is not None:
+            params = get_layerwise_lr_params(
+                self,
+                base_lr=self.lr,
+                weight_decay=self.weight_decay,
+                decay_rate=self.layer_wise_lr_decay,
+            )
         else:
             # Pass only those parameters to the optimizer that require gradients
             params = [p for p in self.parameters() if p.requires_grad]
@@ -597,6 +605,37 @@ class BaseModel(L.LightningModule):
                 )
 
             return [optimizer], [scheduler]
+
+def get_layerwise_lr_params(model, base_lr, weight_decay, decay_rate):
+    """
+    Assign different learning rates to layers based on depth.
+    Args:
+        model: torch.nn.Module
+        base_lr: float
+        weight_decay: float
+        decay_rate: float (e.g., 0.95)
+    Returns:
+        param_groups: list of parameter group dicts
+    """
+    param_groups = []
+    layer_groups = defaultdict(list)
+
+    # Assign each parameter a depth level (based on module order)
+    for depth, (name, module) in enumerate(model.named_modules()):
+        for param_name, param in module.named_parameters(recurse=False):
+            if not param.requires_grad:
+                continue
+            full_param_name = f"{name}.{param_name}" if name else param_name
+            lr = base_lr * (decay_rate ** depth)
+            layer_groups[lr].append(param)
+
+    for lr, params in layer_groups.items():
+        param_groups.append({
+            "params": params,
+            "lr": lr,
+            "weight_decay": weight_decay,
+        })
+    return param_groups
 
 
 class CosineAnnealingLR_Warmstart(_LRScheduler):

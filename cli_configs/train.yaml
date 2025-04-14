@@ -26,6 +26,7 @@ model:
   sam: False  # set trainer.precision=32 if you use sam
   adaptive_sam: False  # set trainer.precision=32 if you use sam
   lr: 0.00002
+  layer_wise_lr_decay: null
   nesterov: False
   scheduler: CosineAnneal
   T_max: ${trainer.max_epochs}
