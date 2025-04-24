@@ -23,7 +23,7 @@ from collections import defaultdict
 from augmentation.mixup import mixup_criterion, mixup_data
 from metrics.conf_mat import ConfusionMatrix
 from regularization.sam import SAM
-
+from collections import OrderedDict, defaultdict
 
 class BaseModel(L.LightningModule):
     def __init__(
@@ -513,10 +513,10 @@ class BaseModel(L.LightningModule):
             ]
         elif self.layer_wise_lr_decay is not None:
             params = get_layerwise_lr_params(
-                self,
+                self.model,
                 base_lr=self.lr,
                 weight_decay=self.weight_decay,
-                decay_rate=self.layer_wise_lr_decay,
+                layer_decay=self.layer_wise_lr_decay,
             )
         else:
             # Pass only those parameters to the optimizer that require gradients
@@ -606,35 +606,64 @@ class BaseModel(L.LightningModule):
 
             return [optimizer], [scheduler]
 
-def get_layerwise_lr_params(model, base_lr, weight_decay, decay_rate):
+def get_layerwise_lr_params(
+    model,
+    base_lr: float,
+    weight_decay: float,
+    layer_decay: float
+):
     """
-    Assign different learning rates to layers based on depth.
-    Args:
-        model: torch.nn.Module
-        base_lr: float
-        weight_decay: float
-        decay_rate: float (e.g., 0.95)
-    Returns:
-        param_groups: list of parameter group dicts
+    Implements BERT style layer wise decay for a ViT from timm:
+      /patch_embed/       → depth 1
+      /blocks.0./         → depth 2
+      /blocks.1./         → depth 3
+      … 
+      /blocks.{n-1}./     → depth n+1
+      /norm/              → depth n+2
+      /head/              → depth n+3
+
+    Then lr = base_lr * (layer_decay ** ( (n+2) - depth ) ).
     """
-    param_groups = []
-    layer_groups = defaultdict(list)
+    # number of transformer blocks
+    n_blocks = len(model.blocks)  
 
-    # Assign each parameter a depth level (based on module order)
-    for depth, (name, module) in enumerate(model.named_modules()):
-        for param_name, param in module.named_parameters(recurse=False):
-            if not param.requires_grad:
-                continue
-            full_param_name = f"{name}.{param_name}" if name else param_name
-            lr = base_lr * (decay_rate ** depth)
-            layer_groups[lr].append(param)
+    # build our name→depth map in order
+    key2depth = OrderedDict([
+        ("patch_embed",                    1),
+        ("patch_embed.proj",               1),
+    ])
+    # each block i → depth = i+1
+    for i in range(n_blocks):
+        key2depth[f"blocks.{i}."] = i + 2
 
-    for lr, params in layer_groups.items():
-        param_groups.append({
-            "params": params,
-            "lr": lr,
-            "weight_decay": weight_decay,
-        })
+    # normalization and head get the highest depths
+    key2depth["fc_norm"] = n_blocks + 2
+    key2depth["head"] = n_blocks + 3
+
+    # now assign parameters to groups
+    lr_groups = defaultdict(list)  # lr → [params]
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+
+        # find the first key that matches this param name
+        for key, depth in key2depth.items():
+            if key in name:
+                print(key, depth, name)
+                exponent = (n_blocks + 3) - depth
+                lr = base_lr * (layer_decay ** exponent)
+                print(key, depth, name, exponent, lr)
+                lr_groups[lr].append(param)
+                break
+        else:
+            # fallback: if nothing matched, give it the base_lr
+            lr_groups[base_lr].append(param)
+
+    # build the optimizer‐style param_groups list
+    param_groups = [
+        {"params": params, "lr": lr, "weight_decay": weight_decay}
+        for lr, params in sorted(lr_groups.items())
+    ]
     return param_groups
 
 
