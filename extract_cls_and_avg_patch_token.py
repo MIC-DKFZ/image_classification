@@ -11,7 +11,7 @@ from parsing_utils import make_omegaconf_resolvers
 
 
 # from datasets.precomputed_features import FNAME_FORMAT_FEATURES
-FNAME_FORMAT_FEATURES = "agg_joint_{model}_{dataset}_{split}_size{imgsize}_float{precision}.h5"
+FNAME_FORMAT_FEATURES = "agg_{method}_{model}_{dataset}_{split}_size{imgsize}_float{precision}.h5"
 
 
 def aggregate_features(x, method: str):
@@ -76,6 +76,7 @@ def extract_features_hdf5(cfg):
             dataloader = datamodule.val_dataloader()
         
         fname = FNAME_FORMAT_FEATURES.format(
+            method=cfg.model.token_aggregation_method,
             model=cfg.model.type.replace('/', '_').replace('.', '_'),
             dataset=cfg.data.module.name,
             split=split,
