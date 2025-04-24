@@ -36,7 +36,7 @@ model:
   mixup_alpha: 0.2
   weight_decay: 0.05 #5e-4
   undecay_norm: False
-  label_smoothing: 0.0
+  label_smoothing: 0.2
   stochastic_depth: False
   resnet_dropout: 0.0
   squeeze_excitation: False
@@ -118,7 +118,7 @@ precomputed_features:
 
 wandb:
   entity: synergy_unit
-  project: FM_adaptation_classification
+  project: FM_adaptation_classification_MAE
   tags: null
   dir: ${log_dir}
   group: ${group_extractor:${log_dir}}
