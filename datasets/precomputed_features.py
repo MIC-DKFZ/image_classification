@@ -1,3 +1,4 @@
+from collections import defaultdict
 import numpy as np
 import torch
 from torch.utils.data import Dataset, Subset
@@ -5,6 +6,14 @@ import h5py
 
 from .base_datamodule import BaseDataModule
 from .blosc2io import Blosc2IO
+
+
+FNAME_FORMAT_FEATURES = "{model}_{dataset}_{split}_size{imgsize}_float{precision}.h5"
+
+
+class DefaultDict(defaultdict):  # for partial string formatting
+    def __missing__(self, key):
+        return f"{{{key}}}"  # Keep the placeholder in the final string
 
 
 class HDF5Dataset(Dataset):
@@ -29,70 +38,60 @@ class HDF5Dataset(Dataset):
 class HDF5DataModule(BaseDataModule):
     def __init__(self, **params):
         super().__init__(**params)
-        self.name = params['name']
-        self.data_fraction = params['data_fraction']
-        self.num_cycles = params['num_cycles']
-        self.model_type = params['model_type']
+        self.data_fraction = params["data_fraction"]
+        self.name = params["name"]
+        self.fname = FNAME_FORMAT_FEATURES.format_map(
+            DefaultDict(str, {
+                "model": params["model_type"].replace('/', '_').replace('.', '_'),
+                "dataset": params["name"],
+                "imgsize": params["imgsize"],
+                "precision": params["precision"],
+            })
+        )
 
     def setup(self, stage = None):
-        self.train_dataset = HDF5Dataset(
-            self.data_path / f"{self.model_type.replace('/', '_').replace('.', '_')}_{self.name.lower()}_train_n{self.num_cycles}.h5"
-        )
+        self.train_dataset = HDF5Dataset(self.data_path / self.fname.format(split="train"))
         if self.data_fraction != 1:
             num_samples = int(len(self.train_dataset) * self.data_fraction)
             indices = np.random.choice(len(self.train_dataset), num_samples, replace=False)
             self.train_dataset = Subset(self.train_dataset, indices)
         
-        self.val_dataset = HDF5Dataset(
-            self.data_path / f"{self.model_type.replace('/', '_').replace('.', '_')}_{self.name.lower()}_val.h5"
-        )
+        self.val_dataset = HDF5Dataset(self.data_path / self.fname.format(split="val"))
         
-        if self.name == "ilsvrc_2012":
+        if self.name == "ILSVRC_2012":
             self.test_dataset = self.val_dataset
         else:
-            self.test_dataset = HDF5Dataset(
-                self.data_path / f"{self.model_type.replace('/', '_').replace('.', '_')}_{self.name.lower()}_test.h5"
-            )
+            self.test_dataset = HDF5Dataset(self.data_path / self.fname.format(split="test"))
 
 
-class BloscDataset(Dataset):
-    def __init__(self, data_dir):
-        self.data_dir = data_dir
-        self.labels = np.load(data_dir / "labels.npy")
+# -----------------------------------------------------------------------------------
 
-    def __len__(self):
-        return len(self.labels)
+FNAME_FORMAT_FEATURES_JOINT_AGG = "agg_joint_{model}_{dataset}_{split}_size{imgsize}_float{precision}.h5"
 
-    def __getitem__(self, index):
-        feature, _ = Blosc2IO.load(str(self.data_dir / f"features_{index}.b2nd"))
-        label = self.labels[index]
-        return feature[0, ...], label.item()
-
-
-class BloscDataModule(BaseDataModule):
+class HDF5DataModuleJointTokenAgg(BaseDataModule):
     def __init__(self, **params):
         super().__init__(**params)
-        self.name = params['name']
-        self.data_fraction = params['data_fraction']
-        self.num_cycles = params['num_cycles']
-        self.model_type = params['model_type']
+        self.data_fraction = params["data_fraction"]
+        self.name = params["name"]
+        self.fname = FNAME_FORMAT_FEATURES_JOINT_AGG.format_map(
+            DefaultDict(str, {
+                "model": params["model_type"].replace('/', '_').replace('.', '_'),
+                "dataset": params["name"],
+                "imgsize": params["imgsize"],
+                "precision": params["precision"],
+            })
+        )
 
     def setup(self, stage = None):
-        self.train_dataset = BloscDataset(
-            self.data_path / f"{self.model_type.replace('/', '_').replace('.', '_')}_{self.name.lower()}_train"
-        )
+        self.train_dataset = HDF5Dataset(self.data_path / self.fname.format(split="train"))
         if self.data_fraction != 1:
             num_samples = int(len(self.train_dataset) * self.data_fraction)
             indices = np.random.choice(len(self.train_dataset), num_samples, replace=False)
             self.train_dataset = Subset(self.train_dataset, indices)
         
-        self.val_dataset = BloscDataset(
-            self.data_path / f"{self.model_type.replace('/', '_').replace('.', '_')}_{self.name.lower()}_val"
-        )
+        self.val_dataset = HDF5Dataset(self.data_path / self.fname.format(split="val"))
         
-        if self.name == "ilsvrc_2012":
+        if self.name == "ILSVRC_2012":
             self.test_dataset = self.val_dataset
         else:
-            self.test_dataset = BloscDataset(
-                self.data_path / f"{self.model_type.replace('/', '_').replace('.', '_')}_{self.name.lower()}_test"
-            )
+            self.test_dataset = HDF5Dataset(self.data_path / self.fname.format(split="test"))

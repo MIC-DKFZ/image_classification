@@ -104,17 +104,16 @@ trainer:
       name: null
   num_sanity_val_steps: 0
   accumulate_grad_batches: 16
-  #log_every_n_steps: 200
+  gradient_clip_val: null
   # Some useful trainer parameters for debugging
+  # log_every_n_steps: 10
   #limit_train_batches: 0.5
   #limit_val_batches: null
   #limit_test_batches: 0.25
-  #gradient_clip_val: 0.5
 
 precomputed_features:
-  # num_cycles: 0
-  precision: 32
-  split: val #null
+  precision: 16
+  split: null  # val
   compression: 4
 
 wandb:

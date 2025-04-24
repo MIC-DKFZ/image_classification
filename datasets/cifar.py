@@ -89,9 +89,9 @@ class CIFAR10DataModule(BaseDataModule):
 
 
 class CIFAR100DataModule(BaseDataModule):
-    def __init__(self, **params):
+    def __init__(self, data_fraction: float, **params):
         super(CIFAR100DataModule, self).__init__(**params)
-        self.data_fraction = params['data_fraction']
+        self.data_fraction = data_fraction
 
         # self.train_transforms = self.train_transforms()
         # self.test_transforms = self.test_transforms()

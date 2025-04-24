@@ -90,3 +90,7 @@ class TimmModel(BaseModel):
 
     def forward(self, x):
         return self.model(x)
+    
+    def extract_features(self, x):
+        # This works for most models in timm
+        return self.model.forward_features(x)

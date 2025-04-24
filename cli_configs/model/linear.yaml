@@ -2,4 +2,4 @@ _target_: models.linear.LinearModel
 embed_dim: 768  # {"vits": 384, "vitb": 768, "vitl": 1024, "vitg": 1536}
 num_classes: ${data.num_classes}
 classification_head_dropout: 0.1
-token_aggregation_method: avg  # cls_token
+token_aggregation_method: joint  # avg, cls_token

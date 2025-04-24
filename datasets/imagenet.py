@@ -39,9 +39,9 @@ class SubsetImageNet(Dataset):
 
 
 class ImagenetDataModule(BaseDataModule):
-    def __init__(self, **params):
+    def __init__(self, data_fraction: float, **params):
         super(ImagenetDataModule, self).__init__(**params)
-        self.data_fraction = params['data_fraction']
+        self.data_fraction = data_fraction
 
     def setup(self, stage: str = None):
         if "albumentations" in str(self.train_transforms.__class__):
