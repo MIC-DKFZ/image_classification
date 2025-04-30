@@ -45,6 +45,8 @@ class TimmModel(BaseModel):
             for name, param in self.model.named_parameters():
                 if "lora" in name:
                     param.requires_grad = True
+                if "head" in name:
+                    param.requires_grad = True
 
         elif kwargs["finetune_method"] == "dora":
             # Apply LoRA to attention layers
@@ -66,7 +68,8 @@ class TimmModel(BaseModel):
             for name, param in self.model.named_parameters():
                 if "lora" in name:
                     param.requires_grad = True
-
+                if "head" in name:
+                    param.requires_grad = True
         else:
             raise NotImplementedError
         
