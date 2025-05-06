@@ -302,7 +302,13 @@ class BaseModel(L.LightningModule):
                 sync_dist=True,
             )
         elif self.metric_computation_mode == "epochwise":
-            self.train_metrics.update(y_hat, y)
+            if self.task == "Classification":
+                if self.subtask == "multilabel":
+                    self.train_metrics.update(torch.sigmoid(y_hat.detach()), y)
+                elif self.subtask == "multiclass":
+                    self.train_metrics.update(F.softmax(y_hat.detach(), dim=-1), y)
+            else:
+                self.train_metrics.update(y_hat.detach(), y)
 
         if hasattr(self, "train_conf_mat"):
             self.train_conf_mat.update(y_hat, y)
@@ -348,7 +354,13 @@ class BaseModel(L.LightningModule):
                 sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
         elif self.metric_computation_mode == "epochwise":
-            self.val_metrics.update(y_hat, y)
+            if self.task == "Classification":
+                if self.subtask == "multilabel":
+                    self.val_metrics.update(torch.sigmoid(y_hat.detach()), y)
+                elif self.subtask == "multiclass":
+                    self.val_metrics.update(F.softmax(y_hat.detach(), dim=-1), y)
+            else:
+                self.val_metrics.update(y_hat.detach(), y)
 
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.update(y_hat, y)

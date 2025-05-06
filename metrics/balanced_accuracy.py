@@ -31,6 +31,10 @@ class BalancedAccuracy(Metric):
         target = target.to(torch.long)
         if self.task == "multilabel":
 
+            # Auto-detect logits vs probs
+            if preds.max() > 1.0 or preds.min() < 0.0:
+                preds = torch.sigmoid(preds)
+
             preds = (preds >= self.threshold).long()
 
             stats = stat_scores(
