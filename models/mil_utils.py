@@ -2,7 +2,36 @@ import torch
 import math
 
 
-def mil_forward_features(encoder, patch_extractor, img):
+def mil_forward_features(encoder, patches, batch_size):
+    """receive all patches as one tensor and iter over it with encoder"""
+
+    # iter over the image with a given batch_size and encode the patches individually
+    features = []
+
+    for i in range(0, len(patches), batch_size):
+
+        if i + batch_size > len(patches):
+
+            if len(patches) > 1:
+                batch = patches[i:]
+            else:
+                batch = patches  # [i]
+
+        else:
+            batch = patches[i : i + batch_size]
+
+        features.append(encoder(batch))
+
+    # unsqueeze to add batch dim
+    # MIL expects batch_size of 1 since individual patches need to be encoded with mil_batch_size already
+    # if images are small enough that a higher batch_size would be possible you can simply drop mil completely
+    # and encode the entire image at once
+    features = torch.concat(features, dim=0).unsqueeze(0)
+
+    return features
+
+
+def mil_forward_features_with_patchextractor(encoder, patch_extractor, img):
     """receive entire memory mapped img and do sliding window here, or draw certain amount of patches randomly"""
     # set image so that patch extractor can calculate patches
     patch_extractor.set_array(img)
@@ -150,23 +179,45 @@ class PatchExtractor:
                     yield torch.stack(patches)
                     patches = []
         else:
-            for i in range(0, max(1, d - pd + 1), sd):
-                for j in range(0, max(1, h - ph + 1), sh):
-                    for k in range(0, max(1, w - pw + 1), sw):
+            for i in range(0, d, sd):
+                for j in range(0, h, sh):
+                    for k in range(0, w, sw):
+                        d_end = i + pd
+                        h_end = j + ph
+                        w_end = k + pw
+
+                        # Slice region within bounds
+                        d_start = i
+                        h_start = j
+                        w_start = k
+
+                        d_end = min(d_end, d)
+                        h_end = min(h_end, h)
+                        w_end = min(w_end, w)
+
                         patch = torch.full(
                             (channel_dim, pd, ph, pw),
                             self.padding_value,
                             dtype=self.array.dtype,
                             device=device,
                         )
-                        d_end = min(i + pd, d)
-                        h_end = min(j + ph, h)
-                        w_end = min(k + pw, w)
-                        patch[:, : d_end - i, : h_end - j, : w_end - k] = (
-                            self.array[:, :, i:d_end, j:h_end, k:w_end]
-                            if len(self.array.shape) == 5
-                            else self.array[:, :, j:h_end, k:w_end]
-                        )
+
+                        # Define slices
+                        patch_d_slice = slice(0, d_end - d_start)
+                        patch_h_slice = slice(0, h_end - h_start)
+                        patch_w_slice = slice(0, w_end - w_start)
+
+                        if len(self.array.shape) == 5:
+                            patch[:, patch_d_slice, patch_h_slice, patch_w_slice] = (
+                                self.array[
+                                    :, :, d_start:d_end, h_start:h_end, w_start:w_end
+                                ]
+                            )
+                        else:
+                            patch[:, 0, patch_h_slice, patch_w_slice] = self.array[
+                                :, :, h_start:h_end, w_start:w_end
+                            ]
+
                         patches.append(patch)
 
                         if len(patches) == self.batch_size:
