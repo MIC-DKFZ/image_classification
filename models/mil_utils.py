@@ -3,6 +3,38 @@ import math
 
 
 def mil_forward_features(encoder, patches, batch_size):
+    """receive all patches as one tensor and iter over it with encoder, batch size>1 allowed"""
+
+    # iter over data batch size
+    total_features = []
+    for img in patches:
+        # iter over the image with a given MIL batch_size and encode the patches individually
+        features_per_img = []
+
+        for i in range(0, len(img), batch_size):
+
+            if i + batch_size > len(img):
+
+                if len(img) > 1:
+                    batch = img[i:]
+                else:
+                    batch = img  # [i]
+
+            else:
+                batch = img[i : i + batch_size]
+
+            features_per_img.append(encoder(batch))
+
+        # save encoded features
+        features_per_img = torch.concat(features_per_img, dim=0).unsqueeze(0)
+        total_features.append(features_per_img)
+
+    total_features = torch.concat(total_features, dim=0)
+
+    return total_features
+
+
+def mil_forward_features_with_bs1(encoder, patches, batch_size):
     """receive all patches as one tensor and iter over it with encoder"""
 
     # iter over the image with a given batch_size and encode the patches individually

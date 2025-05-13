@@ -86,7 +86,7 @@ class ResEncoder_Classifier(BaseModel):
     def forward(self, x):
 
         if self.use_mil_forward:
-            x = mil_forward_features(self.encoder, x[0], self.mil_batch_size)
+            x = mil_forward_features(self.encoder, x, self.mil_batch_size)
         else:
             x = self.encoder(x)
         x = self.cls_head(x)

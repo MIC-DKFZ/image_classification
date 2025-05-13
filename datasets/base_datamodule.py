@@ -19,6 +19,7 @@ class BaseDataModule(LightningDataModule):
         num_workers,
         prepare_data_per_node,
         fold,
+        mil_setting,
         *args,
         **kwargs
     ):
@@ -32,6 +33,7 @@ class BaseDataModule(LightningDataModule):
         self.num_workers = num_workers
         self.prepare_data_per_node = prepare_data_per_node
         self.fold = fold
+        self.mil_setting = mil_setting  # if True, set batch size=1 for validation
 
     def prepare_data(self) -> None:
         return super().prepare_data()
@@ -73,7 +75,7 @@ class BaseDataModule(LightningDataModule):
     def val_dataloader(self):
         valloader = DataLoader(
             self.val_dataset,
-            batch_size=self.batch_size,
+            batch_size=1 if self.mil_setting else self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
@@ -86,7 +88,7 @@ class BaseDataModule(LightningDataModule):
     def test_dataloader(self):
         testloader = DataLoader(
             self.test_dataset,
-            batch_size=self.batch_size,
+            batch_size=1 if self.mil_setting else self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
@@ -99,7 +101,7 @@ class BaseDataModule(LightningDataModule):
     def predict_dataloader(self):
         predictloader = DataLoader(
             self.test_dataset,
-            batch_size=self.batch_size,
+            batch_size=1 if self.mil_setting else self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,

@@ -54,7 +54,8 @@ class RSNA_SpineData(Dataset):
         img, _ = Blosc2IO.load(self.img_dir / (self.img_files[idx] + ".b2nd"), mode="r")
 
         # yield all patches
-        img = torch.from_numpy(img[...]).unsqueeze(0)  # unsqueeze to add batch dim
+        img = torch.from_numpy(img[...]).unsqueeze(0)
+
         self.patch_extractor.set_array(img)
         patches = []
         for i in self.patch_extractor:
