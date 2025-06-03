@@ -1,0 +1,18 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.eurosat.EuroSATDataModule
+    name: EuroSAT
+    data_root_dir: /nvme/UncRobustness/data
+    batch_size: 8
+    data_fraction: 1.0
+    train_transforms: 
+      _target_: augmentation.policies.eurosat.FlipRotateTransformImgNetNorm
+    test_transforms: 
+      _target_: augmentation.policies.eurosat.TestTransformImgNetNorm
+    
+  num_classes: 10
+
+model:
+  task: 'Classification'
+  cifar_size: False
