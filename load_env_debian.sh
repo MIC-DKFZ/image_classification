@@ -23,3 +23,8 @@ export OMP_NUM_THREADS=1
 export DATASET_LOCATION=/dkfz/cluster/gpu/data/OE0441/s522r/ILSVRC_2012
 export EXPERIMENT_LOCATION=/dkfz/cluster/gpu/checkpoints/OE0441/d246a
 export DATA_LOCATION=/dkfz/cluster/gpu/data/OE0441/s522r/
+
+export HF_HOME=/dkfz/cluster/gpu/data/OE0441/d246a
+export WANDB__SERVICE_WAIT=300
+export WANDB_DIR=/dkfz/cluster/gpu/checkpoints/OE0441/d246a
+export WANDB_CACHE_DIR=/dkfz/cluster/gpu/checkpoints/OE0441/d246a
