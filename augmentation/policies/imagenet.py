@@ -2,6 +2,9 @@ import torchvision.transforms as transforms
 
 from ..randaugment import Cutout, ImageNetPolicy, RandAugment
 from .base_transform import BaseTransform
+from torchvision.transforms import InterpolationMode
+from timm.data import create_transform
+
 
 MEAN, STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
 
@@ -57,6 +60,37 @@ class AutoAugmentTransform(BaseTransform):
             ]
         )
 
+        return transform_train
+
+
+class TimmRandAugmentTramsform(BaseTransform):
+    def __init__(self, *args, **kwargs ):
+        super().__init__()
+        self.transform = create_transform(
+                input_size=448,
+                is_training=True,
+                mean=MEAN,
+                std=STD,
+                interpolation='bicubic',
+                auto_augment='rand-m9-mstd0.5',
+                re_prob=0.25,
+                re_mode='pixel',
+                re_count=1
+            )
+    
+    def __call__(self):
+        transform_train = transforms.Compose(
+            [
+                transforms.RandomResizedCrop(448,
+                    scale=(0.08, 1.0),
+                    ratio=(3/4, 4/3),
+                    interpolation=InterpolationMode.BICUBIC),
+                transforms.RandomHorizontalFlip(),
+                self.transform,
+                transforms.ToTensor(),
+                transforms.Normalize(MEAN, STD),
+            ]
+        )
         return transform_train
 
 
