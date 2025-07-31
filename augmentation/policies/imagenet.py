@@ -103,6 +103,8 @@ class TimmRandAugmentTransform(BaseTransform):
             mean=MEAN,
             std=STD,
             interpolation='bicubic',
+            scale=(0.08, 1.0),      # the RandomResizedCrop scale bounds
+            ratio=(3/4, 4/3),
             auto_augment='rand-m9-mstd0.5',
             re_prob=0.25,
             re_mode='pixel',
