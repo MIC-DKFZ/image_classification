@@ -63,7 +63,7 @@ class AutoAugmentTransform(BaseTransform):
         return transform_train
 
 
-class TimmRandAugmentTramsform(BaseTransform):
+class TimmRandAugmentTramsformOld(BaseTransform):
     def __init__(self, *args, **kwargs ):
         super().__init__()
         self.transform = create_transform(
@@ -92,6 +92,26 @@ class TimmRandAugmentTramsform(BaseTransform):
             ]
         )
         return transform_train
+
+
+class TimmRandAugmentTransform(BaseTransform):
+    def __init__(self):
+        super().__init__()
+        self.transform = create_transform(
+            input_size=448,
+            is_training=True,
+            mean=MEAN,
+            std=STD,
+            interpolation='bicubic',
+            auto_augment='rand-m9-mstd0.5',
+            re_prob=0.25,
+            re_mode='pixel',
+            re_count=1
+        )
+
+    def __call__(self, img):
+        # img is PIL.Image or ndarray
+        return self.transform(img)
 
 
 class RandAugmentTransform(BaseTransform):
