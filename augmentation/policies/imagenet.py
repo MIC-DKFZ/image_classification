@@ -109,7 +109,7 @@ class TimmRandAugmentTransform(BaseTransform):
             re_count=1
         )
 
-    def __call__(self, img):
+    def __call__(self):
         transform_train = transforms.Compose(
             [
                 transforms.RandomResizedCrop(448),
