@@ -5,3 +5,4 @@ finetune_method: full
 lora_rank: null
 lora_alpha: null
 lora_dropout: null
+drop_path_rate: 0.15

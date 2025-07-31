@@ -11,6 +11,7 @@ export CPATH=/usr/local/lib:$CPATH
 export PATH=/usr/local/cuda-${CUDA}/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda-${CUDA}/lib64:$LD_LIBRARY_PATH
 export CUDA_HOME=/usr/local/cuda-${CUDA}
+export PATH=$CUDA_HOME/bin:$PATH
 
 #module load GCC/14.1.0
 #module load binutils/2.42
