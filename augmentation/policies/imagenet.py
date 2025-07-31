@@ -110,8 +110,18 @@ class TimmRandAugmentTransform(BaseTransform):
         )
 
     def __call__(self, img):
+        transform_train = transforms.Compose(
+            [
+                transforms.RandomResizedCrop(448),
+                self.transform,
+                transforms.ToTensor(),
+                transforms.Normalize(MEAN, STD),
+            ]
+        )
+
+        return transform_train
         # img is PIL.Image or ndarray
-        return self.transform(img)
+        # return self.transform(img)
 
 
 class RandAugmentTransform(BaseTransform):
