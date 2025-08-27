@@ -1,0 +1,6 @@
+_target_: models.dinov3.Dinov3
+type: dinov3_vitb16_pretrain_lvd1689m-73cec8be
+weight_dir: /dkfz/cluster/gpu/data/mic_data_common/dinov3/weights
+pretrained: True
+classification_head_dropout: 0.2
+token_aggregation_method: avg  # cls_token
