@@ -7,7 +7,7 @@ from hydra.utils import instantiate
 from lightning.pytorch import seed_everything
 from omegaconf import OmegaConf
 import torch
-
+import importlib
 from parsing_utils import make_omegaconf_resolvers
 
 
@@ -65,7 +65,12 @@ def main(cfg):
 
         # instantiate trainer, model and dataset
         trainer = instantiate(cfg.trainer)
-        model = instantiate(cfg.model)
+
+        ModelClass = make_class(cfg.peft._target_, cfg.model._target_)
+        model_args = dict(cfg.peft)
+        model_args.update(dict(cfg.model))
+        model_args.pop("_target_")
+        model = ModelClass(**model_args)
         if cfg.model.compile:
             model = torch.compile(model, mode="default")
         dataset = instantiate(cfg.data).module
@@ -106,6 +111,18 @@ def main(cfg):
         # start fitting
         trainer.fit(model, dataset)
         wandb.finish()
+
+
+def make_class(derived, base):
+    derived = resolve_class(derived)
+    base = resolve_class(base)
+    return type(f"{derived.__name__}_{base.__name__}", (derived, base), {})
+
+
+def resolve_class(path: str):
+    module_path, class_name = path.rsplit('.', 1)
+    module = importlib.import_module(module_path)
+    return getattr(module, class_name)
 
 
 if __name__ == "__main__":

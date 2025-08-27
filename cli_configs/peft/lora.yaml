@@ -1,0 +1,4 @@
+_target_: peft_models.lora.LoRA
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.01

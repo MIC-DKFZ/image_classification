@@ -2,6 +2,7 @@ defaults:
   - _self_
   - env: local
   - model: timm
+  - peft: lora
   - data: imagenet
 
 log_dir: ${hydra:output_subdir}

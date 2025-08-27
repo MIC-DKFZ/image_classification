@@ -1,9 +1,0 @@
-_target_: models.dino.DinoV2Model
-type: dinov2_vitb14_reg
-pretrained: True
-classification_head_dropout: 0.2
-token_aggregation_method: avg #cls_token
-finetune_method: full
-lora_rank: null
-lora_alpha: null
-lora_dropout: null
