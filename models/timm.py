@@ -5,7 +5,7 @@ from base_model import BaseModel
 
 class TimmModel(BaseModel):
     def __init__(self, type, **kwargs):
-        super(TimmModel, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.model = timm.create_model(
             type,

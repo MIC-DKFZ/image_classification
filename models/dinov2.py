@@ -5,7 +5,7 @@ from models.classification_head import ClassificationHead
 
 class Dinov2(BaseModel):
     def __init__(self, type, **kwargs):
-        super(Dinov2, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         size_lookup = {"vits": 384, "vitb": 768, "vitl": 1024, "vitg": 1536}
         for k in size_lookup.keys():
