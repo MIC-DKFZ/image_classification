@@ -7,14 +7,10 @@ class Dinov2(BaseModel):
     def __init__(self, type, **kwargs):
         super().__init__(**kwargs)
 
-        size_lookup = {"vits": 384, "vitb": 768, "vitl": 1024, "vitg": 1536}
-        for k in size_lookup.keys():
-            if k in type:
-                embed_dim = size_lookup[k]
-
         self.model = torch.hub.load("facebookresearch/dinov2", type)
         # The mask token is not needed for fine-tuning
         del self.model.mask_token
+        embed_dim = self.model.embed_dim
 
         self.cls_head = ClassificationHead(
             embed_dim,
