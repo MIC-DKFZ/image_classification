@@ -1,0 +1,3 @@
+_target_: models.timm.TimmModel
+type: google/vit-base-patch16-224
+pretrained: True
