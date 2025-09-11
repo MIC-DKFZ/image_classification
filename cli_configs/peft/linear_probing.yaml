@@ -1,1 +1,2 @@
 _target_: peft_models.linear_probing.LinearProbing
+peft: LinearProbing

@@ -1,5 +1,6 @@
 _target_: peft_models.adapt_former.AdaptFormer
-mode: sequential
+peft: AdaptFormer
+mode: parallel
 bottleneck: 64
 dropout: 0.0
 init_option: lora

@@ -2,8 +2,8 @@ class LinearProbing:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        for name, param in self.model.named_parameters():
-            if "head" in name:
+        for name, param in self.named_parameters():
+            if any(sub in name for sub in ["head", "classifier", "cls_head"]):
                 param.requires_grad = True
             else:
                 param.requires_grad = False

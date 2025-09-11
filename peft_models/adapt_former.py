@@ -2,7 +2,22 @@ import torch
 import torch.nn as nn
 from types import SimpleNamespace
 from functools import partial
-from typing import List
+
+
+MODEL_TO_ARCH_MAPPING = {
+    "VisionTransformer": "VisionTransformer",
+    "DinoVisionTransformer": "DinoVisionTransformer",
+    "DINOv3ViTModel": "DINOv3ViTModel",
+    "ViTModel": "ViTModel",
+    "ViTMAEModel": "ViTModel",
+}
+
+MODULE_MAPPING = {
+    "VisionTransformer": {"block_modules": ["norm1", "attn", "norm2", "mlp"], "sequential": "drop_path2", "parallel": "norm2"},
+    "DinoVisionTransformer": {"block_modules": ["norm1", "attn", "norm2", "mlp"], "sequential": "mlp.drop", "parallel": "norm2"},
+    "DINOv3ViTModel": {"block_modules": ["norm1", "attention", "norm2", "mlp"], "sequential": "drop_path", "parallel": "norm2"},
+    "ViTModel": {"block_modules": ["layernorm_before", "attention", "layernorm_after", "intermediate"], "sequential": "output.dropout", "parallel": "layernorm_after"},
+}
 
 
 class AdaptFormer:
@@ -63,10 +78,6 @@ class AdapterModule(nn.Module):
             raise NotImplementedError
 
     def forward(self, x, add_residual=True, residual=None):
-        x_is_list = False
-        if isinstance(x, List) and len(x) == 1: # DINOv3 fix
-            x = x[0]
-            x_is_list = True
         residual = x if residual is None else residual
         if self.adapter_layernorm_option == "in":
             x = self.adapter_layer_norm_before(x)
@@ -82,15 +93,12 @@ class AdapterModule(nn.Module):
 
         up = up + residual if add_residual else up
 
-        if x_is_list:
-            up = [up]
-
         return up
 
 
-def _infer_block_dim(block: nn.Module) -> int:
+def _infer_block_dim(norm1: nn.Module) -> int:
     # timm blocks have norm1.normalized_shape
-    nshape = getattr(block.norm1, "normalized_shape", None)
+    nshape = getattr(norm1, "normalized_shape", None)  # Timm: norm1
     if nshape is None:
         raise RuntimeError("Cannot infer block dim; provide d_model explicitly.")
     return nshape if isinstance(nshape, int) else nshape[-1]
@@ -109,12 +117,14 @@ def attach_adapters_with_hooks(
     assert mode in ("sequential", "parallel")
     hooked = []
 
+    target_arch = MODEL_TO_ARCH_MAPPING[model.__class__.__name__]
+
     for blk in model.modules():
         # Heuristic for timm ViT blocks
-        if not all(hasattr(blk, a) for a in ("norm1", "attn", "mlp", "norm2")):
+        if not all(hasattr(blk, a) for a in MODULE_MAPPING[target_arch]["block_modules"]):
             continue
 
-        dim = _infer_block_dim(blk)
+        dim = _infer_block_dim(get_module(blk, MODULE_MAPPING[target_arch]["block_modules"][0]))
 
         # Install adapter as a submodule on the parent block
         blk.adapter = AdapterModule(
@@ -132,14 +142,23 @@ def attach_adapters_with_hooks(
             for p in blk.adapter.parameters():
                 p.requires_grad = True
 
-        blk._adapter_ctx = SimpleNamespace(adapt_x=None, mode=mode)
+        run_adapter = None
+        if target_arch == "DINOv3ViTModel":
+            run_adapter = False
+            
+        blk._adapter_ctx = SimpleNamespace(adapt_x=None, run_adapter=run_adapter, mode=mode)
         handles = []
 
         if mode == "sequential":
             # out <- adapter(out)  (post-hook on the block)
-            def block_post_hook(parent, mod, inputs, output):
-                return parent.adapter(output)
-            h = blk.register_forward_hook(partial(block_post_hook, blk))
+            def mlp_post_hook(parent, mod, inputs, output):
+                if parent._adapter_ctx.run_adapter is None or parent._adapter_ctx.run_adapter == True:
+                    output = parent.adapter(output)
+                    parent._adapter_ctx.run_adapter = False
+                else:
+                    parent._adapter_ctx.run_adapter = True
+                return output
+            h = get_module(blk, MODULE_MAPPING[target_arch]["sequential"]).register_forward_hook(partial(mlp_post_hook, blk))
             handles.append(h)
 
         else:  # parallel
@@ -147,19 +166,36 @@ def attach_adapters_with_hooks(
             def norm2_pre_hook(parent, mod_norm2, inputs):
                 (x_before_norm2,) = inputs
                 parent._adapter_ctx.adapt_x = parent.adapter(x_before_norm2, add_residual=False)
-            h1 = blk.norm2.register_forward_pre_hook(partial(norm2_pre_hook, blk))
+                parent._adapter_norm2_done = True
+            h1 = get_module(blk, MODULE_MAPPING[target_arch]["parallel"]).register_forward_pre_hook(partial(norm2_pre_hook, blk))
             handles.append(h1)
 
             # POST-HOOK on the block: add adapter contribution to final output
-            def block_post_hook(parent, mod, inputs, output):
+            def mlp_post_hook(parent, mod, inputs, output):
                 ax = parent._adapter_ctx.adapt_x
+                if ax is None or ax.shape[-1] != output.shape[-1]:  # ax.shape[-1] != output.shape[-1] -> Necessary in dinov3_reference as drop module is used twice in mlp module
+                    return output
                 parent._adapter_ctx.adapt_x = None
-                return output + ax if ax is not None else output
-            h2 = blk.register_forward_hook(partial(block_post_hook, blk))
+                output = output + ax
+                return output
+            h2 = get_module(blk, MODULE_MAPPING[target_arch]["sequential"]).register_forward_hook(partial(mlp_post_hook, blk))
             handles.append(h2)
 
         hooked.append((blk, handles))
 
     if not hooked:
-        raise RuntimeError("No ViT-like blocks found (need norm1/attn/mlp/norm2).")
+        raise RuntimeError("No ViT-like blocks found.")
     return hooked
+
+
+def get_module(module: nn.Module, name: str) -> nn.Module:
+    """Traverse a module hierarchy by dot-separated name and return the submodule."""
+    current = module
+    for attr in name.split("."):
+        # Try named_children / _modules first (safe for nn.Module containers)
+        if attr in current._modules:
+            current = current._modules[attr]
+        else:
+            # Fall back to normal attribute lookup (e.g. plain fields)
+            current = getattr(current, attr)
+    return current

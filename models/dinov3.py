@@ -9,7 +9,10 @@ class Dinov3(BaseModel):
         super().__init__(**kwargs)
 
         model_name = str("_").join(type.split("_")[:2])
-        self.model = torch.hub.load("facebookresearch/dinov3", model_name, weights=str(Path(weight_dir) / (type + ".pth")))
+        # self.model = torch.hub.load("facebookresearch/dinov3", model_name, weights=str(Path(weight_dir) / (type + ".pth")))
+        self.model = torch.hub.load("facebookresearch/dinov3", model_name, pretrained=False)
+        state_dict = torch.load(str(Path(weight_dir) / (type + ".pth")), map_location="cpu")
+        self.model.load_state_dict(state_dict, strict=True)
         embed_dim = self.model.embed_dim
 
         self.cls_head = ClassificationHead(

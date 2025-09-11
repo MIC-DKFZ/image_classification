@@ -1,8 +1,8 @@
 defaults:
   - _self_
   - env: local
-  - model: timm
-  - peft: lora
+  - model: dinov3_reference  # dinov3_reference
+  - peft: adapt_former
   - data: imagenet
 
 log_dir: ${hydra:output_subdir}
@@ -95,7 +95,7 @@ trainer:
   deterministic: False
   precision: '16-mixed'
   enable_progress_bar: True
-  strategy: 'ddp'
+  strategy: 'auto'
   logger:
     - _target_: lightning.pytorch.loggers.WandbLogger
       offline: False

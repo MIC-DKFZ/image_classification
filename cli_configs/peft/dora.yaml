@@ -1,4 +1,7 @@
-_target_: peft_models.dora.DoRA
+_target_: peft_models.lora.LoRA
+peft: DoRA
 lora_rank: 8
 lora_alpha: 16
 lora_dropout: 0.01
+lora_target_modules: ['attn.q_proj', 'attn.k_proj', 'attn.v_proj', 'attn.proj', 'mlp.fc1_g', 'mlp.fc1_x', 'mlp.fc2']  # attn.q_proj, attn.k_proj, attn.v_proj, attn.proj, mlp.fc1_g, mlp.fc1_x, mlp.fc2
+use_dora: True

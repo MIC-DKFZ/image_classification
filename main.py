@@ -82,6 +82,9 @@ def main(cfg):
         cfg_dict["model"]["model"] = cfg_dict["model"].pop("name")
         trainer.logger.log_hyperparams(cfg_dict["model"])
 
+        cfg_dict["peft"].pop("_target_")
+        trainer.logger.log_hyperparams(cfg_dict["peft"])
+
         ## Data
         cfg_dict["data"]["module"].pop("_target_")
         if cfg_dict["data"]["module"]["train_transforms"] is not None:
