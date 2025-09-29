@@ -1,8 +1,8 @@
 defaults:
   - _self_
   - env: local
-  - model: resnet
-  - data: cifar10
+  - model: timm
+  - data: aid
 
 output_subdir: ${exp_dir}/${data.module.name}/checkpoints/${make_group_name:}
 hydra:

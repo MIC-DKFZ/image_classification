@@ -1,0 +1,41 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.aid.AIDDataModule
+    name: AID
+    data_root_dir: /home/d246a/Documents/data/AID #/dkfz/cluster/gpu/data/OE0441/s522r/rocket_wp5/Dataset203_MRNet
+    batch_size: 64
+    train_transforms:
+     _target_: augmentation.policies.aid.FlipRotateTransformImgNetNorm
+    test_transforms:
+     _target_: augmentation.policies.aid.TestTransformImgNetNorm
+  cv:
+    k: 5
+
+  num_classes: 30
+  patch_size: [600, 600]
+
+model:
+  task: 'Classification'
+  subtask: 'multiclass'
+  cifar_size: False
+  input_channels: 3
+  input_dim: 2
+  input_shape: ${data.patch_size}
+  optimizer: AdamW
+  lr: 0.0001
+  warmstart: 20
+  weight_decay: 1e-2
+  result_plot: 'val'
+
+trainer:
+  logger:
+    project: AID
+  accumulate_grad_batches: 12
+  max_epochs: 200
+
+metrics:
+  - 'f1'
+  - 'balanced_acc'
+  - 'ap'
+  - 'auroc'
