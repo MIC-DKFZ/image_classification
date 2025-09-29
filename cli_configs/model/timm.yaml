@@ -1,4 +1,4 @@
 _target_: models.timm.TimmModel
-type: google/vit-base-patch16-224 #timm/resnet18.a1_in1k # timm/convnext_small.fb_in22k
-pretrained: False
+type: timm/resnet18.a1_in1k # google/vit-base-patch16-224 #timm/resnet18.a1_in1k # timm/convnext_small.fb_in22k
+pretrained: True
 

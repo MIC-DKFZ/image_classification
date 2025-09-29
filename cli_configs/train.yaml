@@ -2,7 +2,7 @@ defaults:
   - _self_
   - env: local
   - model: timm
-  - data: aid
+  - data: elpv
 
 output_subdir: ${exp_dir}/${data.module.name}/checkpoints/${make_group_name:}
 hydra:
