@@ -1,0 +1,45 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.elpv.ELPVDataModule
+    name: ELPV
+    data_root_dir: /home/d246a/Documents/data/elpv
+    batch_size: 128
+    train_transforms:
+      _target_: augmentation.policies.elpv.FlipRotateTransformImgNetNorm
+    test_transforms:
+      _target_: augmentation.policies.elpv.TestTransformImgNetNorm
+    # expected helper files in data_root_dir:
+    # - splits_final.json
+    # - labels_probs.json
+    # - data/labels.csv
+
+  cv:
+    k: 5
+
+  num_classes: 2          # binary: defect (1) vs. no-defect (0)
+  patch_size: [300, 300]  # ELPV images are 300x300
+
+model:
+  task: 'Classification'
+  cifar_size: False
+  input_channels: 3       # keep 3ch for pretrained backbones (grayscale repeated to 3)
+  input_dim: 2
+  input_shape: ${data.patch_size}
+  optimizer: AdamW
+  lr: 0.0001
+  warmstart: 20
+  weight_decay: 1e-2
+  result_plot: 'val'
+
+trainer:
+  logger:
+    project: ELPV
+  accumulate_grad_batches: 8
+  max_epochs: 200
+
+metrics:
+  - 'f1'
+  - 'balanced_acc'
+  - 'ap'
+  - 'auroc'
