@@ -7,6 +7,7 @@ MODEL_TO_ARCH_MAPPING = {
     "DINOv3ViTModel": "DINOv3ViTModel",
     "ViTModel": "ViTModel",
     "ViTMAEModel": "ViTModel",
+    "Eva": "Eva",
 }
 
 MODULE_MAPPING = {
@@ -22,9 +23,9 @@ MODULE_MAPPING = {
     },
     "DinoVisionTransformer": {
         "attn.proj": "attn.proj",
-        "attn.q_proj": "attn.q_proj",
-        "attn.k_proj": "attn.k_proj",
-        "attn.v_proj": "attn.v_proj",
+        "attn.q_proj": "attn.qkv",
+        "attn.k_proj": "attn.qkv",
+        "attn.v_proj": "attn.qkv",
         "mlp.fc1": "mlp.fc1",
         "mlp.fc1_g": "mlp.fc1_g",
         "mlp.fc1_x": "mlp.fc1_x",
@@ -49,6 +50,16 @@ MODULE_MAPPING = {
         "mlp.fc1_g": "intermediate.dense",
         "mlp.fc1_x": "intermediate.dense",  # MLP is not gated
         "mlp.fc2":   "output.dense",
+    },
+    "Eva": {
+        "attn.proj":  "attn.proj",
+        "attn.q_proj":"attn.q_proj",
+        "attn.k_proj":"attn.k_proj",
+        "attn.v_proj":"attn.v_proj",
+        "mlp.fc1": "mlp.fc1",
+        "mlp.fc1_g": "mlp.fc1_g",
+        "mlp.fc1_x": "mlp.fc1_x",
+        "mlp.fc2":   "mlp.fc2",
     },
 }
 
