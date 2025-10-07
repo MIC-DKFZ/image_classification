@@ -60,7 +60,8 @@ model:
     
 data:
   module:
-    random_batches: False  # sampling with replacement
+    random_batches: False  # if True, sampling with replacement
+    stratified: True
     num_workers: 12
     prepare_data_per_node: False
     fold: null
