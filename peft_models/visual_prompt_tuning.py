@@ -6,6 +6,15 @@ import torch
 from torch import nn
 
 
+MODEL_TO_MODULE_MAPPING = {
+    "VisionTransformer": ["model.blocks", "norm1.normalized_shape"],  # mae_timm
+    "DinoVisionTransformer": ["model.blocks", "norm1.normalized_shape"],  # dinov3_reference
+    "DINOv3ViTModel": ["model.layer", "norm1.normalized_shape"],  # dinov3
+    "ViTModel": ["model.encoder.layer", "layernorm_before.normalized_shape"],  # supervised
+    "ViTMAEModel": ["model.encoder.layer", "layernorm_before.normalized_shape"],  # mae
+}
+
+
 class VisualPromptTuning:
     """
     Visual Prompt Tuning (VPT) wrapper that augments an existing ViT/EVA model
@@ -22,7 +31,6 @@ class VisualPromptTuning:
         project_dim:        If not None and != hidden_dim, project prompts to `hidden_dim`.
         dropout:            Dropout applied to prompt tokens.
         init_scale:         Xavier-uniform range scale (matches common VPT init).
-        blocks_attr:        Attribute name holding the transformer blocks (default: "blocks").
         hidden_dim:         Force hidden size if it cannot be inferred.
         deep_layers:        Optional subset of layer indices to apply deep prompts to.
                             If None and deep=True, applies to all layers.
@@ -35,29 +43,23 @@ class VisualPromptTuning:
         project_dim: Optional[int] = None,
         dropout: float = 0.0,
         init_scale: float = 1.0,
-        blocks_attr: str = "blocks",
         hidden_dim: Optional[int] = None,
         deep_layers: Optional[Sequence[int]] = None,
         *args, **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.blocks_attr = blocks_attr
         self.num_tokens = int(num_tokens)
         self.deep = bool(deep)
         self.dropout = nn.Dropout(dropout)
 
-        # Locate transformer blocks (timm/EVA style)
-        if not hasattr(self.model.vit.encoder, self.blocks_attr):
-            raise AttributeError(
-                f"Backbone has no '{self.blocks_attr}' attribute. "
-                "Pass the correct attribute via `blocks_attr`."
-            )
-        self.blocks = getattr(self.model.vit.encoder, self.blocks_attr)
+        target_modules = MODEL_TO_MODULE_MAPPING[self.model.__class__.__name__]
+
+        self.blocks = get_module(self, target_modules[0])
         if not isinstance(self.blocks, (nn.Sequential, nn.ModuleList)) or len(self.blocks) == 0:
             raise ValueError("Expected a non-empty nn.Sequential or nn.ModuleList of blocks.")
 
         # Hidden size
-        self.hidden_dim = int(hidden_dim) if hidden_dim is not None else self.model.vit.encoder.layer[0].layernorm_before.normalized_shape[0]
+        self.hidden_dim = int(hidden_dim) if hidden_dim is not None else get_module(self.blocks[0], target_modules[1])[0]
 
         # Prompt (content) dimension before optional projection
         prompt_in_dim = self.hidden_dim if project_dim is None else int(project_dim)
@@ -131,12 +133,17 @@ class VisualPromptTuning:
         if self.deep:
             # Per-layer hooks
             idx_map = {layer_idx: i for i, layer_idx in enumerate(self.deep_layers)}
+            first_layer = True
             for layer_idx, block in enumerate(self.blocks):
                 if layer_idx in idx_map:
-                    dp_index = idx_map[layer_idx]
-                    h = block.register_forward_pre_hook(
-                        self._make_deep_hook(dp_index), with_kwargs=False
-                    )
+                    if first_layer:
+                        h = block.register_forward_pre_hook(self._make_shallow_hook(), with_kwargs=False)
+                        first_layer = False
+                    else:
+                        dp_index = idx_map[layer_idx]
+                        h = block.register_forward_pre_hook(
+                            self._make_deep_hook(dp_index), with_kwargs=False
+                        )
                     self._hook_handles.append(h)
         else:
             # Shallow: only before the first block
@@ -151,11 +158,17 @@ class VisualPromptTuning:
         """
         def hook(_module: nn.Module, inputs: Tuple[torch.Tensor, ...]):
             x = inputs[0]  # x: [B, 1+N, D] after pos_embed + drop
+            is_list = False
+            if isinstance(x, list):
+                x = x[0]
+                is_list = True
             B = x.shape[0]
             pe = self.prompt_proj(self.prompt_embeddings).expand(B, -1, -1)
             pe = self.dropout(pe)
             # Insert after CLS (index 0): [CLS] + [PROMPTS] + [PATCHES]
             x_new = torch.cat((x[:, :1, :], pe, x[:, 1:, :]), dim=1)
+            if is_list:
+                x_new = [x_new]
             inputs = (x_new, *inputs[1:])
             return inputs
         return hook
@@ -167,15 +180,34 @@ class VisualPromptTuning:
         """
         def hook(_module: nn.Module, inputs: Tuple[torch.Tensor, ...]):
             x = inputs[0]  # x: [B, 1+N(+P), D]
+            is_list = False
+            if isinstance(x, list):
+                x = x[0]
+                is_list = True
             B = x.shape[0]
-            # Remove previously injected prompts if sequence already contains them
-            if x.shape[1] >= 1 + self.num_tokens + 1:
-                # assume prompts occupy positions 1..P
-                x = torch.cat((x[:, :1, :], x[:, 1 + self.num_tokens :, :]), dim=1)
+            # # Remove previously injected prompts if sequence already contains them
+            # if x.shape[1] >= 1 + self.num_tokens + 1:
+            #     # assume prompts occupy positions 1..P
+            x = torch.cat((x[:, :1, :], x[:, 1 + self.num_tokens :, :]), dim=1)
 
             pe = self.prompt_proj(self.deep_prompt_embeddings[dp_index]).expand(B, -1, -1)
             pe = self.dropout(pe)
             x_new = torch.cat((x[:, :1, :], pe, x[:, 1:, :]), dim=1)
+            if is_list:
+                x_new = [x_new]
             inputs = (x_new, *inputs[1:])
             return inputs
         return hook
+
+
+def get_module(module: nn.Module, name: str) -> nn.Module:
+    """Traverse a module hierarchy by dot-separated name and return the submodule."""
+    current = module
+    for attr in name.split("."):
+        # Try named_children / _modules first (safe for nn.Module containers)
+        if attr in current._modules:
+            current = current._modules[attr]
+        else:
+            # Fall back to normal attribute lookup (e.g. plain fields)
+            current = getattr(current, attr)
+    return current

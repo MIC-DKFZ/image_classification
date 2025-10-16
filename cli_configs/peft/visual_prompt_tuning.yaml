@@ -5,6 +5,4 @@ deep: True
 project_dim: null
 dropout: 0.0
 init_scale: 1.0
-blocks_attr: layer
-hidden_dim: null
 deep_layers: null
