@@ -6,9 +6,13 @@ data:
     data_root_dir: /home/d246a/Documents/data/AID #/dkfz/cluster/gpu/data/OE0441/s522r/rocket_wp5/Dataset203_MRNet
     batch_size: 64
     train_transforms:
-     _target_: augmentation.policies.aid.FlipRotateTransformImgNetNorm
+     _target_: augmentation.policies.synergy_unit_transforms.FlipRotateTransform
+     image_size: 224  # 224, 448
+     norm: imagenet
     test_transforms:
-     _target_: augmentation.policies.aid.TestTransformImgNetNorm
+     _target_: augmentation.policies.synergy_unit_transforms.TestTransform
+     image_size: 224  # 224, 448
+     norm: imagenet
   cv:
     k: 5
 
@@ -19,23 +23,4 @@ model:
   task: 'Classification'
   subtask: 'multiclass'
   cifar_size: False
-  input_channels: 3
-  input_dim: 2
   input_shape: ${data.patch_size}
-  optimizer: AdamW
-  lr: 0.0001
-  warmstart: 20
-  weight_decay: 1e-2
-  result_plot: 'val'
-
-trainer:
-  logger:
-    project: AID
-  accumulate_grad_batches: 12
-  max_epochs: 200
-
-metrics:
-  - 'f1'
-  - 'balanced_acc'
-  - 'ap'
-  - 'auroc'

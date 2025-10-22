@@ -79,7 +79,7 @@ class AIDData(Dataset):
         #x = torch.from_numpy(np.array(img)).permute(2, 0, 1).contiguous()
 
         if self.transform:
-            x = self.transform()(img)
+            x = self.transform(img)
 
         y = int(self.labels[idx])
         return x, y

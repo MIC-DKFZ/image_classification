@@ -104,7 +104,7 @@ class ELPVDataset(Dataset):
         label = int(self.labels[sid])
 
         if self.transform:
-            x = self.transform()(img)
+            x = self.transform(img)
 
         return x, label
 

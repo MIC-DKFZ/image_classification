@@ -7,11 +7,11 @@ data:
     batch_size: 8
     data_fraction: 1.0
     train_transforms: 
-      _target_: augmentation.policies.eurosat.FlipRotateTransform
+      _target_: augmentation.policies.synergy_unit_transforms.FlipRotateTransform
       image_size: 224  # 224, 448
       norm: imagenet
     test_transforms: 
-      _target_: augmentation.policies.eurosat.TestTransform
+      _target_: augmentation.policies.synergy_unit_transforms.TestTransform
       image_size: 224  # 224, 448
       norm: imagenet
     
