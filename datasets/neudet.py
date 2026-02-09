@@ -12,44 +12,41 @@ from torch.utils.data import Dataset
 from .base_datamodule import BaseDataModule
 
 
-class AIDData(Dataset):
+class NEUDETData(Dataset):
     def __init__(
         self,
         root,
         split,
         transform=None,
-        images_dir="images",
         split_file="splits.json",
         labels_file="labels.json",
-        allowed_exts=(".jpeg", ".jpg", ".png", ".tif", ".tiff"),
+        allowed_exts=(".jpg", ".jpeg", ".png", ".bmp"),
         strict=True,
     ):
         """
-        AID (Aerial Image Dataset) loader.
+        NEU-DET (NEU Surface Defect Database) loader.
 
         Folder layout:
             root/
-              images/
-                Airport/
-                  airport_1.jpg
-                  airport_2.jpg
-                  ...
-                Beach/
-                  ...
-              labels.json       {"Airport/airport_1": 0, ...}
+              train/
+                crazing_1.jpg
+                inclusion_10.jpg
+                ...
+              validation/
+                patches_5.jpg
+                ...
+              labels.json       {"train/crazing_1.jpg": 0, ...}
               splits.json       {"train":[...], "val":[...], "test":[...]}
 
         Args:
             split: "train" | "val" | "test"
-            transform: optional callable that matches style:
-                       transform(**{"image": <tensor>})["image"]
+            transform: optional callable
             strict: if True, raise on missing labels/files; else skip them.
         """
         super().__init__()
         self.root = Path(root)
         self.split = split
         self.transform = transform
-        self.img_dir = self.root / images_dir
         self.allowed_exts = tuple(e.lower() for e in allowed_exts)
         self.strict = strict
 
@@ -79,11 +76,11 @@ class AIDData(Dataset):
                     raise KeyError(f"Missing label for image id '{img_id}' in {labels_path}")
                 continue
 
-            # img_id format: "Airport/airport_1"
-            path = self._resolve_image_path(img_id)
-            if path is None:
+            # img_id format: "train/crazing_1.jpg" or "validation/patches_5.jpg"
+            path = self.root / img_id
+            if not path.exists() or not path.is_file():
                 if self.strict:
-                    raise FileNotFoundError(f"Missing image for id '{img_id}' under {self.img_dir}")
+                    raise FileNotFoundError(f"Missing image for id '{img_id}' at {path}")
                 continue
 
             kept_files.append(path)
@@ -91,27 +88,6 @@ class AIDData(Dataset):
 
         self.img_paths = kept_files
         self.labels = np.asarray(kept_labels, dtype=np.int64)
-
-    def _resolve_image_path(self, img_id: str) -> Path | None:
-        """
-        Resolve an image ID to an existing file path.
-        img_id format: "Airport/airport_1"
-        """
-        # Try with common extensions
-        base_path = self.img_dir / img_id
-        for ext in self.allowed_exts:
-            p = Path(str(base_path) + ext)
-            if p.exists() and p.is_file():
-                return p
-
-        # Last resort: glob with stem
-        stem = os.path.splitext(img_id)[0]
-        candidates = list(self.img_dir.glob(f"{stem}.*"))
-        for cand in candidates:
-            if cand.is_file() and cand.suffix.lower() in self.allowed_exts:
-                return cand
-
-        return None
 
     def __getitem__(self, idx):
         img_path = self.img_paths[idx]
@@ -133,17 +109,17 @@ class AIDData(Dataset):
         return len(self.img_paths)
 
 
-class AIDDataModule(BaseDataModule):
+class NEUDETDataModule(BaseDataModule):
     def __init__(self, **params):
-        super(AIDDataModule, self).__init__(**params)
+        super(NEUDETDataModule, self).__init__(**params)
 
     def setup(self, stage: str):
-        self.train_dataset = AIDData(
+        self.train_dataset = NEUDETData(
             self.data_path,
             split="train",
             transform=self.train_transforms,
         )
-        self.val_dataset = AIDData(
+        self.val_dataset = NEUDETData(
             self.data_path,
             split="val",
             transform=self.test_transforms,
@@ -153,23 +129,23 @@ class AIDDataModule(BaseDataModule):
 if __name__ == '__main__':
     import os
     from torch.utils.data import DataLoader
-    from augmentation.policies.aid import FlipRotateTransformImgNetNorm, TestTransformImgNetNorm
+    from augmentation.policies.neudet import TrainTransform, TestTransform
 
     # Get DATA_ROOT from environment or use default
     data_root = os.environ.get("DATA_ROOT", "/home/d246a/Documents/data/SynergyUnitDatasets")
 
     print("="*80)
-    print("Testing AID Dataset")
+    print("Testing NEUDET Dataset")
     print(f"Using DATA_ROOT: {data_root}")
     print("="*80)
 
     # Get augmentation transforms (instantiate the classes)
-    train_aug = FlipRotateTransformImgNetNorm()()
-    val_aug = TestTransformImgNetNorm()()
+    train_aug = TrainTransform()()
+    val_aug = TestTransform()()
 
     # Test train set with augmentations
     print("\n[Train Set with Augmentations]")
-    train_ds = AIDData(root=f"{data_root}/AID", split="train", transform=train_aug)
+    train_ds = NEUDETData(root=f"{data_root}/NEUDET", split="train", transform=train_aug)
     train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, num_workers=2)
 
     print(f"Total train samples: {len(train_ds)}")
@@ -183,7 +159,7 @@ if __name__ == '__main__':
 
     # Test val set with augmentations
     print("\n[Val Set with Augmentations]")
-    val_ds = AIDData(root=f"{data_root}/AID", split="val", transform=val_aug)
+    val_ds = NEUDETData(root=f"{data_root}/NEUDET", split="val", transform=val_aug)
     val_loader = DataLoader(val_ds, batch_size=16, shuffle=False, num_workers=2)
 
     print(f"Total val samples: {len(val_ds)}")
@@ -196,5 +172,5 @@ if __name__ == '__main__':
         print(f"  Unique labels: {torch.unique(labels).tolist()}")
 
     print("\n" + "="*80)
-    print("✓ AID Dataset test completed successfully!")
+    print("✓ NEUDET Dataset test completed successfully!")
     print("="*80)

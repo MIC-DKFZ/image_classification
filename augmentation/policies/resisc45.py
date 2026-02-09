@@ -1,23 +1,25 @@
 import torchvision.transforms as transforms
-from ..randaugment import RandAugment
 from .base_transform import BaseTransform
 
 MEAN_IMGNET, STD_IMGNET = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
-MEAN, STD = (0.3448, 0.3807, 0.4082), (0.0910, 0.0650, 0.0552)
 
 
-class FlipRotateTransformImgNetNorm(BaseTransform):
+class TrainTransform(BaseTransform):
+    """
+    RESISC45 training transforms.
+    Rotation-invariant augmentations for remote sensing scene classification.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__()
 
     def __call__(self):
         transform_train = transforms.Compose(
             [
-                transforms.Resize(640),
-                transforms.RandomCrop(600),
+                transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip(),
-                transforms.RandomRotation(180),
+                transforms.RandomRotation(180),  # Aerial images can be in any orientation
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
                 transforms.ToTensor(),
                 transforms.Normalize(MEAN_IMGNET, STD_IMGNET),
             ]
@@ -25,19 +27,19 @@ class FlipRotateTransformImgNetNorm(BaseTransform):
         return transform_train
 
 
-class TestTransformImgNetNorm(BaseTransform):
+class TestTransform(BaseTransform):
     def __init__(self, *args, **kwargs):
         super().__init__()
 
     def __call__(self):
-        transform_train = transforms.Compose(
+        transform_test = transforms.Compose(
             [
-                transforms.Resize(640),
-                transforms.CenterCrop(600),
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
                 transforms.ToTensor(),
                 transforms.Normalize(MEAN_IMGNET, STD_IMGNET),
             ]
         )
-        return transform_train
+        return transform_test
 
 

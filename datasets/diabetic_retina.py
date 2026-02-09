@@ -5,45 +5,43 @@ import os
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
 from .base_datamodule import BaseDataModule
+from .blosc2io import Blosc2IO
 
-
-class AIDData(Dataset):
+class EyePACSData(Dataset):
     def __init__(
         self,
         root,
         split,
         transform=None,
-        images_dir="images",
+        images_dir="train",
         split_file="splits.json",
-        labels_file="labels.json",
+        labels_file="trainLabels.csv",
+        image_col="image",
+        label_col="level",
         allowed_exts=(".jpeg", ".jpg", ".png", ".tif", ".tiff"),
         strict=True,
     ):
         """
-        AID (Aerial Image Dataset) loader.
+        EyePACS / Kaggle DR Dataset with minimal splits.json.
 
-        Folder layout:
+        Folder layout (example):
             root/
-              images/
-                Airport/
-                  airport_1.jpg
-                  airport_2.jpg
-                  ...
-                Beach/
-                  ...
-              labels.json       {"Airport/airport_1": 0, ...}
-              splits.json       {"train":[...], "val":[...], "test":[...]}
+              train/              (images)
+              trainLabels.csv
+              splits.json         {"train":[...], "val":[...], "test":[...]}
 
         Args:
             split: "train" | "val" | "test"
-            transform: optional callable that matches style:
-                       transform(**{"image": <tensor>})["image"]
-            strict: if True, raise on missing labels/files; else skip them.
+            transform: optional callable that matches your MRNet style:
+                       transform(**{"image": <tensor or array>})["image"]
+                       (e.g., Albumentations wrapper). If None, returns torch tensor.
+            strict: if True, raise on missing labels/files; else silently skip them.
         """
         super().__init__()
         self.root = Path(root)
@@ -56,58 +54,70 @@ class AIDData(Dataset):
         split_path = self.root / split_file
         labels_path = self.root / labels_file
 
-        # Load split ids
+        # ---- load split ids ----
         with open(split_path, "r", encoding="utf-8") as f:
             splits = json.load(f)
 
         if split not in splits:
             raise ValueError(f"Split '{split}' not in {split_path}. Keys: {list(splits.keys())}")
 
+        # IDs may be stored as "10_left" or "10_left.jpeg"
         self.img_files = [str(x) for x in splits[split]]
 
-        # Load labels
-        with open(labels_path, "r", encoding="utf-8") as f:
-            label_map = json.load(f)
+        # ---- load labels ----
+        df = pd.read_csv(labels_path)
+        if image_col not in df.columns or label_col not in df.columns:
+            raise ValueError(f"{labels_path} must contain columns '{image_col}' and '{label_col}'")
 
-        # Build final file list + labels
+        df = df[[image_col, label_col]].dropna().copy()
+        df[image_col] = df[image_col].astype(str)
+        df[label_col] = df[label_col].astype(int)
+
+        # Kaggle EyePACS labels typically keyed by stem (no extension)
+        label_map = dict(zip(df[image_col], df[label_col]))
+
+        # ---- build final file list + labels (filter/validate) ----
         kept_files = []
         kept_labels = []
 
-        for img_id in self.img_files:
-            if img_id not in label_map:
+        for raw_id in self.img_files:
+            stem = os.path.splitext(raw_id)[0]
+
+            if stem not in label_map:
                 if self.strict:
-                    raise KeyError(f"Missing label for image id '{img_id}' in {labels_path}")
+                    raise KeyError(f"Missing label for image id '{stem}' in {labels_path}")
                 continue
 
-            # img_id format: "Airport/airport_1"
-            path = self._resolve_image_path(img_id)
+            path = self._resolve_image_path(raw_id)
             if path is None:
                 if self.strict:
-                    raise FileNotFoundError(f"Missing image for id '{img_id}' under {self.img_dir}")
+                    raise FileNotFoundError(f"Missing image for id '{raw_id}' under {self.img_dir}")
                 continue
 
-            kept_files.append(path)
-            kept_labels.append(label_map[img_id])
+            kept_files.append(path)                # Path
+            kept_labels.append(label_map[stem])    # int
 
         self.img_paths = kept_files
         self.labels = np.asarray(kept_labels, dtype=np.int64)
 
-    def _resolve_image_path(self, img_id: str) -> Path | None:
+    def _resolve_image_path(self, raw_id: str) -> Path | None:
         """
-        Resolve an image ID to an existing file path.
-        img_id format: "Airport/airport_1"
+        Resolve an ID to an existing file path.
+        - If ID already includes extension and exists -> use it
+        - Else try allowed extensions appended to stem
         """
-        # Try with common extensions
-        base_path = self.img_dir / img_id
-        for ext in self.allowed_exts:
-            p = Path(str(base_path) + ext)
-            if p.exists() and p.is_file():
-                return p
+        p = self.img_dir / raw_id
+        if p.exists() and p.is_file():
+            return p
 
-        # Last resort: glob with stem
-        stem = os.path.splitext(img_id)[0]
-        candidates = list(self.img_dir.glob(f"{stem}.*"))
-        for cand in candidates:
+        stem = os.path.splitext(raw_id)[0]
+        for ext in self.allowed_exts:
+            p2 = self.img_dir / f"{stem}{ext}"
+            if p2.exists() and p2.is_file():
+                return p2
+
+        # Last resort: any file with matching stem (handles weird/uppercase ext)
+        for cand in self.img_dir.glob(f"{stem}.*"):
             if cand.is_file() and cand.suffix.lower() in self.allowed_exts:
                 return cand
 
@@ -129,21 +139,24 @@ class AIDData(Dataset):
 
         return img, y
 
+
     def __len__(self):
         return len(self.img_paths)
 
 
-class AIDDataModule(BaseDataModule):
+
+class EyePACSDataModule(BaseDataModule):
     def __init__(self, **params):
-        super(AIDDataModule, self).__init__(**params)
+        super(EyePACSDataModule, self).__init__(**params)
 
     def setup(self, stage: str):
-        self.train_dataset = AIDData(
+
+        self.train_dataset = EyePACSData(
             self.data_path,
             split="train",
             transform=self.train_transforms,
         )
-        self.val_dataset = AIDData(
+        self.val_dataset = EyePACSData(
             self.data_path,
             split="val",
             transform=self.test_transforms,
@@ -153,23 +166,23 @@ class AIDDataModule(BaseDataModule):
 if __name__ == '__main__':
     import os
     from torch.utils.data import DataLoader
-    from augmentation.policies.aid import FlipRotateTransformImgNetNorm, TestTransformImgNetNorm
+    from augmentation.policies.diabetic_retina import TrainTransform, TestTransform
 
     # Get DATA_ROOT from environment or use default
     data_root = os.environ.get("DATA_ROOT", "/home/d246a/Documents/data/SynergyUnitDatasets")
 
     print("="*80)
-    print("Testing AID Dataset")
+    print("Testing DiabeticRetinopathy Dataset")
     print(f"Using DATA_ROOT: {data_root}")
     print("="*80)
 
     # Get augmentation transforms (instantiate the classes)
-    train_aug = FlipRotateTransformImgNetNorm()()
-    val_aug = TestTransformImgNetNorm()()
+    train_aug = TrainTransform()()
+    val_aug = TestTransform()()
 
     # Test train set with augmentations
     print("\n[Train Set with Augmentations]")
-    train_ds = AIDData(root=f"{data_root}/AID", split="train", transform=train_aug)
+    train_ds = EyePACSData(root=f"{data_root}/DiabeticRetinopathy", split="train", transform=train_aug)
     train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, num_workers=2)
 
     print(f"Total train samples: {len(train_ds)}")
@@ -183,7 +196,7 @@ if __name__ == '__main__':
 
     # Test val set with augmentations
     print("\n[Val Set with Augmentations]")
-    val_ds = AIDData(root=f"{data_root}/AID", split="val", transform=val_aug)
+    val_ds = EyePACSData(root=f"{data_root}/DiabeticRetinopathy", split="val", transform=val_aug)
     val_loader = DataLoader(val_ds, batch_size=16, shuffle=False, num_workers=2)
 
     print(f"Total val samples: {len(val_ds)}")
@@ -196,5 +209,5 @@ if __name__ == '__main__':
         print(f"  Unique labels: {torch.unique(labels).tolist()}")
 
     print("\n" + "="*80)
-    print("✓ AID Dataset test completed successfully!")
+    print("✓ DiabeticRetinopathy Dataset test completed successfully!")
     print("="*80)
