@@ -7,13 +7,18 @@ from hydra.utils import instantiate
 from lightning.pytorch import seed_everything
 from omegaconf import OmegaConf
 import torch
-
+import importlib
 from parsing_utils import make_omegaconf_resolvers
 
 
 @hydra.main(version_base=None, config_path="./cli_configs", config_name="train")
 def main(cfg):
-
+    # Creating the logging directory. This has to happen before wandb.init.
+    log_path = Path(cfg.log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+    
+    wandb.init(**cfg.wandb)
+    
     # seeding
     if cfg.seed:
         seed_everything(cfg.seed)
@@ -22,16 +27,11 @@ def main(cfg):
 
     # setup logger
     try:
-        Path(
-            "./main.log"
-        ).unlink()  # gets automatically created, however logs are available in Weights and Biases so we do not need to log twice
+        # gets automatically created, however logs are available in Weights and Biases
+        # so we do not need to log twice
+        Path("./main.log").unlink()
     except:
         pass
-    log_path = Path(cfg.trainer.logger.save_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
-
-    uid = cfg.output_subdir.split("/")[-1]
-    cfg.trainer.logger.group = uid
 
     # add sync_batchnorm if multiple GPUs are used
     if cfg.trainer.devices > 1 and cfg.trainer.accelerator == "gpu":
@@ -61,17 +61,16 @@ def main(cfg):
         if cfg.trainer["enable_checkpointing"]:
             for i in cfg.trainer.callbacks:
                 if i["_target_"] == "lightning.pytorch.callbacks.ModelCheckpoint":
-                    i["dirpath"] = os.path.join(
-                        str(cfg.exp_dir),
-                        str(cfg.data.module.name),
-                        "checkpoints",
-                        uid,
-                        str(cfg.data.module.fold),
-                    )
+                    i["dirpath"] = os.path.join(cfg.log_dir, str(cfg.data.module.fold))
 
         # instantiate trainer, model and dataset
         trainer = instantiate(cfg.trainer)
-        model = instantiate(cfg.model)
+
+        ModelClass = make_class(cfg.peft._target_, cfg.model._target_)
+        model_args = dict(cfg.peft)
+        model_args.update(dict(cfg.model))
+        model_args.pop("_target_")
+        model = ModelClass(**model_args)
         if cfg.model.compile:
             model = torch.compile(model, mode="default")
         dataset = instantiate(cfg.data).module
@@ -82,6 +81,9 @@ def main(cfg):
         cfg_dict["model"].pop("_target_")
         cfg_dict["model"]["model"] = cfg_dict["model"].pop("name")
         trainer.logger.log_hyperparams(cfg_dict["model"])
+
+        cfg_dict["peft"].pop("_target_")
+        trainer.logger.log_hyperparams(cfg_dict["peft"])
 
         ## Data
         cfg_dict["data"]["module"].pop("_target_")
@@ -116,6 +118,18 @@ def main(cfg):
             trainer.fit(model, dataset)
 
         wandb.finish()
+
+
+def make_class(derived, base):
+    derived = resolve_class(derived)
+    base = resolve_class(base)
+    return type(f"{derived.__name__}_{base.__name__}", (derived, base), {})
+
+
+def resolve_class(path: str):
+    module_path, class_name = path.rsplit('.', 1)
+    module = importlib.import_module(module_path)
+    return getattr(module, class_name)
 
 
 if __name__ == "__main__":

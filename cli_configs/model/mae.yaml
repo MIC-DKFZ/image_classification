@@ -1,0 +1,5 @@
+_target_: models.transformer.TransformerModel
+backbone: MAE
+type: facebook/vit-mae-base
+token_aggregation_method: cls_token
+pretrained: True

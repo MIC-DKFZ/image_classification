@@ -1,5 +1,6 @@
 # @package _global_
-exp_dir: ${oc.env:EXPERIMENT_LOCATION}
+exp_dir: /dkfz/cluster/gpu/data/OE0441/k539i/data/synergy_unit/experiments
+data_dir: /dkfz/cluster/gpu/data/OE0441/k539i/data/synergy_unit/datasets
 
 trainer:
   enable_progress_bar: False

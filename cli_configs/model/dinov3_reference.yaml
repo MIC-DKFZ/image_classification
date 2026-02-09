@@ -1,0 +1,8 @@
+_target_: models.dinov3.Dinov3
+backbone: Dinov3 (Reference)
+type: dinov3_vitb16_pretrain_lvd1689m-73cec8be
+weight_dir: /dkfz/cluster/gpu/data/mic_data_common/dinov3/weights
+# weight_dir: /home/k539i/Documents/network_drives/cluster/dkfz/cluster/gpu/data/mic_data_common/dinov3/weights
+classification_head_dropout: 0.2
+token_aggregation_method: cls_token
+pretrained: True

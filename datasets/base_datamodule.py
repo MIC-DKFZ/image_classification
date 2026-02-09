@@ -2,6 +2,7 @@ import random
 from pathlib import Path
 
 import numpy as np
+from sklearn.model_selection import StratifiedShuffleSplit
 import torch
 from lightning.pytorch import LightningDataModule
 from torch.utils.data import DataLoader, RandomSampler
@@ -25,10 +26,10 @@ class BaseDataModule(LightningDataModule):
     ):
         super(BaseDataModule, self).__init__()
 
-        self.data_path = Path(data_root_dir)  # / name
+        self.data_path = Path(data_root_dir)
         self.batch_size = batch_size
-        self.train_transforms = train_transforms
-        self.test_transforms = test_transforms
+        self.train_transforms = train_transforms()
+        self.test_transforms = test_transforms()
         self.random_batches = random_batches
         self.num_workers = num_workers
         self.prepare_data_per_node = prepare_data_per_node
@@ -40,6 +41,30 @@ class BaseDataModule(LightningDataModule):
 
     def setup(self, stage: str) -> None:
         pass
+    
+    def _get_targets(self, dataset):
+        """Retrieve the labels from a dataset. This method should be overridden by
+        subclasses if needed.
+        """
+        return dataset.targets
+    
+    def _apply_fraction(self, dataset, fraction: float, stratify: bool):
+        """Apply a data fraction with optional stratification."""
+        if fraction >= 1.0:
+            return dataset
+
+        if stratify:
+            targets = np.array(self._get_targets(dataset))
+            splitter = StratifiedShuffleSplit(
+                n_splits=1, train_size=fraction, random_state=42
+            )
+            idx, _ = next(splitter.split(np.zeros(len(targets)), targets))
+        else:
+            idx = np.random.choice(
+                len(dataset), int(len(dataset) * fraction), replace=False
+            )
+
+        return torch.utils.data.Subset(dataset, idx)
 
     def train_dataloader(self):
         if not self.random_batches:

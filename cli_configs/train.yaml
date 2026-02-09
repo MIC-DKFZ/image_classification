@@ -1,14 +1,18 @@
 defaults:
   - _self_
   - env: local
-  - model: timm
-  - data: elpv
+  - model: mae
+  - peft: lora
+  - data: imagenet
 
-output_subdir: ${exp_dir}/${data.module.name}/checkpoints/${make_group_name:}
+log_dir: ${hydra:output_subdir}
+
 hydra:
-  output_subdir: ${output_subdir}
+  output_subdir: ${exp_dir}/${data.module.name}/${make_group_name:${model.name},${model.finetune_method}}
   job:
     chdir: False
+    env_set:
+      HYDRA_FULL_ERROR: 1
   run:
     dir: .
 
@@ -18,20 +22,22 @@ override hydra/job_logging: disable
 seed: False
 
 model:
-  optimizer: SGD
+  finetune_method: full
+  optimizer: AdamW
   sam: False  # set trainer.precision=32 if you use sam
   adaptive_sam: False  # set trainer.precision=32 if you use sam
-  lr: 0.1
+  lr: 0.00002
+  layer_wise_lr_decay: null
   nesterov: False
   scheduler: CosineAnneal
   T_max: ${trainer.max_epochs}
-  warmstart: 0
+  warmstart: 2
   warmstart2: 0
   mixup: False
   mixup_alpha: 0.2
-  weight_decay: 5e-4
+  weight_decay: 0.05 #5e-4
   undecay_norm: False
-  label_smoothing: 0.0
+  label_smoothing: 0.2
   stochastic_depth: False
   resnet_dropout: 0.0
   squeeze_excitation: False
@@ -42,7 +48,7 @@ model:
   task: 'Classification'
   subtask: 'multiclass'  # 'multilabel'
   metric_computation_mode: 'epochwise'
-  result_plot: 'val'
+  result_plot: null  # 'val' for validation plots (confusion matrix)
   num_classes: ${data.num_classes}
   metrics: ${metrics}
   epochs: ${trainer.max_epochs}
@@ -51,16 +57,14 @@ model:
   classification_head_dropout: 0.0
   token_aggregation_method: cls_token
   pretrained: False
-  finetune_method: full
-  save_preds: True
     
 data:
   module:
-    random_batches: False
+    random_batches: False  # if True, sampling with replacement
+    stratified: True
     num_workers: 12
     prepare_data_per_node: False
     fold: null
-    mil_setting: False
   num_classes: ???
   cv:
     k: 1  # 1=no Cross Validation
@@ -68,8 +72,6 @@ data:
 metrics:
   - 'acc'
   - 'f1'
-
-val_only: False
 
 trainer:
   _target_: lightning.pytorch.Trainer
@@ -84,27 +86,41 @@ trainer:
       dirpath: ???
       filename: '{epoch}-{val_loss:.2f}'
       auto_insert_metric_name: True
+      save_last: True
   devices: 1
   accelerator: 'gpu'
   sync_batchnorm: False  # set to True if you use multiple GPUs
-  enable_checkpointing: False
-  max_epochs: 200
+  enable_checkpointing: True
+  max_epochs: 20
   benchmark: True
   deterministic: False
   precision: '16-mixed'
   enable_progress_bar: True
-  strategy: 'ddp'
-  logger: 
-    _target_: lightning.pytorch.loggers.WandbLogger
-    save_dir: ${exp_dir}/${data.module.name}
-    offline: False
-    project: ${data.module.name}
-    group: ???
+  strategy: 'auto'
+  logger:
+    - _target_: lightning.pytorch.loggers.WandbLogger
+      offline: False
+      save_dir: ${log_dir}
+    - _target_: lightning.pytorch.loggers.CSVLogger
+      save_dir: ${log_dir}
+      name: null
   num_sanity_val_steps: 0
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 16
+  gradient_clip_val: null
   # Some useful trainer parameters for debugging
-  #limit_train_batches: 0.1
-  #limit_val_batches: 0.5
+  # log_every_n_steps: 10
+  #limit_train_batches: 0.5
+  #limit_val_batches: null
   #limit_test_batches: 0.25
-  #gradient_clip_val: 0.5
-  #log_every_n_steps: 50
+
+precomputed_features:
+  precision: 16
+  split: null  # val
+  compression: 4
+
+wandb:
+  entity: synergy_unit
+  project: FM_adaptation_classification_MAE
+  tags: null
+  dir: ${log_dir}
+  group: ${group_extractor:${log_dir}}

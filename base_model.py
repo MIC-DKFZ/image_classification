@@ -8,25 +8,22 @@ import wandb
 from madgrad import MADGRAD
 from timm.optim import RMSpropTF
 from torch.optim.lr_scheduler import _LRScheduler
-import torch.nn.functional as F
 from torchmetrics import (
     AUROC,
     Accuracy,
-    AveragePrecision,
     F1Score,
     MeanAbsoluteError,
     MeanSquaredError,
     MetricCollection,
     Precision,
     Recall,
+    AveragePrecision,
 )
-from torchmetrics.aggregation import CatMetric
-from metrics.balanced_accuracy import BalancedAccuracy
-
+from collections import defaultdict
 from augmentation.mixup import mixup_criterion, mixup_data
 from metrics.conf_mat import ConfusionMatrix
 from regularization.sam import SAM
-
+from collections import OrderedDict, defaultdict
 
 class BaseModel(L.LightningModule):
     def __init__(
@@ -37,6 +34,7 @@ class BaseModel(L.LightningModule):
         metrics,
         num_classes,
         name,
+        finetune_method,
         lr,
         weight_decay,
         optimizer,
@@ -46,6 +44,7 @@ class BaseModel(L.LightningModule):
         scheduler,
         T_max,
         warmstart,
+        warmstart2,
         epochs,
         mixup,
         mixup_alpha,
@@ -87,9 +86,11 @@ class BaseModel(L.LightningModule):
                     num_labels=num_classes,
                 )
             if "balanced_acc" in metrics:
-                metrics_dict["Balanced_Accuracy"] = BalancedAccuracy(
+                metrics_dict["Balanced_Accuracy"] = Accuracy(
                     task=metric_task,
                     num_classes=num_classes,
+                    average="macro",
+                    num_labels=num_classes,
                 )
             if "f1" in metrics:
                 metrics_dict["F1"] = F1Score(
@@ -158,18 +159,13 @@ class BaseModel(L.LightningModule):
                 self.train_pred_list = []
                 self.train_label_list = []
 
-        self.save_preds = True if kwargs["save_preds"] else False
-        if self.save_preds:
-            self.val_preds = CatMetric(dist_sync_on_step=False)
-            self.val_labels = CatMetric(dist_sync_on_step=False)
-            self.val_indices = CatMetric(dist_sync_on_step=False)
-
         metrics = MetricCollection(metrics_dict)
-        self.train_metrics = metrics.clone(prefix="Train/")
-        self.val_metrics = metrics.clone(prefix="Val/")
+        self.train_metrics = metrics.clone(prefix="train_")
+        self.val_metrics = metrics.clone(prefix="val_")
 
         # Training Args
         self.name = name
+        self.finetune_method = finetune_method
         # self.batch_size = batch_size
         self.lr = lr
         self.weight_decay = weight_decay
@@ -180,7 +176,8 @@ class BaseModel(L.LightningModule):
         self.scheduler = scheduler
         self.T_max = T_max
         self.warmstart = warmstart
-        self.warmstart2 = kwargs["warmstart2"]
+        self.warmstart2 = warmstart2
+        self.layer_wise_lr_decay = kwargs.get("layer_wise_lr_decay", None)
         self.epochs = epochs
         self.pretrained = pretrained
 
@@ -196,9 +193,6 @@ class BaseModel(L.LightningModule):
         self.apply_shakedrop = apply_shakedrop
         self.undecay_norm = undecay_norm
         self.zero_init_residual = zero_init_residual
-
-        # Finetuning method
-        self.finetuning_method = kwargs["finetune_method"]
 
         # Data and Dataloading
         self.input_dim = input_dim
@@ -236,10 +230,6 @@ class BaseModel(L.LightningModule):
             if self.num_classes == 1:
                 y_hat = y_hat.view(-1)
 
-        if x.shape[0] == 1 and len(y_hat.shape) == 1:
-            # for cases where batch size is 1 and y_hat doesn't have a batch dim
-            y_hat = y_hat.unsqueeze(0)
-
         if self.sam:
             opt = self.optimizers()
 
@@ -274,9 +264,9 @@ class BaseModel(L.LightningModule):
                 )
 
         self.log(
-            "Train/loss",
+            "train_loss",
             loss,
-            on_step=False,
+            on_step=True,
             on_epoch=True,
             prog_bar=True,
             sync_dist=True,
@@ -288,12 +278,12 @@ class BaseModel(L.LightningModule):
         # save metrics
         if self.metric_computation_mode == "stepwise":
             metrics_res = self.train_metrics(y_hat, y)
-            if "Train/F1_per_class" in metrics_res.keys():
-                for i, value in enumerate(metrics_res["Train/F1_per_class"]):
-                    metrics_res["Train/F1_class_{}".format(i)] = (
+            if "train_F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["train_F1_per_class"]):
+                    metrics_res["train_F1_class_{}".format(i)] = (
                         value if not torch.isnan(value) else 0.0
                     )
-                del metrics_res["Train/F1_per_class"]
+                del metrics_res["train_F1_per_class"]
             self.log_dict(
                 metrics_res,
                 on_step=False,
@@ -302,13 +292,7 @@ class BaseModel(L.LightningModule):
                 sync_dist=True,
             )
         elif self.metric_computation_mode == "epochwise":
-            if self.task == "Classification":
-                if self.subtask == "multilabel":
-                    self.train_metrics.update(torch.sigmoid(y_hat.detach()), y)
-                elif self.subtask == "multiclass":
-                    self.train_metrics.update(F.softmax(y_hat.detach(), dim=-1), y)
-            else:
-                self.train_metrics.update(y_hat.detach(), y)
+            self.train_metrics.update(y_hat, y)
 
         if hasattr(self, "train_conf_mat"):
             self.train_conf_mat.update(y_hat, y)
@@ -329,7 +313,7 @@ class BaseModel(L.LightningModule):
             y_hat, y.float() if self.subtask == "multilabel" else y
         )
         self.log(
-            "Val/loss",
+            "val_loss",
             val_loss,
             on_step=False,
             on_epoch=True,
@@ -340,12 +324,12 @@ class BaseModel(L.LightningModule):
         # save metrics
         if self.metric_computation_mode == "stepwise":
             metrics_res = self.val_metrics(y_hat, y)
-            if "Val/F1_per_class" in metrics_res.keys():
-                for i, value in enumerate(metrics_res["Val/F1_per_class"]):
-                    metrics_res["Val/F1_class_{}".format(i)] = (
+            if "val_F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["val_F1_per_class"]):
+                    metrics_res["val_F1_class_{}".format(i)] = (
                         value if not torch.isnan(value) else 0.0
                     )
-                del metrics_res["Val/F1_per_class"]
+                del metrics_res["val_F1_per_class"]
             self.log_dict(
                 metrics_res,
                 on_step=False,
@@ -354,28 +338,13 @@ class BaseModel(L.LightningModule):
                 sync_dist=True,  # True if self.trainer.num_devices > 1 else False,
             )
         elif self.metric_computation_mode == "epochwise":
-            if self.task == "Classification":
-                if self.subtask == "multilabel":
-                    self.val_metrics.update(torch.sigmoid(y_hat.detach()), y)
-                elif self.subtask == "multiclass":
-                    self.val_metrics.update(F.softmax(y_hat.detach(), dim=-1), y)
-            else:
-                self.val_metrics.update(y_hat.detach(), y)
+            self.val_metrics.update(y_hat, y)
 
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.update(y_hat, y)
-        if hasattr(self, "val_preds"):
-            """self.val_pred_list.extend(y_hat.detach().cpu())
-            self.val_label_list.extend(y.detach().cpu())"""
-            actual_batch_size = x.size(0)  # dynamic size (works for last batch)
-            start_idx = batch_idx * self.trainer.val_dataloaders.batch_size
-            idx = torch.arange(
-                start_idx, start_idx + actual_batch_size, device=self.device
-            )
-
-            self.val_preds.update(y_hat.detach())
-            self.val_labels.update(y.detach())
-            self.val_indices.update(idx)
+        if hasattr(self, "val_pred_list"):
+            self.val_pred_list.extend(y_hat)
+            self.val_label_list.extend(y)
 
     def predict_step(self, batch, batch_idx):
 
@@ -391,12 +360,12 @@ class BaseModel(L.LightningModule):
     def on_validation_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
             metrics_res = self.val_metrics.compute()
-            if "Val/F1_per_class" in metrics_res.keys():
-                for i, value in enumerate(metrics_res["Val/F1_per_class"]):
-                    metrics_res["Val/F1_class_{}".format(i)] = (
+            if "val_F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["val_F1_per_class"]):
+                    metrics_res["val_F1_class_{}".format(i)] = (
                         value if not torch.isnan(value) else 0.0
                     )
-                del metrics_res["Val/F1_per_class"]
+                del metrics_res["val_F1_per_class"]
             self.log_dict(
                 metrics_res,
                 on_step=False,
@@ -410,80 +379,29 @@ class BaseModel(L.LightningModule):
         if hasattr(self, "val_conf_mat"):
             self.val_conf_mat.save_state(self, "val")
             self.val_conf_mat.reset()
-        if hasattr(self, "val_preds"):
-            """# Stack tensors along batch dim
-            val_preds = torch.stack(self.val_pred_list, dim=0).to(self.device)
-            val_labels = torch.stack(self.val_label_list, dim=0).to(self.device)
-            # print(len(self.val_pred_list), val_preds.shape)
-            # Gather from all GPUs
-            preds_all = self.all_gather(val_preds)
-            preds_all = preds_all.view(-1, *preds_all.shape[2:])
-            labels_all = self.all_gather(val_labels)
-            labels_all = labels_all.view(-1, *labels_all.shape[2:])
-            # print(preds_all.shape)"""
-
-            preds_all = self.val_preds.compute()  # shape: [N_total, C]
-            labels_all = self.val_labels.compute()
-            indices = self.val_indices.compute()
-
-            if self.trainer.is_global_zero:
-                # Sort by original index to preserve dataset order
-                sorted_idx = torch.argsort(indices)
-                preds_all = preds_all[sorted_idx]
-                labels_all = labels_all[sorted_idx]
-                if self.task == "Regression":
-                    data = [[x, y] for (x, y) in zip(labels_all, preds_all)]
-                    table = wandb.Table(
-                        data=data, columns=["Ground Truth", "Prediction"]
+        if hasattr(self, "val_pred_list"):
+            data = [[x, y] for (x, y) in zip(self.val_label_list, self.val_pred_list)]
+            table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
+            wandb.log(
+                {
+                    "Val Scatterplot": wandb.plot.scatter(
+                        table, "Ground Truth", "Prediction", "Validation Scatterplot"
                     )
-                    wandb.log(
-                        {
-                            "Val Scatterplot": wandb.plot.scatter(
-                                table,
-                                "Ground Truth",
-                                "Prediction",
-                                "Validation Scatterplot",
-                            )
-                        }
-                    )
-                if self.save_preds:
-
-                    if self.task == "Classification":
-                        columns = (
-                            (["GT_" + str(i) for i in range(len(labels_all[0]))])
-                            if self.subtask == "multilabel"
-                            else ["GT"]
-                        ) + ["Pred_" + str(i) for i in range(len(preds_all[0]))]
-                        data = [
-                            (
-                                (x.tolist() if self.subtask == "multilabel" else [x])
-                                + (
-                                    F.softmax(y, dim=-1)
-                                    if self.subtask == "multiclass"
-                                    else torch.sigmoid(y)
-                                ).tolist()
-                            )
-                            for x, y in zip(labels_all, preds_all)
-                        ]
-                        table = wandb.Table(data=data, columns=columns)
-                        wandb.log({"Val Predictions": table})
-                    else:
-                        raise NotImplementedError
-
+                }
+            )
             # reset
-            self.val_preds.reset()
-            self.val_labels.reset()
-            self.val_indices.reset()
+            self.val_pred_list = []
+            self.val_label_list = []
 
     def on_train_epoch_end(self) -> None:
         if self.metric_computation_mode == "epochwise":
             metrics_res = self.train_metrics.compute()
-            if "Train/F1_per_class" in metrics_res.keys():
-                for i, value in enumerate(metrics_res["Train/F1_per_class"]):
-                    metrics_res["Train/F1_class_{}".format(i)] = (
+            if "train_F1_per_class" in metrics_res.keys():
+                for i, value in enumerate(metrics_res["train_F1_per_class"]):
+                    metrics_res["train_F1_class_{}".format(i)] = (
                         value if not torch.isnan(value) else 0.0
                     )
-                del metrics_res["Train/F1_per_class"]
+                del metrics_res["train_F1_per_class"]
 
             self.log_dict(
                 metrics_res,
@@ -569,7 +487,17 @@ class BaseModel(L.LightningModule):
                             nn.init.constant_(m.bn3.weight, 0)
 
     def configure_optimizers(self):
-        # leave bias and params of batch norm undecayed as in https://arxiv.org/pdf/1812.01187.pdf (Bag of tricks)
+        # Full-FT requires special setup
+        if self.finetune_method == "full_sawtooth":
+            assert self.scheduler == "CosineAnneal"
+            assert not self.sam
+            # Separate encoder and cls_head parameters. Assumes the properties
+            # "encoder_params" and "cls_head_params" to be defined in the model class!
+            encoder_params = self.encoder_params
+            cls_head_params = self.cls_head_params
+        
+        # leave bias and params of batch norm undecayed as in
+        # https://arxiv.org/pdf/1812.01187.pdf (Bag of tricks)
         if self.undecay_norm:
             model_params = []
             norm_params = []
@@ -583,229 +511,88 @@ class BaseModel(L.LightningModule):
                 {"params": model_params},
                 {"params": norm_params, "weight_decay": 0},
             ]
+        elif self.layer_wise_lr_decay is not None:
+            params = get_layerwise_lr_params(
+                self.model,
+                base_lr=self.lr,
+                weight_decay=self.weight_decay,
+                layer_decay=self.layer_wise_lr_decay,
+            )
         else:
-            params = self.parameters()
+            # Pass only those parameters to the optimizer that require gradients
+            params = [p for p in self.parameters() if p.requires_grad]
+        
+        # Set the optimizer and prepare the optimizer kwargs
+        optimizer_kwargs = {
+            "lr": self.lr,
+            "weight_decay": self.weight_decay,
+        }
+        if self.optimizer == "SGD":
+            base_optimizer = torch.optim.SGD
+            optimizer_kwargs["momentum"] = 0.9
+            optimizer_kwargs["nesterov"] = self.nesterov
+        elif self.optimizer == "Adam":
+            base_optimizer = torch.optim.Adam
+        elif self.optimizer == "AdamW":
+            base_optimizer = torch.optim.AdamW
+        elif self.optimizer == "Rmsprop":
+            base_optimizer = RMSpropTF
+        elif self.optimizer == "Madgrad":
+            base_optimizer = MADGRAD
+            optimizer_kwargs["momentum"] = 0.9
+        else:
+            raise NotImplementedError
 
-        if self.finetuning_method == "full_sawtooth":
-            # Separate encoder and cls_head parameters
-            encoder_params = []
-            cls_head_params = []
-
-            for name, param in self.named_parameters():
-                if "encoder" in name:
-                    encoder_params.append(param)
-                elif "cls_head" in name:
-                    cls_head_params.append(param)
-
+        # Setup optimizer
         if not self.sam:
-            if self.optimizer == "SGD":
-                if self.finetuning_method == "full_sawtooth":
-                    optimizer = torch.optim.SGD(
-                        [
-                            {
-                                "params": cls_head_params,
-                                "lr": self.lr,
-                                "momentum": 0.9,
-                                "weight_decay": self.weight_decay,
-                                "nesterov": self.nesterov,
-                                "name": "cls_head",
-                            },
-                            {
-                                "params": encoder_params,
-                                "lr": self.lr,
-                                "momentum": 0.9,
-                                "weight_decay": self.weight_decay,
-                                "nesterov": self.nesterov,
-                                "name": "encoder",
-                            },
-                        ]
-                    )
-
-                else:
-                    optimizer = torch.optim.SGD(
-                        params,
-                        lr=self.lr,
-                        momentum=0.9,
-                        weight_decay=self.weight_decay,
-                        nesterov=self.nesterov,
-                    )
-            elif self.optimizer == "Adam":
-                if self.finetuning_method == "full_sawtooth":
-                    optimizer = torch.optim.Adam(
-                        [
-                            {
-                                "params": cls_head_params,
-                                "lr": self.lr,
-                                "weight_decay": self.weight_decay,
-                                "name": "cls_head",
-                            },
-                            {
-                                "params": encoder_params,
-                                "lr": self.lr,
-                                "weight_decay": self.weight_decay,
-                                "name": "encoder",
-                            },
-                        ]
-                    )
-
-                else:
-                    optimizer = torch.optim.Adam(
-                        params, lr=self.lr, weight_decay=self.weight_decay
-                    )
-            elif self.optimizer == "AdamW":
-
-                if self.finetuning_method == "full_sawtooth":
-                    optimizer = torch.optim.AdamW(
-                        [
-                            {
-                                "params": cls_head_params,
-                                "lr": self.lr,
-                                "weight_decay": self.weight_decay,
-                                "name": "cls_head",
-                            },
-                            {
-                                "params": encoder_params,
-                                "lr": self.lr,
-                                "weight_decay": self.weight_decay,
-                                "name": "encoder",
-                            },
-                        ]
-                    )
-
-                else:
-                    optimizer = torch.optim.AdamW(
-                        params, lr=self.lr, weight_decay=self.weight_decay
-                    )
-            elif self.optimizer == "Rmsprop":
-
-                if self.finetuning_method == "full_sawtooth":
-                    optimizer = RMSpropTF(
-                        [
-                            {
-                                "params": cls_head_params,
-                                "lr": self.lr,
-                                "weight_decay": self.weight_decay,
-                                "name": "cls_head",
-                            },
-                            {
-                                "params": encoder_params,
-                                "lr": self.lr,
-                                "weight_decay": self.weight_decay,
-                                "name": "encoder",
-                            },
-                        ]
-                    )
-
-                else:
-                    optimizer = RMSpropTF(
-                        params, lr=self.lr, weight_decay=self.weight_decay
-                    )
-            elif self.optimizer == "Madgrad":
-
-                if self.finetuning_method == "full_sawtooth":
-                    optimizer = MADGRAD(
-                        [
-                            {
-                                "params": cls_head_params,
-                                "lr": self.lr,
-                                "momentum": 0.9,
-                                "weight_decay": self.weight_decay,
-                                "name": "cls_head",
-                            },
-                            {
-                                "params": encoder_params,
-                                "lr": self.lr,
-                                "momentum": 0.9,
-                                "weight_decay": self.weight_decay,
-                                "name": "encoder",
-                            },
-                        ]
-                    )
-
-                else:
-                    optimizer = MADGRAD(
-                        params, lr=self.lr, momentum=0.9, weight_decay=self.weight_decay
-                    )
+            if self.finetune_method == "full_sawtooth":
+                optimizer = base_optimizer(
+                    [
+                        {
+                            "params": cls_head_params,
+                            "name": "cls_head",
+                            **optimizer_kwargs
+                        },
+                        {
+                            "params": encoder_params,
+                            "name": "encoder",
+                            **optimizer_kwargs
+                        },
+                    ]
+                )
+            else:
+                optimizer = base_optimizer(params, **optimizer_kwargs)
 
         else:
             # ASAM paper suggests 10x larger rho for adaptive SAM than in normal SAM
             rho = 0.5 if self.adaptive_sam else 0.05
+            optimizer = SAM(
+                params,
+                base_optimizer=base_optimizer,
+                adaptive=self.adaptive_sam,
+                rho=rho,
+                **optimizer_kwargs
+            )
 
-            if self.optimizer == "SGD":
-                base_optimizer = torch.optim.SGD
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    momentum=0.9,
-                    weight_decay=self.weight_decay,
-                    nesterov=self.nesterov,
-                    rho=rho,
-                )
-            elif self.optimizer == "Madgrad":
-                base_optimizer = MADGRAD
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    momentum=0.9,
-                    weight_decay=self.weight_decay,
-                    rho=rho,
-                )
-            elif self.optimizer == "Adam":
-                base_optimizer = torch.optim.Adam
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    weight_decay=self.weight_decay,
-                    rho=rho,
-                )
-            elif self.optimizer == "AdamW":
-                base_optimizer = torch.optim.AdamW
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    weight_decay=self.weight_decay,
-                    rho=rho,
-                )
-            elif self.optimizer == "Rmsprop":
-                base_optimizer = RMSpropTF
-                optimizer = SAM(
-                    params,
-                    base_optimizer,
-                    adaptive=self.adaptive_sam,
-                    lr=self.lr,
-                    weight_decay=self.weight_decay,
-                    rho=rho,
-                )
-
+        # Setup scheduler
         if not self.scheduler:
             return [optimizer]
         else:
-            if self.scheduler == "CosineAnneal" and self.warmstart == 0:
+            if self.finetune_method == "full_sawtooth":
+                scheduler = CosineAnnealingLR_DoubleWarmstart(
+                    optimizer,
+                    T_max=self.T_max,
+                    warmstart1=self.warmstart,
+                    warmstart2=self.warmstart2,
+                )
+            elif self.scheduler == "CosineAnneal" and self.warmstart == 0:
                 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                     optimizer, T_max=self.T_max
                 )
             elif self.scheduler == "CosineAnneal" and self.warmstart > 0:
-                if self.finetuning_method == "full_sawtooth":
-                    scheduler = CosineAnnealingLR_DoubleWarmstart(
-                        optimizer,
-                        T_max=self.T_max,
-                        warmstart1=self.warmstart,
-                        warmstart2=self.warmstart2,
-                    )
-                else:
-                    scheduler = CosineAnnealingLR_Warmstart(
-                        optimizer,
-                        T_max=self.T_max,
-                        warmstart=self.warmstart,
-                    )
+                scheduler = CosineAnnealingLR_Warmstart(
+                    optimizer, T_max=self.T_max, warmstart=self.warmstart
+                )
             elif self.scheduler == "Step":
                 # decays every 1/4 epochs
                 scheduler = torch.optim.lr_scheduler.StepLR(
@@ -818,6 +605,66 @@ class BaseModel(L.LightningModule):
                 )
 
             return [optimizer], [scheduler]
+
+def get_layerwise_lr_params(
+    model,
+    base_lr: float,
+    weight_decay: float,
+    layer_decay: float
+):
+    """
+    Implements BERT style layer wise decay for a ViT from timm:
+      /patch_embed/       → depth 1
+      /blocks.0./         → depth 2
+      /blocks.1./         → depth 3
+      … 
+      /blocks.{n-1}./     → depth n+1
+      /norm/              → depth n+2
+      /head/              → depth n+3
+
+    Then lr = base_lr * (layer_decay ** ( (n+2) - depth ) ).
+    """
+    # number of transformer blocks
+    n_blocks = len(model.blocks)  
+
+    # build our name→depth map in order
+    key2depth = OrderedDict([
+        ("patch_embed",                    1),
+        ("patch_embed.proj",               1),
+    ])
+    # each block i → depth = i+1
+    for i in range(n_blocks):
+        key2depth[f"blocks.{i}."] = i + 2
+
+    # normalization and head get the highest depths
+    key2depth["fc_norm"] = n_blocks + 2
+    key2depth["head"] = n_blocks + 3
+
+    # now assign parameters to groups
+    lr_groups = defaultdict(list)  # lr → [params]
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+
+        # find the first key that matches this param name
+        for key, depth in key2depth.items():
+            if key in name:
+                print(key, depth, name)
+                exponent = (n_blocks + 3) - depth
+                lr = base_lr * (layer_decay ** exponent)
+                print(key, depth, name, exponent, lr)
+                lr_groups[lr].append(param)
+                break
+        else:
+            # fallback: if nothing matched, give it the base_lr
+            lr_groups[base_lr].append(param)
+
+    # build the optimizer‐style param_groups list
+    param_groups = [
+        {"params": params, "lr": lr, "weight_decay": weight_decay}
+        for lr, params in sorted(lr_groups.items())
+    ]
+    return param_groups
 
 
 class CosineAnnealingLR_Warmstart(_LRScheduler):

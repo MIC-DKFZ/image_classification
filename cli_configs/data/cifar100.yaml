@@ -2,8 +2,10 @@
 data:
   module:
     _target_: datasets.cifar.CIFAR100DataModule
-    data_dir: 'CIFAR10'
+    name: CIFAR100
+    data_root_dir: ${data_dir}/cifar100
     batch_size: 128
+    data_fraction: 1.0
     train_transforms: 
       _target_: augmentation.policies.cifar.RandAugmentTransform
       cutout_size: 8
