@@ -18,7 +18,6 @@ class Flowers102Data(Dataset):
         root,
         split,
         transform=None,
-        dataset_dir="images",
         split_file="splits.json",
         labels_file="labels.json",
         allowed_exts=(".jpg", ".jpeg", ".png"),
@@ -39,7 +38,7 @@ class Flowers102Data(Dataset):
                   ...
                 test/
                   ...
-              labels.json       {"train/1/image_001.jpg": 0, ...}
+              labels.json       {"images/train/1/image_001.jpg": 0, ...}
               splits.json       {"train":[...], "val":[...], "test":[...]}
 
         Args:
@@ -51,7 +50,6 @@ class Flowers102Data(Dataset):
         self.root = Path(root)
         self.split = split
         self.transform = transform
-        self.dataset_dir = self.root / dataset_dir
         self.allowed_exts = tuple(e.lower() for e in allowed_exts)
         self.strict = strict
 
@@ -81,7 +79,7 @@ class Flowers102Data(Dataset):
                     raise KeyError(f"Missing label for image id '{img_id}' in {labels_path}")
                 continue
 
-            path = self.dataset_dir / img_id
+            path = self.root / img_id
             if not path.exists() or not path.is_file():
                 if self.strict:
                     raise FileNotFoundError(f"Missing image for id '{img_id}' at {path}")

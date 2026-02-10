@@ -7,7 +7,7 @@ Two testing approaches available:
 **Use the `__main__` blocks for quick sanity checks:**
 
 ```bash
-export DATA_ROOT=/home/d246a/Documents/data/SynergyUnitDatasets
+export DATA_ROOT=/path_to_data/SynergyUnitDatasets
 
 # Test individual dataset
 python -m datasets.aid
@@ -182,7 +182,7 @@ python datasets/helpers/aid_split.py --root $DATA_ROOT/AID
 ### Import Errors
 ```bash
 # Ensure you're in project root
-cd /home/d246a/Documents/projects/classification_downstream
+cd /home/to/projects/classification_downstream
 
 # Ensure packages installed
 pip install torch torchvision pillow numpy h5py tqdm scikit-learn
