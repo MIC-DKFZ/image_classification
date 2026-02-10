@@ -19,6 +19,30 @@ All 10 datasets have been reorganized with clean folder names and consistent str
 | `diabetic-retinopathy-detection` | `DiabeticRetinopathy` | ✓ Clean name |
 | `fgvc-aircraft/.../data` | `FGVCAircraft` | ✓ Flattened deeply nested structure |
 
+## Dataset Split Statistics
+
+Quick reference table for all dataset splits:
+
+| # | Dataset | Classes | Total Images | Train | Val | Test | Split Type |
+|---|---------|---------|--------------|-------|-----|------|------------|
+| 1 | AID | 30 | 10,000 | 6,000 | 2,000 | 2,000 | Random 60/20/20 |
+| 2 | ZooScanNet | 116 | 797,061 | 478,236 | 159,412 | 159,413 | Random 60/20/20 (filtered) |
+| 3 | ChestXray14 | 15 | 112,120 | 68,749 | 22,125 | 21,246 | Patient-level 60/20/20 |
+| 4 | NEUDET | 6 | 1,800 | 1,440 | 180 | 180 | Official train + split valid |
+| 5 | RxRx1 | 1,139 | 115,656 | 60,918 | 20,306 | 34,432 | Official train/test + split |
+| 6 | Flowers102 | 102 | 7,370 | 6,552 | 490 | 328 | Official train + split valid |
+| 7 | RESISC45 | 45 | 31,500 | 18,900 | 6,300 | 6,300 | Official train/val/test |
+| 8 | PCam | 2 | 262,144 | 157,286 | 52,429 | 52,429 | Random 60/20/20 |
+| 9 | DiabeticRetinopathy | 5 | 35,126 | 21,074 | 7,026 | 7,026 | Random 60/20/20 |
+| 10 | FGVCAircraft | 100 | 10,000 | 6,000 | 2,000 | 2,000 | Random 60/20/20 |
+
+**Notes:**
+- **RESISC45**: Official splits MUST be preserved for benchmark comparability
+- **Flowers102**: Non-stratified split (classes have 1-2 samples in valid set)
+- **NEUDET**: Respects official train/validation boundary
+- **ChestXray14**: Patient-level splitting prevents data leakage
+- **ZooScanNet**: Adaptive size filtering applied (24px-64px based on class size)
+
 ## Final Dataset Structures
 
 ### 1. AID (Aerial Image Dataset)
@@ -256,4 +280,4 @@ dm = AIDDataModule(data_path=f"{DATA_ROOT}/AID", ...)
 - **ChestXray14**: Patient-level stratified splitting to prevent data leakage (68,749/22,125/21,246)
 - **ZooScanNet**: Adaptive image size filtering applied (478,236/159,412/159,413)
 - **RxRx1**: Uses existing train/test split, creates val from train (60,918/20,306/34,432)
-- All unnecessary files backed up to `/home/d246a/Documents/data/backup_synergy/`
+
