@@ -11,7 +11,7 @@ data:
     test_transforms:
       _target_: augmentation.policies.zooscannet.TestTransform
 
-  num_classes: 20
+  num_classes: 116
 
 model:
   task: 'Classification'

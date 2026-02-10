@@ -11,11 +11,11 @@ data:
     test_transforms:
       _target_: augmentation.policies.chestxray14.TestTransform
 
-  num_classes: 14
+  num_classes: 15
 
 model:
   task: 'Classification'
-  subtask: 'multilabel'
+  subtask: 'multiclass'
   cifar_size: False
   input_channels: 3
   patch_size: [224, 224]

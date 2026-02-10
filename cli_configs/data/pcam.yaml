@@ -15,7 +15,7 @@ data:
 
 model:
   task: 'Classification'
-  subtask: 'binary'
+  subtask: 'multiclass'
   cifar_size: False
   input_channels: 3
   patch_size: [224, 224]

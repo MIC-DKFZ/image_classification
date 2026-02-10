@@ -7,10 +7,10 @@ echo "Configuration: max_epochs=5, data_fraction=0.1"
 echo "========================================"
 
 HYDRA_FULL_ERROR=1 python main.py \
-    model=dinov3_reference \
-    data=aid \
-    peft=gps \
-    trainer.max_epochs=5 \
+    model=mae_timm \
+    data=rxrx1 \
+    peft=lora \
+    trainer.max_epochs=1 \
     data.module.data_fraction=0.1
 
 if [ $? -eq 0 ]; then
