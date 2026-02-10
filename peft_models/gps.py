@@ -71,7 +71,7 @@ class GPS:
         calib_loader = self._build_calibration_loader()
 
         # dummy optimizer to satisfy calculate_gradient's signature (no step is taken)
-        dummy_opt = torch.optim.SGD(self.model.parameters(), lr=1e-3)
+        dummy_opt = torch.optim.SGD(self.parameters(), lr=1e-3)
 
         # Some GPS versions read fields from args; keep it minimal & consistent
         args = SimpleNamespace(times_para=self.gps_percent)
@@ -79,8 +79,11 @@ class GPS:
         use_amp = str(getattr(self.trainer, "precision", "")).startswith("16")
 
         # 1) gradient probe (forward+backward over the tiny loader; no optimizer.step)
+        #    Pass `self` (full LightningModule) so forward() returns logits,
+        #    not raw backbone outputs (e.g. HuggingFace BaseModelOutputWithPooling).
+        #    Gradients still flow to self.model.parameters() since it's a submodule.
         calculate_gradient(
-            model=self.model,
+            model=self,
             loader=calib_loader,
             optimizer=dummy_opt,
             loss_fn=self.criterion,
@@ -108,6 +111,9 @@ def prune_by_percentile_gradient_perCell(model, time_para=1):
             new_mask = np.ones_like(param.data.cpu().numpy())
         elif 'head' in name or "bias" in name or "gamma" in name:
             new_mask = np.zeros_like(param.data.cpu().numpy())
+        elif param.grad is None:
+            # No gradient (e.g. pooler params unused in forward) → freeze
+            new_mask = np.ones_like(param.data.cpu().numpy())
         else:
             if "patch_embed" in name or "conv" in name or "stem.proj.weight" in name or "downsample.proj.weight" in name:
                 tensor = param.grad.data.cpu().numpy()
@@ -152,9 +158,10 @@ def prune_by_percentile_gradient_perCell(model, time_para=1):
     print("---------------------------------------------------------------")
 
     print("---------------------------------------------------------------")
-    print("Trainable parameter / Total (without head): ", trainable_withouthead, "/", total_withouthead, "(", np.round((trainable_withouthead/total_withouthead)*100,4), "%)")
-    print("Trainable parameter / Total (head): ", trainable_head, "/", total_head, "(", np.round((trainable_head/total_head)*100,4), "%)")
-    print("Trainable parameter / Total (total): ", trainable_head+trainable_withouthead, "/", total_head+total_withouthead, "(", np.round(((trainable_head+trainable_withouthead)/(total_head+total_withouthead))*100,4), "%)")
+    print("Trainable parameter / Total (without head): ", trainable_withouthead, "/", total_withouthead, "(", np.round((trainable_withouthead/total_withouthead)*100,4) if total_withouthead else 0, "%)")
+    print("Trainable parameter / Total (head): ", trainable_head, "/", total_head, "(", np.round((trainable_head/total_head)*100,4) if total_head else 0, "%)")
+    total_all = total_head + total_withouthead
+    print("Trainable parameter / Total (total): ", trainable_head+trainable_withouthead, "/", total_all, "(", np.round(((trainable_head+trainable_withouthead)/total_all)*100,4) if total_all else 0, "%)")
 
     print("#######################################################################")
     return new_masks
