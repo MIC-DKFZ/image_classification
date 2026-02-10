@@ -18,6 +18,8 @@ class FlipRotateTransformImgNetNorm(BaseTransform):
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip(),
                 transforms.RandomRotation(180),
+                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+                transforms.Resize(224),
                 transforms.ToTensor(),
                 transforms.Normalize(MEAN_IMGNET, STD_IMGNET),
             ]
@@ -34,6 +36,7 @@ class TestTransformImgNetNorm(BaseTransform):
             [
                 transforms.Resize(640),
                 transforms.CenterCrop(600),
+                transforms.Resize(224),
                 transforms.ToTensor(),
                 transforms.Normalize(MEAN_IMGNET, STD_IMGNET),
             ]

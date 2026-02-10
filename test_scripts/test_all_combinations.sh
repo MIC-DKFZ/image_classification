@@ -11,7 +11,7 @@ DATA_FRACTIONS=(0.1 1.0)
 MODELS=(
     "supervised"
     "mae_timm"
-    "dinov3"
+    "dinov3_reference"
 )
 
 # Dataset configs
@@ -84,7 +84,6 @@ for model in "${MODELS[@]}"; do
                     peft="$peft" \
                     trainer.max_epochs="$MAX_EPOCHS" \
                     data.module.data_fraction="$data_frac" \
-                    trainer.fast_dev_run=false \
                     > "$LOG_FILE" 2>&1
 
                 # End timer

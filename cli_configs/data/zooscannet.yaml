@@ -3,8 +3,9 @@ data:
   module:
     _target_: datasets.zooscannet.ZooScanNetDataModule
     name: ZooScanNet
-    data_root_dir: ${data_dir}/ZooScanNet
+    data_root_dir: /home/d246a/Documents/data/SynergyUnitDatasets/ZooScanNet
     batch_size: 32
+    data_fraction: 0.1
     train_transforms:
       _target_: augmentation.policies.zooscannet.TrainTransform
     test_transforms:
@@ -20,7 +21,6 @@ model:
   patch_size: [224, 224]
   input_shape: ${model.patch_size}
 
-trainer:
-  logger:
-    project: ZooScanNet
-  max_epochs: 100
+wandb:
+  entity: synergy_unit
+  project: ZooScanNet

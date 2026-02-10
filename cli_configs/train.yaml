@@ -4,6 +4,8 @@ defaults:
   - model: mae
   - peft: lora
   - data: imagenet
+  - override hydra/hydra_logging: disabled
+  - override hydra/job_logging: disabled
 
 log_dir: ${hydra:output_subdir}
 
@@ -16,8 +18,6 @@ hydra:
   run:
     dir: .
 
-override hydra/hydra_logging: disable
-override hydra/job_logging: disable
 
 seed: False
 

@@ -276,7 +276,6 @@ python -m datasets.flowers102
 
 ## Notes
 
-- **⚠️ DATA LEAKAGE WARNING**: Always respect official dataset splits! See [DATA_LEAKAGE_WARNING.md](DATA_LEAKAGE_WARNING.md) for details.
 - **RESISC45**, **Flowers102**, and **NEUDET** have official splits that MUST be preserved
 - All other splits use stratified sampling to maintain class balance
 - **Flowers102** uses non-stratified split for val/test (valid set has classes with only 1-2 samples)
