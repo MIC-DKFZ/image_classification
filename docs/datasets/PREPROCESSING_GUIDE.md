@@ -4,7 +4,12 @@ This guide explains how to preprocess all 10 datasets using the provided scripts
 
 ## Datasets Overview
 
-All datasets will use **60/20/20 train/val/test splits** with stratified sampling.
+**IMPORTANT:** Some datasets have official train/val/test splits that MUST be preserved to prevent data leakage:
+- **RESISC45** - Uses official train/validation/test splits (DO NOT merge!)
+- **Flowers102** - Uses official train, splits official valid into val+test
+- **NEUDET** - Uses official train, splits official validation into val+test
+
+Other datasets use **60/20/20 train/val/test splits** with stratified sampling.
 
 **Note:** Replace `$DATA_ROOT` in the commands below with your actual dataset root directory path.
 
@@ -86,18 +91,22 @@ python datasets/helpers/chestxray14_split.py \
 
 ---
 
-### 4. NEU-DET Dataset
+### 4. NEU-DET Dataset ⚠️ OFFICIAL SPLITS
 
 **Location:** `$DATA_ROOT/neu-surface-defect-database`
 
+**IMPORTANT:** NEUDET has official train/validation folders. This script RESPECTS those:
+- Uses official train/ folder as-is
+- Splits official validation/ folder into val + test
+
 ```bash
-# Create splits
+# Create splits (respects official train/validation boundary)
 python datasets/helpers/neudet_split.py \
   --root $DATA_ROOT/neu-surface-defect-database \
   --neudet_dir NEU-DET \
   --out_json splits.json \
   --out_labels labels.json \
-  --train_frac 0.6 --val_frac 0.2 --test_frac 0.2 \
+  --test_from_valid_frac 0.5 \
   --seed 42
 ```
 
@@ -120,35 +129,43 @@ python datasets/helpers/rxrx1_split.py \
 
 ---
 
-### 6. Flowers-102 Dataset
+### 6. Flowers-102 Dataset ⚠️ OFFICIAL SPLITS
 
 **Location:** `$DATA_ROOT/pytorch-challange-flower-dataset`
 
+**IMPORTANT:** Flowers102 has official train/valid folders. This script RESPECTS those:
+- Uses official train/ folder as-is
+- Splits official valid/ folder into val + test
+- Note: Official test/ folder is unlabeled and not used
+
 ```bash
-# Create splits
+# Create splits (respects official train/valid boundary)
 python datasets/helpers/flowers102_split.py \
   --root $DATA_ROOT/pytorch-challange-flower-dataset \
   --dataset_dir dataset \
   --out_json splits.json \
   --out_labels labels.json \
-  --train_frac 0.6 --val_frac 0.2 --test_frac 0.2 \
+  --test_from_valid_frac 0.5 \
   --seed 42
 ```
 
 ---
 
-### 7. RESISC45 Dataset
+### 7. RESISC45 Dataset 🔴 CRITICAL - OFFICIAL SPLITS
 
 **Location:** `$DATA_ROOT/resisc45_images`
 
+**CRITICAL:** RESISC45 has official train/validation/test folders that MUST be used exactly as-is!
+- Official test set is the standard benchmark for remote sensing
+- Merging and re-splitting would make results non-comparable with literature
+- This script preserves ALL official boundaries
+
 ```bash
-# Create splits
+# Create splits (uses official train/validation/test as-is - NO merging!)
 python datasets/helpers/resisc45_split.py \
   --root $DATA_ROOT/resisc45_images \
   --out_json splits.json \
-  --out_labels labels.json \
-  --train_frac 0.6 --val_frac 0.2 --test_frac 0.2 \
-  --seed 42
+  --out_labels labels.json
 ```
 
 ---
@@ -258,8 +275,25 @@ python -m datasets.flowers102
 
 ## Notes
 
-- All splits use stratified sampling to maintain class balance
+- **⚠️ DATA LEAKAGE WARNING**: Always respect official dataset splits! See [DATA_LEAKAGE_WARNING.md](DATA_LEAKAGE_WARNING.md) for details.
+- **RESISC45**, **Flowers102**, and **NEUDET** have official splits that MUST be preserved
+- All other splits use stratified sampling to maintain class balance
 - ChestXray14 uses patient-level splitting to avoid data leakage
 - PCam requires H5 extraction (may take time and disk space)
 - ZooScanNet filters out small images and rare classes
 - All datasets follow the same interface for consistency
+
+## Dataset Split Summary
+
+| Dataset | Split Strategy | Official Splits? |
+|---------|---------------|------------------|
+| AID | Random 60/20/20 | No |
+| ZooScanNet | Random 60/20/20 (filtered) | No |
+| ChestXray14 | Random 60/20/20 (patient-level) | No |
+| **NEUDET** | **Official train + split validation** | ⚠️ Yes (partial) |
+| RxRx1 | Official train/test + split train | Yes |
+| **Flowers102** | **Official train + split valid** | ⚠️ Yes (partial) |
+| **RESISC45** | **Official train/val/test** | 🔴 Yes (CRITICAL) |
+| PCam | Random 60/20/20 | No |
+| DiabeticRetinopathy | Random 60/20/20 | No |
+| FGVCAircraft | Random 60/20/20 | No |
