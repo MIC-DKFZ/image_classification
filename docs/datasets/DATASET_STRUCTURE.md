@@ -82,8 +82,8 @@ NEUDET/
 ```
 - **Classes**: 6 (defect types)
 - **Total images**: 1,800
-- **Split**: 1,080 train / 360 val / 360 test
-- **Note**: Maintains original train/validation folder structure
+- **Split**: 1,440 train / 180 val / 180 test
+- **Note**: Uses official train folder, splits official validation into val+test (50/50)
 
 ### 5. RxRx1 (Cell Microscopy)
 ```
@@ -106,14 +106,15 @@ Flowers102/
 ├── images/              [RENAMED from dataset/]
 │   ├── train/
 │   ├── valid/
-│   └── test/
+│   └── test/           (unlabeled - not used)
 ├── splits.json
 ├── labels.json
 └── class_map.json
 ```
 - **Classes**: 102 (flower species)
-- **Total images**: 7,370
-- **Split**: 4,422 train / 1,474 val / 1,474 test
+- **Total images**: 7,370 (6,552 train + 818 valid, 819 test unlabeled)
+- **Split**: 6,552 train / 490 val / 328 test
+- **Note**: Uses official train folder, splits official valid into val (60%) + test (40%) with non-stratified split
 
 ### 7. RESISC45 (Remote Sensing)
 ```
@@ -133,14 +134,18 @@ RESISC45/
 ### 8. PCam (Histopathology)
 ```
 PCam/
-└── pcamv1/
-    ├── camelyonpatch_level_2_split_train_x.h5
-    ├── camelyonpatch_level_2_split_train_y.h5
-    └── ...
+├── images/
+│   ├── train/
+│   ├── val/
+│   └── test/
+├── splits.json
+├── labels.json
+└── class_map.json
 ```
 - **Classes**: 2 (tumor present/absent)
-- **Native size**: 96×96 patches
-- **Note**: H5 files need extraction (not yet done)
+- **Total images**: 262,144 (96×96 patches)
+- **Split**: 157,286 train / 52,429 val / 52,429 test
+- **Note**: Extracted from H5 files to PNG images
 
 ### 9. DiabeticRetinopathy
 ```
@@ -148,12 +153,15 @@ DiabeticRetinopathy/
 ├── train/
 │   ├── 10_left.jpeg
 │   ├── 10_right.jpeg
-│   └── ... (~35k images)
+│   └── ...
 ├── splits.json
+├── labels.json
+├── class_map.json
 └── trainLabels.csv
 ```
 - **Classes**: 5 (severity levels 0-4)
-- **Note**: Uses existing splits from prior preprocessing
+- **Total images**: 35,126
+- **Split**: 21,074 train / 7,026 val / 7,026 test
 
 ### 10. FGVCAircraft
 ```
@@ -215,7 +223,7 @@ All dataset classes have been updated to use the new clean folder names:
 | `chestxray14.py` | `$DATA_ROOT/ChestXray14` | None |
 | `neudet.py` | `$DATA_ROOT/NEUDET` | None |
 | `rxrx1.py` | `$DATA_ROOT/RxRx1` | None |
-| `flowers102.py` | `$DATA_ROOT/Flowers102` | `dataset_dir="dataset"` → `dataset_dir="images"` |
+| `flowers102.py` | `$DATA_ROOT/Flowers102` | Removed `dataset_dir` parameter, uses `root/img_id` directly |
 | `resisc45.py` | `$DATA_ROOT/RESISC45` | None |
 | `pcam.py` | `$DATA_ROOT/PCam` | None |
 | `diabetic_retina.py` | `$DATA_ROOT/DiabeticRetinopathy` | None |
@@ -241,8 +249,11 @@ dm = AIDDataModule(data_path=f"{DATA_ROOT}/AID", ...)
 
 ## Notes
 
-- All datasets use 60/20/20 train/val/test splits (where applicable)
-- Stratified sampling ensures balanced class distribution across splits
-- Patient-level splitting used for ChestXray14 to prevent data leakage
-- Adaptive image size filtering used for ZooScanNet
+- Most datasets use 60/20/20 train/val/test splits with stratified sampling
+- **RESISC45**: Uses official train/validation/test splits (18,900/6,300/6,300)
+- **Flowers102**: Uses official train, splits official valid into val+test with non-stratified split (6,552/490/328)
+- **NEUDET**: Uses official train, splits official validation into val+test (1,440/180/180)
+- **ChestXray14**: Patient-level stratified splitting to prevent data leakage (68,749/22,125/21,246)
+- **ZooScanNet**: Adaptive image size filtering applied (478,236/159,412/159,413)
+- **RxRx1**: Uses existing train/test split, creates val from train (60,918/20,306/34,432)
 - All unnecessary files backed up to `/home/d246a/Documents/data/backup_synergy/`
