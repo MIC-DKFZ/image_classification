@@ -156,7 +156,7 @@ if __name__ == '__main__':
     from augmentation.policies.aid import FlipRotateTransformImgNetNorm, TestTransformImgNetNorm
 
     # Get DATA_ROOT from environment or use default
-    data_root = os.environ.get("DATA_ROOT", "/home/d246a/Documents/data/SynergyUnitDatasets")
+    data_root = os.environ.get("DATA_ROOT", "./data")
 
     print("="*80)
     print("Testing AID Dataset")

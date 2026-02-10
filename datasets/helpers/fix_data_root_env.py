@@ -64,7 +64,7 @@ def fix_data_root(file_path):
     print("="*80)'''
 
     new_section = f'''    # Get DATA_ROOT from environment or use default
-    data_root = os.environ.get("DATA_ROOT", "/home/d246a/Documents/data/SynergyUnitDatasets")
+    data_root = os.environ.get("DATA_ROOT", "./data")
 
     print("="*80)
     print("Testing {dataset_name} Dataset")
@@ -108,7 +108,7 @@ def main():
     print("✓ All dataset files fixed!")
     print("="*80)
     print("\nNow you can run:")
-    print("  export DATA_ROOT=/home/d246a/Documents/data/SynergyUnitDatasets")
+    print("  export DATA_ROOT=./data")
     print("  python -m datasets.chestxray14")
 
 

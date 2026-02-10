@@ -16,14 +16,14 @@ import numpy as np
 def setup_environment():
     """Set up environment variables for all tests."""
     if "DATA_ROOT" not in os.environ:
-        os.environ["DATA_ROOT"] = "/home/d246a/Documents/data/SynergyUnitDatasets"
+        os.environ["DATA_ROOT"] = "./data"
     yield
 
 
 @pytest.fixture
 def data_root():
     """Get the DATA_ROOT path."""
-    return Path(os.environ.get("DATA_ROOT", "/home/d246a/Documents/data/SynergyUnitDatasets"))
+    return Path(os.environ.get("DATA_ROOT", "./data"))
 
 
 @pytest.fixture

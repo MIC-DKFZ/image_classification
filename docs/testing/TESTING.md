@@ -12,7 +12,7 @@ All dataset classes now include comprehensive test blocks that verify:
 
 ```bash
 # Set data root
-export DATA_ROOT=/home/d246a/Documents/data/SynergyUnitDatasets
+export DATA_ROOT=./data
 
 # Run all tests
 python test_all_datasets.py
@@ -23,7 +23,7 @@ python test_all_datasets.py
 Each dataset .py file can be run standalone:
 
 ```bash
-export DATA_ROOT=/home/d246a/Documents/data/SynergyUnitDatasets
+export DATA_ROOT=./data
 
 # Test AID dataset
 python -m datasets.aid

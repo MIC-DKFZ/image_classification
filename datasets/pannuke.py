@@ -101,8 +101,10 @@ if __name__ == "__main__":
     ])
 
     # Create train/val datasets for fold 1
-    train_ds = PanNukeHF(root="/home/d246a/Documents/data/hf-cache", split="train", fold=1, transform=tfm)
-    val_ds   = PanNukeHF(root="/home/d246a/Documents/data/hf-cache", split="val", fold=1, transform=tfm)
+    import os
+    hf_cache = os.environ.get("HF_HOME", "./hf-cache")
+    train_ds = PanNukeHF(root=hf_cache, split="train", fold=1, transform=tfm)
+    val_ds   = PanNukeHF(root=hf_cache, split="val", fold=1, transform=tfm)
 
     # Wrap in DataLoader
     train_loader = DataLoader(train_ds, batch_size=8, shuffle=True, num_workers=2)

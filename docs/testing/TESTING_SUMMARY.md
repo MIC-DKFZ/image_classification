@@ -115,7 +115,7 @@ Require actual dataset files. Will skip if data not found.
 
 ### 1. Quick Smoke Test (No pytest needed)
 ```bash
-export DATA_ROOT=/home/d246a/Documents/data/SynergyUnitDatasets
+export DATA_ROOT=./data
 
 # Test one dataset
 python -m datasets.aid

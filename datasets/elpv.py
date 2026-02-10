@@ -124,9 +124,11 @@ class ELPVDataModule(BaseDataModule):
 
 
 if __name__ == '__main__':
+    import os
     from torch.utils.data import DataLoader
 
-    train_ds = ELPVDataset(root="/home/d246a/Documents/data/elpv/", split="train", fold=0)
+    data_root = os.environ.get("DATA_ROOT", "./data")
+    train_ds = ELPVDataset(root=f"{data_root}/elpv/", split="train", fold=0)
     train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=4)
 
     imgs, labels = next(iter(train_loader))

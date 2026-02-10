@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Set DATA_ROOT if not already set
 if "DATA_ROOT" not in os.environ:
-    os.environ["DATA_ROOT"] = "/home/d246a/Documents/data/SynergyUnitDatasets"
+    os.environ["DATA_ROOT"] = "./data"
 
 print(f"Using DATA_ROOT: {os.environ['DATA_ROOT']}")
 print()

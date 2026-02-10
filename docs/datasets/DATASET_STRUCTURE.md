@@ -258,13 +258,13 @@ All dataset classes have been updated to use the new clean folder names:
 Set the `$DATA_ROOT` environment variable to point to your SynergyUnitDatasets folder:
 
 ```bash
-export DATA_ROOT=/home/d246a/Documents/data/SynergyUnitDatasets
+export DATA_ROOT=/path/to/your/SynergyUnitDatasets
 ```
 
 Or in Python:
 ```python
 import os
-DATA_ROOT = os.environ.get("DATA_ROOT", "/path/to/SynergyUnitDatasets")
+DATA_ROOT = os.environ.get("DATA_ROOT", "./data")
 
 # Load a dataset
 from datasets.aid import AIDDataModule

@@ -1,8 +1,10 @@
+import os
 from PIL import Image
 from pathlib import Path
 from collections import Counter
 
-root = Path("/home/d246a/Documents/data/elpv/data/images")
+data_root = os.environ.get("DATA_ROOT", "./data")
+root = Path(f"{data_root}/elpv/data/images")
 counts = Counter()
 
 for p in root.rglob("*.png"):

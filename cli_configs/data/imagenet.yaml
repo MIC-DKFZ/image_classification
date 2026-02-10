@@ -3,7 +3,7 @@ data:
   module:
     _target_: datasets.imagenet.ImagenetDataModule
     name: ILSVRC_2012
-    data_root_dir: /dkfz/cluster/gpu/data/OE0441/s522r/ILSVRC_2012 #/home/d246a/network_drives/E132-Projekte/Projects/Helmholtz_Imaging_ACVL/misc/imagenet/ILSVRC_2012 #/dkfz/cluster/gpu/data/OE0441/s522r/ILSVRC_2012 #
+    data_root_dir: ${data_dir}/ILSVRC_2012  # Or use cluster path: /dkfz/cluster/gpu/data/OE0441/s522r/ILSVRC_2012
     batch_size: 8
     data_fraction: 0.1
     train_transforms: 

@@ -3,7 +3,7 @@ data:
   module:
     _target_: datasets.elpv.ELPVDataModule
     name: ELPV
-    data_root_dir: /home/d246a/Documents/data/elpv
+    data_root_dir: ${data_dir}/elpv
     batch_size: 128
     train_transforms:
       _target_: augmentation.policies.elpv.FlipRotateTransformImgNetNorm
