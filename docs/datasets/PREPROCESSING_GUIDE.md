@@ -131,21 +131,22 @@ python datasets/helpers/rxrx1_split.py \
 
 ### 6. Flowers-102 Dataset ⚠️ OFFICIAL SPLITS
 
-**Location:** `$DATA_ROOT/pytorch-challange-flower-dataset`
+**Location:** `$DATA_ROOT/Flowers102`
 
 **IMPORTANT:** Flowers102 has official train/valid folders. This script RESPECTS those:
-- Uses official train/ folder as-is
-- Splits official valid/ folder into val + test
-- Note: Official test/ folder is unlabeled and not used
+- Uses official train/ folder as-is (6552 images)
+- Splits official valid/ folder into val (60%) + test (40%) using non-stratified split
+- Note: Official test/ folder is unlabeled (819 images, not used)
+- **Why non-stratified?** Valid set has 4 classes with only 1 sample, making stratified splitting impossible
 
 ```bash
-# Create splits (respects official train/valid boundary)
+# Create splits (respects official train/valid boundary, non-stratified split)
 python datasets/helpers/flowers102_split.py \
-  --root $DATA_ROOT/pytorch-challange-flower-dataset \
-  --dataset_dir dataset \
+  --root $DATA_ROOT/Flowers102 \
+  --dataset_dir images \
   --out_json splits.json \
   --out_labels labels.json \
-  --test_from_valid_frac 0.5 \
+  --test_from_valid_frac 0.4 \
   --seed 42
 ```
 
@@ -278,6 +279,7 @@ python -m datasets.flowers102
 - **⚠️ DATA LEAKAGE WARNING**: Always respect official dataset splits! See [DATA_LEAKAGE_WARNING.md](DATA_LEAKAGE_WARNING.md) for details.
 - **RESISC45**, **Flowers102**, and **NEUDET** have official splits that MUST be preserved
 - All other splits use stratified sampling to maintain class balance
+- **Flowers102** uses non-stratified split for val/test (valid set has classes with only 1-2 samples)
 - ChestXray14 uses patient-level splitting to avoid data leakage
 - PCam requires H5 extraction (may take time and disk space)
 - ZooScanNet filters out small images and rare classes
@@ -292,7 +294,7 @@ python -m datasets.flowers102
 | ChestXray14 | Random 60/20/20 (patient-level) | No |
 | **NEUDET** | **Official train + split validation** | ⚠️ Yes (partial) |
 | RxRx1 | Official train/test + split train | Yes |
-| **Flowers102** | **Official train + split valid** | ⚠️ Yes (partial) |
+| **Flowers102** | **Official train + split valid (non-stratified)** | ⚠️ Yes (partial) |
 | **RESISC45** | **Official train/val/test** | 🔴 Yes (CRITICAL) |
 | PCam | Random 60/20/20 | No |
 | DiabeticRetinopathy | Random 60/20/20 | No |

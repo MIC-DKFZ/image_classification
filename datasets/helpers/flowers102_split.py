@@ -3,16 +3,19 @@
 Create splits.json for Flowers-102 dataset RESPECTING official splits.
 
 Flowers-102 has official train/valid folders. We KEEP these as-is:
-- train/ folder → train split
-- valid/ folder → split into val + test
-- test/ folder is unlabeled (not used)
+- train/ folder → train split (6552 images)
+- valid/ folder → split into val + test (818 images total)
+- test/ folder is unlabeled (819 images, not used)
+
+NOTE: Uses non-stratified random split for valid set because many classes
+have only 1-2 samples, making stratified splitting impossible.
 """
 
 import argparse
 import json
 from pathlib import Path
 import numpy as np
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import train_test_split
 
 
 def main():
@@ -42,7 +45,7 @@ def main():
             for img_path in class_dir.iterdir():
                 if not img_path.is_file() or img_path.suffix.lower() not in exts:
                     continue
-                rel_path = f"train/{class_name}/{img_path.name}"
+                rel_path = f"images/train/{class_name}/{img_path.name}"
                 train_data.append((rel_path, class_name))
 
     # Collect images from official valid folder (will split into val+test)
@@ -57,7 +60,7 @@ def main():
             for img_path in class_dir.iterdir():
                 if not img_path.is_file() or img_path.suffix.lower() not in exts:
                     continue
-                rel_path = f"valid/{class_name}/{img_path.name}"
+                rel_path = f"images/valid/{class_name}/{img_path.name}"
                 valid_data.append((rel_path, class_name))
 
     print(f"Official train images: {len(train_data)}")
@@ -72,14 +75,16 @@ def main():
     train_ids = [img_id for img_id, _ in train_data]
 
     # Split valid into val + test
+    # NOTE: Using non-stratified split because valid set has classes with only 1-2 samples,
+    # making stratified splitting impossible. This is acceptable given the small valid set size.
     valid_ids = [img_id for img_id, _ in valid_data]
-    valid_labels = np.array([class_to_idx[cls] for _, cls in valid_data])
 
-    sss = StratifiedShuffleSplit(n_splits=1, test_size=args.test_from_valid_frac, random_state=args.seed)
-    val_idx, test_idx = next(sss.split(np.zeros_like(valid_labels), valid_labels))
-
-    val_ids = [valid_ids[i] for i in val_idx]
-    test_ids = [valid_ids[i] for i in test_idx]
+    val_ids, test_ids = train_test_split(
+        valid_ids,
+        test_size=args.test_from_valid_frac,
+        random_state=args.seed,
+        shuffle=True
+    )
 
     # Verify no overlap
     assert set(train_ids).isdisjoint(val_ids)
@@ -111,6 +116,7 @@ def main():
     print(f"  val:   {len(val_ids)} images ({(1-args.test_from_valid_frac)*100:.0f}% of official valid)")
     print(f"  test:  {len(test_ids)} images ({args.test_from_valid_frac*100:.0f}% of official valid)")
     print(f"\n⚠️  NO DATA LEAKAGE: Official train/valid boundary preserved!")
+    print(f"⚠️  NOTE: Using non-stratified split (valid set has classes with 1-2 samples)")
 
 
 if __name__ == "__main__":
