@@ -2,6 +2,7 @@
 data/
 experiments/
 cluster_jobs.txt
+test_runs_*/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
