@@ -3,14 +3,14 @@
 # Test a single experiment first to verify setup
 
 echo "Testing single experiment: supervised + aid + lora"
-echo "Configuration: max_epochs=1, data_fraction=0.01"
-echo "========================================" 
+echo "Configuration: max_epochs=5, data_fraction=0.1"
+echo "========================================"
 
 HYDRA_FULL_ERROR=1 python main.py \
     model=supervised \
     data=aid \
     peft=lora \
-    trainer.max_epochs=1 \
+    trainer.max_epochs=5 \
     data.module.data_fraction=0.1
 
 if [ $? -eq 0 ]; then

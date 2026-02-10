@@ -6,14 +6,15 @@ Test all combinations of:
 - **3 Models**: supervised, mae_timm, dinov3
 - **10 Datasets**: aid, zooscannet, chestxray14, neudet, rxrx1, flowers102, resisc45, pcam, diabetic_retina, fgvc_aircraft
 - **7 PEFT Methods**: adapt_former, full_finetuning, gps, linear_probing, lora, vera, visual_prompt_tuning
+- **2 Data Fractions**: 0.1 (10% of data), 1.0 (full data)
 
-**Total**: 3 × 10 × 7 = **210 experiments**
+**Total**: 3 × 10 × 7 × 2 = **420 experiments**
 
 ## Test Configuration
 
-- `max_epochs=1` (fast iteration)
-- `data_fraction=0.01` (1% of data)
-- Purpose: Verify all combinations run without errors
+- `max_epochs=5` (reliable timing measurement)
+- `data_fraction=0.1, 1.0` (10% and 100% of data)
+- Purpose: Verify all combinations run without errors and measure training time
 
 ## Scripts
 
@@ -21,13 +22,13 @@ Test all combinations of:
 ```bash
 ./test_scripts/test_dryrun.sh
 ```
-Shows all 210 commands without executing. Review to ensure commands look correct.
+Shows all 420 commands without executing. Review to ensure commands look correct.
 
 ### 2. Single Test (Recommended Second Step)
 ```bash
 ./test_scripts/test_single.sh
 ```
-Runs ONE experiment (supervised + aid + lora) to verify:
+Runs ONE experiment (supervised + aid + lora, 5 epochs, 10% data) to verify:
 - Python environment works
 - All dependencies are installed
 - Config files are correct
@@ -39,22 +40,26 @@ Runs ONE experiment (supervised + aid + lora) to verify:
 ```bash
 ./test_scripts/test_all_combinations.sh
 ```
-Runs all 210 experiments sequentially. This will:
+Runs all 420 experiments sequentially. This will:
 - Create a timestamped log directory
-- Run each experiment with 1 epoch, 0.01 data fraction
-- Log each experiment to separate file
-- Generate summary of successes/failures
+- Run each experiment with 5 epochs and both 0.1 and 1.0 data fractions
+- Log each experiment to separate file with timing information
+- Generate summary of successes/failures with durations
 
-**Estimated time**: ~30-60 seconds per experiment = 1.75-3.5 hours total (depending on hardware)
+**Estimated time**:
+- 0.1 data fraction: ~1-3 min per experiment = 7-21 hours for 210 experiments
+- 1.0 data fraction: ~5-30 min per experiment = 17.5-105 hours for 210 experiments
+- **Total: ~1-5 days** (depending on hardware and dataset sizes)
 
 ## Output Structure
 
 ```
 test_runs_YYYYMMDD_HHMMSS/
-├── summary.txt                          # Overall results
-├── supervised_aid_lora.log             # Individual experiment logs
-├── supervised_aid_vera.log
-├── mae_timm_flowers102_gps.log
+├── summary.txt                                   # Overall results with timing
+├── supervised_aid_lora_frac0_1.log             # 10% data experiments
+├── supervised_aid_lora_frac1_0.log             # 100% data experiments
+├── supervised_aid_vera_frac0_1.log
+├── mae_timm_flowers102_gps_frac1_0.log
 └── ...
 ```
 
@@ -90,10 +95,19 @@ If experiments fail:
 ## Example: Run Specific Combination Manually
 
 ```bash
+# Run with 10% data for 5 epochs
 python main.py \
     model=supervised \
     data=aid \
     peft=lora \
-    trainer.max_epochs=1 \
-    data.module.data_fraction=0.01
+    trainer.max_epochs=5 \
+    data.module.data_fraction=0.1
+
+# Run with full data for 5 epochs
+python main.py \
+    model=supervised \
+    data=aid \
+    peft=lora \
+    trainer.max_epochs=5 \
+    data.module.data_fraction=1.0
 ```
