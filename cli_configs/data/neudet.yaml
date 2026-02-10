@@ -1,0 +1,26 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.neudet.NEUDETDataModule
+    name: NEUDET
+    data_root_dir: ${data_dir}/NEUDET
+    batch_size: 32
+    train_transforms:
+      _target_: augmentation.policies.neudet.TrainTransform
+    test_transforms:
+      _target_: augmentation.policies.neudet.TestTransform
+
+  num_classes: 6
+
+model:
+  task: 'Classification'
+  subtask: 'multiclass'
+  cifar_size: False
+  input_channels: 3
+  patch_size: [224, 224]
+  input_shape: ${model.patch_size}
+
+trainer:
+  logger:
+    project: NEUDET
+  max_epochs: 100

@@ -1,0 +1,26 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.zooscannet.ZooScanNetDataModule
+    name: ZooScanNet
+    data_root_dir: ${data_dir}/ZooScanNet
+    batch_size: 32
+    train_transforms:
+      _target_: augmentation.policies.zooscannet.TrainTransform
+    test_transforms:
+      _target_: augmentation.policies.zooscannet.TestTransform
+
+  num_classes: 20
+
+model:
+  task: 'Classification'
+  subtask: 'multiclass'
+  cifar_size: False
+  input_channels: 3
+  patch_size: [224, 224]
+  input_shape: ${model.patch_size}
+
+trainer:
+  logger:
+    project: ZooScanNet
+  max_epochs: 100

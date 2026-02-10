@@ -1,0 +1,26 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.flowers102.Flowers102DataModule
+    name: Flowers102
+    data_root_dir: ${data_dir}/Flowers102
+    batch_size: 32
+    train_transforms:
+      _target_: augmentation.policies.flowers102.TrainTransform
+    test_transforms:
+      _target_: augmentation.policies.flowers102.TestTransform
+
+  num_classes: 102
+
+model:
+  task: 'Classification'
+  subtask: 'multiclass'
+  cifar_size: False
+  input_channels: 3
+  patch_size: [224, 224]
+  input_shape: ${model.patch_size}
+
+trainer:
+  logger:
+    project: Flowers102
+  max_epochs: 100

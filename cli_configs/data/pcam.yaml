@@ -1,0 +1,26 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.pcam.PCamDataModule
+    name: PCam
+    data_root_dir: ${data_dir}/PCam
+    batch_size: 32
+    train_transforms:
+      _target_: augmentation.policies.pcam.TrainTransform
+    test_transforms:
+      _target_: augmentation.policies.pcam.TestTransform
+
+  num_classes: 2
+
+model:
+  task: 'Classification'
+  subtask: 'binary'
+  cifar_size: False
+  input_channels: 3
+  patch_size: [224, 224]
+  input_shape: ${model.patch_size}
+
+trainer:
+  logger:
+    project: PCam
+  max_epochs: 50

@@ -1,0 +1,26 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.chestxray14.ChestXray14DataModule
+    name: ChestXray14
+    data_root_dir: ${data_dir}/ChestXray14
+    batch_size: 32
+    train_transforms:
+      _target_: augmentation.policies.chestxray14.TrainTransform
+    test_transforms:
+      _target_: augmentation.policies.chestxray14.TestTransform
+
+  num_classes: 14
+
+model:
+  task: 'Classification'
+  subtask: 'multilabel'
+  cifar_size: False
+  input_channels: 3
+  patch_size: [224, 224]
+  input_shape: ${model.patch_size}
+
+trainer:
+  logger:
+    project: ChestXray14
+  max_epochs: 50

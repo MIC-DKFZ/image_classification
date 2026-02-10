@@ -1,0 +1,26 @@
+# @package _global_
+data:
+  module:
+    _target_: datasets.fgvc_aircraft.FGVCAircraftDataModule
+    name: FGVCAircraft
+    data_root_dir: ${data_dir}/FGVCAircraft
+    batch_size: 32
+    train_transforms:
+      _target_: augmentation.policies.fgvc_aircraft.TrainTransform
+    test_transforms:
+      _target_: augmentation.policies.fgvc_aircraft.TestTransform
+
+  num_classes: 100
+
+model:
+  task: 'Classification'
+  subtask: 'multiclass'
+  cifar_size: False
+  input_channels: 3
+  patch_size: [224, 224]
+  input_shape: ${model.patch_size}
+
+trainer:
+  logger:
+    project: FGVCAircraft
+  max_epochs: 100
