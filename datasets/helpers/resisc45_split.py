@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-Create splits.json for RESISC45 dataset.
+Create splits.json for RESISC45 dataset RESPECTING official splits.
 
-RESISC45 has train/validation/test folders with class subfolders.
-We'll merge them and create our own 60/20/20 splits.
+RESISC45 has official train/validation/test folders. We MUST use these as-is
+to prevent test data leakage!
+
+CRITICAL: Do NOT merge and re-split! This would leak test samples into training.
 """
 
 import argparse
 import json
-import os
 from pathlib import Path
-import numpy as np
-from sklearn.model_selection import StratifiedShuffleSplit
 
 
 def main():
@@ -19,29 +18,23 @@ def main():
     ap.add_argument("--root", required=True, help="Dataset root (contains train/validation/test folders)")
     ap.add_argument("--out_json", default="splits.json", help="Output splits file")
     ap.add_argument("--out_labels", default="labels.json", help="Output labels file")
-    ap.add_argument("--train_frac", type=float, default=0.6)
-    ap.add_argument("--val_frac", type=float, default=0.2)
-    ap.add_argument("--test_frac", type=float, default=0.2)
-    ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--exts", nargs="+", default=[".jpg", ".jpeg", ".png"])
     args = ap.parse_args()
-
-    if not np.isclose(args.train_frac + args.val_frac + args.test_frac, 1.0):
-        raise ValueError("train_frac + val_frac + test_frac must sum to 1.0")
 
     root = Path(args.root)
     exts = {e.lower() for e in args.exts}
 
-    # Collect all images from train, validation, test folders
-    image_data = []
+    # Collect images from OFFICIAL splits (DO NOT MERGE!)
+    image_data = {}  # split_name -> list of (path, class)
 
     for split_name in ["train", "validation", "test"]:
         split_dir = root / split_name
         if not split_dir.exists():
-            print(f"Warning: {split_dir} does not exist, skipping")
-            continue
+            print(f"ERROR: {split_dir} does not exist!")
+            print(f"RESISC45 requires official train/validation/test folders.")
+            raise FileNotFoundError(f"Missing {split_name} folder")
 
-        # Each split has class subfolders
+        split_data = []
         for class_dir in split_dir.iterdir():
             if not class_dir.is_dir():
                 continue
@@ -53,48 +46,43 @@ def main():
 
                 # Store as relative path from root
                 rel_path = f"{split_name}/{class_name}/{img_path.name}"
-                image_data.append((rel_path, class_name))
+                split_data.append((rel_path, class_name))
 
-    print(f"Total images collected: {len(image_data)}")
+        image_data[split_name] = split_data
+        print(f"Official {split_name}: {len(split_data)} images")
 
     # Create class-to-index mapping
-    unique_classes = sorted(set(cls for _, cls in image_data))
+    all_images = []
+    for split_data in image_data.values():
+        all_images.extend(split_data)
+
+    unique_classes = sorted(set(cls for _, cls in all_images))
     class_to_idx = {cls: idx for idx, cls in enumerate(unique_classes)}
     print(f"Number of classes: {len(class_to_idx)}")
 
-    # Prepare data for splitting
-    image_ids = [img_id for img_id, _ in image_data]
-    labels = np.array([class_to_idx[cls] for _, cls in image_data])
+    # Create splits using OFFICIAL boundaries
+    train_ids = [img_id for img_id, _ in image_data["train"]]
+    val_ids = [img_id for img_id, _ in image_data["validation"]]
+    test_ids = [img_id for img_id, _ in image_data["test"]]
 
-    # Stratified split
-    sss1 = StratifiedShuffleSplit(n_splits=1, test_size=args.test_frac, random_state=args.seed)
-    trainval_idx, test_idx = next(sss1.split(np.zeros_like(labels), labels))
+    # CRITICAL VERIFICATION: Ensure no overlap!
+    assert set(train_ids).isdisjoint(val_ids), "Train/Val overlap detected!"
+    assert set(train_ids).isdisjoint(test_ids), "Train/Test overlap detected!"
+    assert set(val_ids).isdisjoint(test_ids), "Val/Test overlap detected!"
+    print("✓ Verified: No data leakage between official splits")
 
-    trainval_ids = [image_ids[i] for i in trainval_idx]
-    trainval_labels = labels[trainval_idx]
-    test_ids = [image_ids[i] for i in test_idx]
-
-    # Split train vs val
-    val_rel = args.val_frac / (args.train_frac + args.val_frac)
-    sss2 = StratifiedShuffleSplit(n_splits=1, test_size=val_rel, random_state=args.seed + 1)
-    train_idx, val_idx = next(sss2.split(np.zeros_like(trainval_labels), trainval_labels))
-
-    train_ids = [trainval_ids[i] for i in train_idx]
-    val_ids = [trainval_ids[i] for i in val_idx]
-
-    # Verify no overlap
-    assert set(train_ids).isdisjoint(val_ids)
-    assert set(train_ids).isdisjoint(test_ids)
-    assert set(val_ids).isdisjoint(test_ids)
-
-    # Save splits
-    splits_out = {"train": train_ids, "val": val_ids, "test": test_ids}
+    # Save splits (using official split names)
+    splits_out = {
+        "train": train_ids,
+        "val": val_ids,  # Note: official "validation" → "val" for consistency
+        "test": test_ids
+    }
     splits_path = root / args.out_json
     with open(splits_path, "w", encoding="utf-8") as f:
         json.dump(splits_out, f, indent=2)
 
     # Save labels
-    labels_dict = {img_id: class_to_idx[cls] for img_id, cls in image_data}
+    labels_dict = {img_id: class_to_idx[cls] for img_id, cls in all_images}
     labels_path = root / args.out_labels
     with open(labels_path, "w", encoding="utf-8") as f:
         json.dump(labels_dict, f, indent=2)
@@ -104,12 +92,14 @@ def main():
     with open(class_map_path, "w", encoding="utf-8") as f:
         json.dump(class_to_idx, f, indent=2)
 
-    print(f"Wrote {splits_path}")
+    print(f"\nWrote {splits_path}")
     print(f"Wrote {labels_path}")
     print(f"Wrote {class_map_path}")
-    print(f"train: {len(train_ids)} images")
-    print(f"val:   {len(val_ids)} images")
-    print(f"test:  {len(test_ids)} images")
+    print(f"\n✓ USING OFFICIAL RESISC45 SPLITS:")
+    print(f"  train: {len(train_ids)} images")
+    print(f"  val:   {len(val_ids)} images")
+    print(f"  test:  {len(test_ids)} images")
+    print(f"\n⚠️  CRITICAL: Official test split preserved - NO DATA LEAKAGE!")
 
 
 if __name__ == "__main__":
