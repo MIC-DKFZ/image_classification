@@ -8,8 +8,8 @@ echo "========================================"
 
 HYDRA_FULL_ERROR=1 python main.py \
     model=mae_timm \
-    data=rxrx1 \
-    peft=lora \
+    data=aid \
+    peft=gps \
     trainer.max_epochs=1 \
     data.module.data_fraction=0.1
 
