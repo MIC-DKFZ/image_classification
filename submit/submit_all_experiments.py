@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -34,15 +35,30 @@ DATASETS = [
     "fgvc_aircraft",
 ]
 
-PEFTS = [
-    "adapt_former",
-    "full_finetuning",
-    "gps",
-    "linear_probing",
-    "lora",
-    "vera",
-    "visual_prompt_tuning",
-]
+PEFTS = {
+    "adapt_former": {
+        "bottleneck": [16, 64, 256],
+        "dropout": [0.0, 0.05, 0.1],
+    },
+    "full_finetuning": {},
+    "gps": {
+        "gps_percent": [1, 4, 16],
+        "gps_calib_batches": [1, 2, 4],
+    },
+    "linear_probing": {},
+    "lora": {
+        "lora_rank": [4, 8, 16],
+        "lora_alpha": [8, 16, 32],
+    },
+    "vera": {
+        "vera_rank": [4, 8, 16],
+        "vera_dropout": [0.0, 0.01, 0.05],
+    },
+    "visual_prompt_tuning": {
+        "num_tokens": [8, 20, 40],
+        "dropout": [0.0, 0.05, 0.1],
+    },
+}
 
 DATASET_EPOCH_MEANS = {
     "aid": 0.43,
@@ -63,6 +79,7 @@ class Experiment:
     model: str
     dataset: str
     peft: str
+    peft_overrides: dict[str, object]
     max_epochs: int
     data_fraction: float
     lr: float
@@ -122,19 +139,33 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def iter_peft_variants() -> Iterable[tuple[str, dict[str, object]]]:
+    for peft_name, hparams in PEFTS.items():
+        if not hparams:
+            yield peft_name, {}
+            continue
+
+        param_names = list(hparams.keys())
+        value_product = itertools.product(*(hparams[name] for name in param_names))
+        for values in value_product:
+            yield peft_name, dict(zip(param_names, values, strict=True))
+
+
 def iter_experiments() -> Iterable[Experiment]:
-    for max_epochs, data_fraction, lr, model, dataset, peft in itertools.product(
+    peft_variants = list(iter_peft_variants())
+    for max_epochs, data_fraction, lr, model, dataset, (peft, peft_overrides) in itertools.product(
         MAX_EPOCHS,
         DATA_FRACTIONS,
         LEARNING_RATES,
         MODELS,
         DATASETS,
-        PEFTS,
+        peft_variants,
     ):
         yield Experiment(
             model=model,
             dataset=dataset,
             peft=peft,
+            peft_overrides=peft_overrides,
             max_epochs=max_epochs,
             data_fraction=data_fraction,
             lr=lr,
@@ -158,6 +189,9 @@ def build_python_command(args: argparse.Namespace, experiment: Experiment) -> st
         f"data_dir={args.data_dir}",
         f"exp_dir={args.exp_dir}",
     ]
+    parts.extend(
+        f"peft.{name}={value}" for name, value in experiment.peft_overrides.items()
+    )
     parts.extend(args.extra_override)
     return " ".join(parts)
 
