@@ -3,7 +3,7 @@ data:
   module:
     _target_: datasets.resisc45.RESISC45DataModule
     name: RESISC45
-    data_root_dir: /home/d246a/Documents/data/SynergyUnitDatasets/RESISC45
+    data_root_dir: ${data_dir}/RESISC45
     batch_size: 32
     data_fraction: 0.1
     train_transforms:

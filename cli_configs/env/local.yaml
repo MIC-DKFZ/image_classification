@@ -1,2 +1,3 @@
 # @package _global_
-exp_dir: '/home/d246a/Documents/projects/classification_downstream/experiments'
+exp_dir: ???
+data_dir: ???
