@@ -58,6 +58,13 @@ def parse_args() -> argparse.Namespace:
         help="Print commands instead of submitting them.",
     )
     parser.add_argument(
+        "--subset",
+        help=(
+            "Optional 0-based subset slice in the form start:end. "
+            "Start is inclusive, end is exclusive."
+        ),
+    )
+    parser.add_argument(
         "--extra-override",
         action="append",
         default=[],
@@ -113,10 +120,42 @@ def format_submit_command(submit_command: list[str]) -> str:
     return " ".join(submit_command[:-1] + [f'"{python_command}"'])
 
 
+def parse_subset_arg(subset: str, total_experiments: int) -> tuple[int, int]:
+    parts = subset.split(":", maxsplit=1)
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise ValueError(
+            f"Invalid --subset value '{subset}'. Expected format start:end."
+        )
+
+    try:
+        start = int(parts[0])
+        end = int(parts[1])
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid --subset value '{subset}'. Start and end must be integers."
+        ) from exc
+
+    if start < 0 or end < 0:
+        raise ValueError("--subset does not support negative indices.")
+    if start > end:
+        raise ValueError("--subset start must be <= end.")
+    if end > total_experiments:
+        raise ValueError(
+            f"--subset end {end} exceeds the manifest size {total_experiments}."
+        )
+
+    return start, end
+
+
 def main() -> int:
     args = parse_args()
     manifest = read_manifest(args.manifest)
     experiments = manifest["experiments"]
+
+    if args.subset:
+        start, end = parse_subset_arg(args.subset, len(experiments))
+        experiments = experiments[start:end]
+
     progress_label = "Printing commands" if args.dry_run else "Submitting jobs"
     failures: list[tuple[str, subprocess.CompletedProcess[str]]] = []
 
