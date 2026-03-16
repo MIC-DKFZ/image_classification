@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 
 MAX_EPOCHS = [5, 10, 20, 40, 100]
-DATA_FRACTIONS = [0.1, 0.2, 0.4, 1.0]
+DATA_FRACTIONS = [0.1, 0.2, 0.4, 0.6, 0.8, 1.0]
 LEARNING_RATES = [1e-5, 2e-5, 5e-5]
 
 MODELS = [
