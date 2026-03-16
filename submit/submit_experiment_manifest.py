@@ -33,14 +33,9 @@ def parse_args() -> argparse.Namespace:
         help="Value passed to Hydra as exp_dir=...",
     )
     parser.add_argument(
-        "--env",
-        default="cluster",
-        help="Hydra env config to use. Defaults to 'cluster'.",
-    )
-    parser.add_argument(
-        "--python-executable",
-        default="python",
-        help="Python executable used inside the submitted command.",
+        "--conda-path",
+        default="/dkfz/cluster/gpu/data/mic_data_common/synergy_unit/scripts/submit.sh",
+        help="Path to the cluster submission wrapper script.",
     )
     parser.add_argument(
         "--wandb-entity",
@@ -75,9 +70,9 @@ def parse_args() -> argparse.Namespace:
 
 def build_python_command(args: argparse.Namespace, experiment: dict[str, object]) -> str:
     parts = [
-        args.python_executable,
+        "python",
         "main.py",
-        f"env={args.env}",
+        "env=cluster",
         f"wandb.entity={args.wandb_entity}",
         f"wandb.project={args.wandb_project}",
         f"+wandb.name={experiment['id']}",
@@ -99,17 +94,13 @@ def build_python_command(args: argparse.Namespace, experiment: dict[str, object]
     return " ".join(parts)
 
 
-def build_submit_command(python_command: str) -> list[str]:
+def build_submit_command(args: argparse.Namespace, python_command: str) -> list[str]:
     return [
-        "bsub2",
+        args.conda_path,
         "-n",
         "synergy",
         "-e",
         "synergy",
-        "-q",
-        "gpu-pro",
-        "-m",
-        "35",
         "-c",
         python_command,
     ]
@@ -161,7 +152,7 @@ def main() -> int:
 
     for experiment in tqdm(experiments, desc=progress_label):
         python_command = build_python_command(args, experiment)
-        submit_command = build_submit_command(python_command)
+        submit_command = build_submit_command(args, python_command)
 
         if args.dry_run:
             print(format_submit_command(submit_command))
