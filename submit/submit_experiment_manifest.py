@@ -94,9 +94,13 @@ def build_python_command(args: argparse.Namespace, experiment: dict[str, object]
     return " ".join(parts)
 
 
-def build_submit_command(args: argparse.Namespace, python_command: str) -> list[str]:
+def build_submit_command(
+    args: argparse.Namespace, experiment: dict[str, object], python_command: str
+) -> list[str]:
     return [
         args.conda_path,
+        "-i",
+        str(experiment["id"]),
         "-n",
         "synergy",
         "-e",
@@ -152,7 +156,7 @@ def main() -> int:
 
     for experiment in tqdm(experiments, desc=progress_label):
         python_command = build_python_command(args, experiment)
-        submit_command = build_submit_command(args, python_command)
+        submit_command = build_submit_command(args, experiment, python_command)
 
         if args.dry_run:
             print(format_submit_command(submit_command))
