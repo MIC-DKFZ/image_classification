@@ -17,9 +17,10 @@ HRID_SETTINGS = {
     "use_hash_suffix": True,
 }
 ESTIMATION_ASSUMPTIONS = [
-    "Dataset mean runtime is a per-epoch estimate at data_fraction=1.0.",
+    "Dataset runtime is a per-epoch estimate in seconds at data_fraction=1.0.",
     "Runtime scales linearly with max_epochs.",
-    "Runtime scales linearly with data_fraction.",
+    "The train portion of an epoch scales linearly with data_fraction.",
+    "The validation portion of an epoch stays fixed across data fractions.",
     "Runtime is treated as independent of model, PEFT method, learning rate, and PEFT hyperparameters.",
 ]
 
@@ -71,18 +72,27 @@ PEFTS = {
     },
 }
 
-DATASET_EPOCH_MEANS = {
-    "aid": 0.43,
-    "zooscannet": 25.09,
-    "chestxray14": 3.67,
-    "neudet": 0.13,
-    "rxrx1": 3.11,
-    "flowers102": 0.36,
-    "resisc45": 0.99,
-    "pcam": 7.74,
-    "diabetic_retina": 4.96,
-    "fgvc_aircraft": 0.37,
-}
+DATASET_EPOCH_SPLIT_TIMINGS_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "synergy_unit/data/dataset_mean_epoch_split_times.json"
+)
+
+
+def load_dataset_epoch_seconds(
+    path: Path = DATASET_EPOCH_SPLIT_TIMINGS_PATH,
+) -> dict[str, dict[str, float]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    timings = payload["mean_epoch_seconds_per_dataset"]
+    return {
+        dataset: {
+            "train": float(values["train_epoch_seconds"]),
+            "val": float(values["val_epoch_seconds"]),
+        }
+        for dataset, values in timings.items()
+    }
+
+
+DATASET_EPOCH_SECONDS = load_dataset_epoch_seconds()
 
 
 @dataclass(frozen=True)
@@ -151,14 +161,20 @@ def generate_experiment_id(payload: dict[str, Any]) -> str:
         raise ValueError(f"Failed to generate HRID for payload {payload}") from exc
 
 
+def estimate_epoch_seconds(dataset: str, data_fraction: float) -> float:
+    split_seconds = DATASET_EPOCH_SECONDS[dataset]
+    return split_seconds["train"] * data_fraction + split_seconds["val"]
+
+
 def estimate_gpu_hours(experiments: Iterable[ExperimentSpec]) -> float:
-    total_minutes = 0.0
+    total_seconds = 0.0
     for experiment in experiments:
-        epoch_minutes = DATASET_EPOCH_MEANS[experiment.dataset]
-        total_minutes += (
-            epoch_minutes * experiment.max_epochs * experiment.data_fraction
+        epoch_seconds = estimate_epoch_seconds(
+            dataset=experiment.dataset,
+            data_fraction=experiment.data_fraction,
         )
-    return total_minutes / 60.0
+        total_seconds += epoch_seconds * experiment.max_epochs
+    return total_seconds / 3600.0
 
 
 def build_manifest() -> dict[str, Any]:
