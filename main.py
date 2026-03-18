@@ -82,6 +82,8 @@ def main(cfg):
         cfg_dict["model"]["model"] = cfg_dict["model"].pop("name")
         trainer.logger.log_hyperparams(cfg_dict["model"])
 
+        trainer.logger.log_hyperparams({"dataset": cfg_dict["dataset"]})
+
         cfg_dict["peft"].pop("_target_")
         trainer.logger.log_hyperparams(cfg_dict["peft"])
 
