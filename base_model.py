@@ -681,9 +681,14 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
         self.warmstart = warmstart
         self.T = 0
 
-        super(CosineAnnealingLR_Warmstart, self).__init__(
-            optimizer, last_epoch, verbose
-        )
+        try:
+            super(CosineAnnealingLR_Warmstart, self).__init__(
+                optimizer, last_epoch=last_epoch, verbose=verbose
+            )
+        except TypeError:
+            super(CosineAnnealingLR_Warmstart, self).__init__(
+                optimizer, last_epoch=last_epoch
+            )
 
     def get_lr(self):
         if not self._get_lr_called_within_step:
@@ -772,9 +777,14 @@ class CosineAnnealingLR_DoubleWarmstart(_LRScheduler):
         if self.encoder_group is None:
             raise ValueError("Optimizer must have a parameter group named 'encoder'.")
 
-        super(CosineAnnealingLR_DoubleWarmstart, self).__init__(
-            optimizer, last_epoch, verbose
-        )
+        try:
+            super(CosineAnnealingLR_DoubleWarmstart, self).__init__(
+                optimizer, last_epoch=last_epoch, verbose=verbose
+            )
+        except TypeError:
+            super(CosineAnnealingLR_DoubleWarmstart, self).__init__(
+                optimizer, last_epoch=last_epoch
+            )
 
     def get_lr(self):
         if not self._get_lr_called_within_step:
