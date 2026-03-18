@@ -118,11 +118,13 @@ class ZooScanNetDataModule(BaseDataModule):
             self.data_path,
             split="train",
             transform=self.train_transforms,
+            split_file=self.split_file,
         )
         self.val_dataset = ZooScanNetData(
             self.data_path,
             split="val",
             transform=self.test_transforms,
+            split_file=self.split_file,
         )
 
 

@@ -155,11 +155,13 @@ class EyePACSDataModule(BaseDataModule):
             self.data_path,
             split="train",
             transform=self.train_transforms,
+            split_file=self.split_file,
         )
         self.val_dataset = EyePACSData(
             self.data_path,
             split="val",
             transform=self.test_transforms,
+            split_file=self.split_file,
         )
 
 

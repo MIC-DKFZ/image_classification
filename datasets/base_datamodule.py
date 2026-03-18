@@ -53,6 +53,7 @@ class BaseDataModule(LightningDataModule):
         self.fold = fold
         self.data_fraction = data_fraction
         self.stratified = stratified
+        self.split_file = kwargs.get("split_file", "splits.json")
         self._fraction_applied = False
 
     def prepare_data(self) -> None:
@@ -97,7 +98,7 @@ class BaseDataModule(LightningDataModule):
             return
         if not hasattr(self, "train_dataset"):
             return
-        if self.data_fraction >= 1.0 or self.data_fraction is None:
+        if self.data_fraction is None or self.data_fraction >= 1.0:
             self._fraction_applied = True
             return
         self.train_dataset = self._apply_fraction(

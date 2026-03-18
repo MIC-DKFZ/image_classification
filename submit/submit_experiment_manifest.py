@@ -65,10 +65,43 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Additional Hydra override to append. Can be passed multiple times.",
     )
+    parser.add_argument(
+        "--trial",
+        type=int,
+        default=0,
+        help="Subset trial index to use when selecting split files. Defaults to 0.",
+    )
     return parser.parse_args()
 
 
+def fraction_label(value: float) -> str:
+    return f"{value:.1f}".replace(".", "_")
+
+
+def build_split_file_override(args: argparse.Namespace, experiment: dict[str, object]) -> str:
+    data_fraction = experiment.get("data_fraction")
+    samples_per_class = experiment.get("samples_per_class")
+
+    if (data_fraction is None) == (samples_per_class is None):
+        raise ValueError(
+            f"Experiment {experiment['id']} must define exactly one of "
+            "data_fraction or samples_per_class."
+        )
+
+    if data_fraction is not None:
+        return (
+            f"subsets/data_fraction_{fraction_label(float(data_fraction))}"
+            f"_trial_{args.trial}.json"
+        )
+
+    return f"subsets/samples_per_class_{samples_per_class}_trial_{args.trial}.json"
+
+
 def build_python_command(args: argparse.Namespace, experiment: dict[str, object]) -> str:
+    split_file = build_split_file_override(args, experiment)
+    data_fraction = experiment.get("data_fraction")
+    samples_per_class = experiment.get("samples_per_class")
+
     parts = [
         "python",
         "main.py",
@@ -80,7 +113,10 @@ def build_python_command(args: argparse.Namespace, experiment: dict[str, object]
         f"data={experiment['dataset']}",
         f"peft={experiment['peft']}",
         f"trainer.max_epochs={experiment['max_epochs']}",
-        f"data.module.data_fraction={experiment['data_fraction']}",
+        "data.module.data_fraction=null",
+        f"+data.module.split_file={split_file}",
+        f"+data_fraction={data_fraction if data_fraction is not None else 'null'}",
+        f"+samples_per_class={samples_per_class if samples_per_class is not None else 'null'}",
         f"model.lr={experiment['lr']}",
         f"data_dir={args.data_dir}",
         f"exp_dir={args.exp_dir}",
