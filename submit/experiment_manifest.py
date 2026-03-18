@@ -27,9 +27,9 @@ ESTIMATION_ASSUMPTIONS = [
     "Runtime is treated as independent of model, PEFT method, learning rate, and PEFT hyperparameters.",
 ]
 
-MAX_EPOCHS = [5, 10, 20, 40, 100]
-DATA_FRACTIONS = [0.1, 0.2, 0.4, 0.6, 0.8, 1.0]
-SAMPLES_PER_CLASS = [10, 20, 30, 40, 50]
+MAX_EPOCHS = [20]  # [5, 10, 20, 40, 100]
+DATA_FRACTIONS = []  # [0.1, 0.2, 0.4, 0.6, 0.8, 1.0]
+SAMPLES_PER_CLASS = [50]  # [10, 20, 30, 40, 50]
 LEARNING_RATES = [1e-5, 2e-5, 5e-5]
 
 MODELS = [
@@ -47,33 +47,37 @@ DATASETS = [
     "flowers102",
     "resisc45",
     "pcam",
-    "diabetic_retina",
+    # "diabetic_retina",
     "fgvc_aircraft",
 ]
 
+# PEFTS = {
+#     "adapt_former": {
+#         "bottleneck": [16, 64, 256],
+#         "dropout": [0.0, 0.05, 0.1],
+#     },
+#     "full_finetuning": {},
+#     "gps": {
+#         "gps_percent": [1, 4, 16],
+#         "gps_calib_batches": [1, 2, 4],
+#     },
+#     "linear_probing": {},
+#     "lora": {
+#         "lora_rank": [4, 8, 16],
+#         "lora_alpha": [8, 16, 32],
+#     },
+#     "vera": {
+#         "vera_rank": [4, 8, 16],
+#         "vera_dropout": [0.0, 0.01, 0.05],
+#     },
+#     "visual_prompt_tuning": {
+#         "num_tokens": [8, 20, 40],
+#         "dropout": [0.0, 0.05, 0.1],
+#     },
+# }
+
 PEFTS = {
-    "adapt_former": {
-        "bottleneck": [16, 64, 256],
-        "dropout": [0.0, 0.05, 0.1],
-    },
-    "full_finetuning": {},
-    "gps": {
-        "gps_percent": [1, 4, 16],
-        "gps_calib_batches": [1, 2, 4],
-    },
-    "linear_probing": {},
-    "lora": {
-        "lora_rank": [4, 8, 16],
-        "lora_alpha": [8, 16, 32],
-    },
-    "vera": {
-        "vera_rank": [4, 8, 16],
-        "vera_dropout": [0.0, 0.01, 0.05],
-    },
-    "visual_prompt_tuning": {
-        "num_tokens": [8, 20, 40],
-        "dropout": [0.0, 0.05, 0.1],
-    },
+    "linear_probing": {}
 }
 
 DATASET_EPOCH_SPLIT_TIMINGS_PATH = (

@@ -7,6 +7,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 import torch
 from lightning.pytorch import LightningDataModule
 from torch.utils.data import DataLoader, RandomSampler, Subset
+from typing import Optional
 
 
 class BaseDataModule(LightningDataModule):
@@ -35,7 +36,7 @@ class BaseDataModule(LightningDataModule):
         num_workers,
         prepare_data_per_node,
         fold,
-        data_fraction: float = 1.0,
+        data_fraction: Optional[float] = None,
         stratified: bool = True,
         *args,
         **kwargs
@@ -96,7 +97,7 @@ class BaseDataModule(LightningDataModule):
             return
         if not hasattr(self, "train_dataset"):
             return
-        if self.data_fraction >= 1.0:
+        if self.data_fraction >= 1.0 or self.data_fraction is None:
             self._fraction_applied = True
             return
         self.train_dataset = self._apply_fraction(
