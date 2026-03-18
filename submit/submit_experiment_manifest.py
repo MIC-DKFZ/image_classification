@@ -128,7 +128,7 @@ def build_python_command(args: argparse.Namespace, experiment: dict[str, object]
 
     peft_params = experiment.get("peft_params", {})
     for name, value in peft_params.items():
-        parts.append(f"peft.{name}={value}")
+        parts.append(f"++peft.{name}={value}")
 
     parts.extend(args.extra_override)
     return " ".join(parts)
