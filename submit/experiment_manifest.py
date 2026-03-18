@@ -30,54 +30,51 @@ ESTIMATION_ASSUMPTIONS = [
 MAX_EPOCHS = [20]  # [5, 10, 20, 40, 100]
 DATA_FRACTIONS = []  # [0.1, 0.2, 0.4, 0.6, 0.8, 1.0]
 SAMPLES_PER_CLASS = [50]  # [10, 20, 30, 40, 50]
+TRIALS = [0]
 LEARNING_RATES = [1e-5, 2e-5, 5e-5]
 
 MODELS = [
-    "supervised",
-    "mae_timm",
+    # "supervised",
+    # "mae_timm",
     "dinov3_reference",
 ]
 
 DATASETS = [
     "aid",
-    "zooscannet",
-    "chestxray14",
-    "neudet",
-    "rxrx1",
-    "flowers102",
-    "resisc45",
-    "pcam",
+    # "zooscannet",
+    # "chestxray14",
+    # "neudet",
+    # "rxrx1",
+    # "flowers102",
+    # "resisc45",
+    # "pcam",
     # "diabetic_retina",
-    "fgvc_aircraft",
+    # "fgvc_aircraft",
 ]
 
-# PEFTS = {
-#     "adapt_former": {
-#         "bottleneck": [16, 64, 256],
-#         "dropout": [0.0, 0.05, 0.1],
-#     },
-#     "full_finetuning": {},
-#     "gps": {
-#         "gps_percent": [1, 4, 16],
-#         "gps_calib_batches": [1, 2, 4],
-#     },
-#     "linear_probing": {},
-#     "lora": {
-#         "lora_rank": [4, 8, 16],
-#         "lora_alpha": [8, 16, 32],
-#     },
-#     "vera": {
-#         "vera_rank": [4, 8, 16],
-#         "vera_dropout": [0.0, 0.01, 0.05],
-#     },
-#     "visual_prompt_tuning": {
-#         "num_tokens": [8, 20, 40],
-#         "dropout": [0.0, 0.05, 0.1],
-#     },
-# }
-
 PEFTS = {
-    "linear_probing": {}
+    # "adapt_former": {
+    #     "bottleneck": [16, 64, 256],
+    #     "dropout": [0.0, 0.05, 0.1],
+    # },
+    # "full_finetuning": {},
+    # "gps": {
+    #     "gps_percent": [1, 4, 16],
+    #     "gps_calib_batches": [1, 2, 4],
+    # },
+    "linear_probing": {},
+    # "lora": {
+    #     "lora_rank": [4, 8, 16],
+    #     "lora_alpha": [8, 16, 32],
+    # },
+    # "vera": {
+    #     "vera_rank": [4, 8, 16],
+    #     "vera_dropout": [0.0, 0.01, 0.05],
+    # },
+    # "visual_prompt_tuning": {
+    #     "num_tokens": [8, 20, 40],
+    #     "dropout": [0.0, 0.05, 0.1],
+    # },
 }
 
 DATASET_EPOCH_SPLIT_TIMINGS_PATH = (
@@ -145,6 +142,7 @@ class ExperimentSpec:
     model: str
     dataset: str
     peft: str
+    trial: int
     max_epochs: int
     data_fraction: float | None
     samples_per_class: int | None
@@ -174,6 +172,7 @@ def iter_experiments() -> Iterable[ExperimentSpec]:
         for samples_per_class in SAMPLES_PER_CLASS
     ]
     for (
+        trial,
         max_epochs,
         sweep_variant,
         lr,
@@ -181,6 +180,7 @@ def iter_experiments() -> Iterable[ExperimentSpec]:
         dataset,
         (peft, peft_params),
     ) in itertools.product(
+        TRIALS,
         MAX_EPOCHS,
         sweep_variants,
         LEARNING_RATES,
@@ -192,6 +192,7 @@ def iter_experiments() -> Iterable[ExperimentSpec]:
             model=model,
             dataset=dataset,
             peft=peft,
+            trial=trial,
             max_epochs=max_epochs,
             data_fraction=sweep_variant["data_fraction"],
             samples_per_class=sweep_variant["samples_per_class"],

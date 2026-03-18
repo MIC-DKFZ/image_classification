@@ -68,8 +68,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--trial",
         type=int,
-        default=0,
-        help="Subset trial index to use when selecting split files. Defaults to 0.",
+        help=(
+            "Deprecated override for subset trial index. If omitted, the value "
+            "from the manifest record is used."
+        ),
     )
     return parser.parse_args()
 
@@ -81,6 +83,7 @@ def fraction_label(value: float) -> str:
 def build_split_file_override(args: argparse.Namespace, experiment: dict[str, object]) -> str:
     data_fraction = experiment.get("data_fraction")
     samples_per_class = experiment.get("samples_per_class")
+    trial = args.trial if args.trial is not None else experiment.get("trial", 0)
 
     if (data_fraction is None) == (samples_per_class is None):
         raise ValueError(
@@ -91,10 +94,10 @@ def build_split_file_override(args: argparse.Namespace, experiment: dict[str, ob
     if data_fraction is not None:
         return (
             f"subsets/data_fraction_{fraction_label(float(data_fraction))}"
-            f"_trial_{args.trial}.json"
+            f"_trial_{trial}.json"
         )
 
-    return f"subsets/samples_per_class_{samples_per_class}_trial_{args.trial}.json"
+    return f"subsets/samples_per_class_{samples_per_class}_trial_{trial}.json"
 
 
 def build_python_command(args: argparse.Namespace, experiment: dict[str, object]) -> str:
