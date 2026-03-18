@@ -118,6 +118,7 @@ def build_python_command(args: argparse.Namespace, experiment: dict[str, object]
         f"trainer.max_epochs={experiment['max_epochs']}",
         "data.module.data_fraction=null",
         f"+data.module.split_file={split_file}",
+        f"+dataset={experiment['dataset']}",
         f"+data_fraction={data_fraction if data_fraction is not None else 'null'}",
         f"+samples_per_class={samples_per_class if samples_per_class is not None else 'null'}",
         f"model.lr={experiment['lr']}",
