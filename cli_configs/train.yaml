@@ -10,7 +10,7 @@ defaults:
 log_dir: ${hydra:output_subdir}
 
 hydra:
-  output_subdir: ${exp_dir}/${data.module.name}/${make_group_name:${model.name},${model.finetune_method}}
+  output_subdir: ${exp_dir}/${data.module.name}/${run_name_or_generated:${wandb.name},${model.name},${model.finetune_method}}
   job:
     chdir: False
     env_set:

@@ -17,6 +17,18 @@ def _get_model_embed_dim(model_type: str):
 
 
 def make_omegaconf_resolvers():
+    def _make_group_name(model, ft_method):
+        return (
+            datetime.now().strftime("%Y%m%d_%H%M%S")
+            + f"_{model.lower()}_{ft_method.lower()}_"
+            + str(uuid4())
+        )
+
+    def _run_name_or_generated(run_name, model, ft_method):
+        if run_name not in (None, "", "null"):
+            return str(run_name)
+        return _make_group_name(model, ft_method)
+
     OmegaConf.register_new_resolver(
         "path_formatter",
         lambda s: s.replace("[", "")
@@ -34,11 +46,12 @@ def make_omegaconf_resolvers():
     OmegaConf.register_new_resolver("model_name_extractor", lambda s: s.split(".")[-1])
     OmegaConf.register_new_resolver(
         "make_group_name",
-        lambda model, ft_method: (
-            datetime.now().strftime("%Y%m%d_%H%M%S")
-            + f"_{model.lower()}_{ft_method.lower()}_"
-            + str(uuid4())
-        ),
+        _make_group_name,
+        use_cache=True,
+    )
+    OmegaConf.register_new_resolver(
+        "run_name_or_generated",
+        _run_name_or_generated,
         use_cache=True,
     )
     OmegaConf.register_new_resolver("group_extractor", lambda s: s.split("/")[-1])
