@@ -37,7 +37,7 @@ model:
   mixup_alpha: 0.2
   weight_decay: 0.05 #5e-4
   undecay_norm: False
-  label_smoothing: 0.2
+  label_smoothing: 0.1
   stochastic_depth: False
   resnet_dropout: 0.0
   squeeze_excitation: False
