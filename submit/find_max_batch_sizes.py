@@ -36,6 +36,7 @@ DEFAULT_TIMEOUT_SECONDS = 1800
 DEFAULT_LIMIT_TRAIN_BATCHES = 1
 DEFAULT_LIMIT_VAL_BATCHES = 1
 DEFAULT_JOB_LABEL = "batch_size_probe"
+BATCH_SIZE_GRANULARITY = 16
 VERBOSE = False
 DATASETS = [
     "aid",
@@ -272,16 +273,15 @@ def is_oom_failure(returncode: int, combined_output: str) -> bool:
     return returncode in {137, 139}
 
 
-def even_floor(value: int) -> int:
-    if value <= 2:
+def granularity_floor(value: int) -> int:
+    if value <= BATCH_SIZE_GRANULARITY:
         return value
-    return value if value % 2 == 0 else value - 1
+    remainder = value % BATCH_SIZE_GRANULARITY
+    return value if remainder == 0 else value - remainder
 
 
 def choose_probe_batch_size(initial_batch_size: int) -> int:
-    if initial_batch_size <= 2:
-        return max(1, initial_batch_size)
-    return max(2, even_floor(initial_batch_size))
+    return max(BATCH_SIZE_GRANULARITY, granularity_floor(initial_batch_size))
 
 
 def build_probe_command(
@@ -507,18 +507,12 @@ def find_max_batch_size(
             break
         if attempt["status"] == "oom":
             high_failure = current
-            if current <= 2:
-                single_attempt = run_probe_once(args=args, combo=combo, batch_size=1)
-                append_attempt(payload, combo, entry, single_attempt)
-                if single_attempt["status"] == "success":
-                    return 1, None
-                if single_attempt["status"] == "oom":
-                    return None, "oom_at_batch_size_1"
-                return None, f"{single_attempt['status']}_at_batch_size_1"
+            if current <= BATCH_SIZE_GRANULARITY:
+                return None, f"oom_at_batch_size_{BATCH_SIZE_GRANULARITY}"
 
-            next_current = max(2, even_floor(current // 2))
+            next_current = max(BATCH_SIZE_GRANULARITY, granularity_floor(current // 2))
             if next_current == current:
-                next_current = max(2, current - 2)
+                next_current = max(BATCH_SIZE_GRANULARITY, current - BATCH_SIZE_GRANULARITY)
             current = next_current
             continue
         return None, f"probe_{attempt['status']}_at_batch_size_{current}"
@@ -544,12 +538,12 @@ def find_max_batch_size(
     if high_failure is None:
         return low_success, None
 
-    while low_success is not None and high_failure - low_success > 2:
+    while low_success is not None and high_failure - low_success > BATCH_SIZE_GRANULARITY:
         candidate = (low_success + high_failure) // 2
-        if low_success >= 2:
-            candidate = even_floor(candidate)
+        if low_success >= BATCH_SIZE_GRANULARITY:
+            candidate = granularity_floor(candidate)
             if candidate <= low_success:
-                candidate = low_success + 2
+                candidate = low_success + BATCH_SIZE_GRANULARITY
         if candidate >= high_failure:
             break
 
