@@ -67,9 +67,11 @@ def main(cfg):
         trainer = instantiate(cfg.trainer)
 
         ModelClass = make_class(cfg.peft._target_, cfg.model._target_)
-        model_args = dict(cfg.peft)
-        model_args.update(dict(cfg.model))
-        model_args.pop("_target_")
+        model_args = dict(cfg.model)
+        peft_args = dict(cfg.peft)
+        model_args.pop("_target_", None)
+        peft_args.pop("_target_", None)
+        model_args.update(peft_args)
         model = ModelClass(**model_args)
         if cfg.model.compile:
             model = torch.compile(model, mode="default")

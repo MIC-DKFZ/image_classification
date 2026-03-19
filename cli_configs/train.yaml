@@ -31,7 +31,7 @@ model:
   nesterov: False
   scheduler: CosineAnneal
   T_max: ${trainer.max_epochs}
-  warmstart: 2
+  warmstart: 10
   warmstart2: 0
   mixup: False
   mixup_alpha: 0.2
