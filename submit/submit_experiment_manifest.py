@@ -175,7 +175,10 @@ def build_python_command(
 
     peft_params = experiment.get("peft_params", {})
     for name, value in peft_params.items():
-        parts.append(f"++peft.{name}={value}")
+        if "." in name:
+            parts.append(f"{name}={value}")
+        else:
+            parts.append(f"++peft.{name}={value}")
 
     parts.extend(args.extra_override)
     return " ".join(parts)
