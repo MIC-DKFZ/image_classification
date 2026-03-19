@@ -53,28 +53,32 @@ DATASETS = [
 ]
 
 PEFTS = {
-    # "adapt_former": {
-    #     "bottleneck": [16, 64, 256],
-    #     "dropout": [0.0, 0.05, 0.1],
-    # },
-    # "full_finetuning": {},
-    # "gps": {
-    #     "gps_percent": [1, 4, 16],
-    #     "gps_calib_batches": [1, 2, 4],
-    # },
+    "adapt_former": {
+        "bottleneck": [16, 64, 256],
+        "dropout": [0.0, 0.05, 0.1],
+    },
+    "full_finetuning": {
+        "model.warmstart": [10],
+        "trainer.gradient_clip_val": [1.0],
+    },
+    "gps": {
+        "gps_percent": [1, 4, 16],
+        "gps_calib_batches": [1, 2, 4],
+    },
     "linear_probing": {},
-    # "lora": {
-    #     "lora_rank": [4, 8, 16],
-    #     "lora_alpha": [8, 16, 32],
-    # },
-    # "vera": {
-    #     "vera_rank": [4, 8, 16],
-    #     "vera_dropout": [0.0, 0.01, 0.05],
-    # },
-    # "visual_prompt_tuning": {
-    #     "num_tokens": [8, 20, 40],
-    #     "dropout": [0.0, 0.05, 0.1],
-    # },
+    "lora": {
+        "lora_rank": [4, 8, 16],
+        "lora_alpha": [8, 16, 32],
+    },
+    "vera": {
+        "vera_rank": [4, 8, 16],
+        "vera_dropout": [0.0, 0.01, 0.05],
+    },
+    "visual_prompt_tuning": {
+        "deep": [True, False],
+        "num_tokens": [8, 20, 40],
+        "dropout": [0.0, 0.05, 0.1],
+    },
 }
 
 DATASET_EPOCH_SPLIT_TIMINGS_PATH = (
