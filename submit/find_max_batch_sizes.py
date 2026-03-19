@@ -30,12 +30,13 @@ from synergy_unit.helpers.generate_samples_per_class_subsets import (
 DEFAULT_OUTPUT_JSON = Path("synergy_unit/data/max_batch_sizes.json")
 DEFAULT_SAMPLES_PER_CLASS = 50
 DEFAULT_TRIAL = 0
-DEFAULT_MAX_EPOCHS = 2
+DEFAULT_MAX_EPOCHS = 1
 DEFAULT_MAX_BATCH_SIZE_CAP = 4096
 DEFAULT_TIMEOUT_SECONDS = 1800
-DEFAULT_LIMIT_TRAIN_BATCHES = 10
-DEFAULT_LIMIT_VAL_BATCHES = 10
+DEFAULT_LIMIT_TRAIN_BATCHES = 1
+DEFAULT_LIMIT_VAL_BATCHES = 1
 DEFAULT_JOB_LABEL = "batch_size_probe"
+VERBOSE = False
 DATASETS = [
     "aid",
     "zooscannet",
@@ -157,6 +158,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Resume from an existing output JSON by skipping combinations already marked successful.",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable detailed per-probe logging. Defaults to off.",
+    )
     return parser.parse_args()
 
 
@@ -164,8 +170,9 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def log(message: str) -> None:
-    print(f"[batch-probe] {message}", flush=True)
+def log(message: str, *, always: bool = False) -> None:
+    if always or VERBOSE:
+        tqdm.write(f"[batch-probe] {message}")
 
 
 def load_data_batch_size(dataset: str) -> int:
@@ -214,27 +221,47 @@ def build_combinations() -> list[ProbeCombination]:
 
 def load_results(args: argparse.Namespace, combinations: list[ProbeCombination]) -> dict[str, Any]:
     if args.resume and args.output_json.exists():
-        return json.loads(args.output_json.read_text(encoding="utf-8"))
+        raw_results = json.loads(args.output_json.read_text(encoding="utf-8"))
+        payload = {"combinations": [asdict(combo) for combo in combinations], "results": {}}
+        for item in raw_results:
+            key = f"{item['dataset']}__{item['model']}__{item['peft']}"
+            max_batch_size = item.get("max_batch_size")
+            if max_batch_size is not None:
+                payload["results"][key] = {"status": "success", "max_batch_size": max_batch_size}
+        return payload
 
     return {
-        "generated_at": now_iso(),
-        "updated_at": now_iso(),
-        "samples_per_class": args.samples_per_class,
-        "trial": args.trial,
-        "max_epochs_per_probe": args.max_epochs,
-        "max_batch_size_cap": args.max_batch_size_cap,
-        "limit_train_batches": args.limit_train_batches,
-        "limit_val_batches": args.limit_val_batches,
         "combinations": [asdict(combo) for combo in combinations],
         "results": {},
     }
 
 
-def write_results(path: Path, payload: dict[str, Any]) -> None:
-    payload["updated_at"] = now_iso()
+def build_summary_results(payload: dict[str, Any], combinations: list[ProbeCombination]) -> list[dict[str, Any]]:
+    summary: list[dict[str, Any]] = []
+    for combo in combinations:
+        entry = payload["results"].get(combo.key)
+        if entry is None:
+            continue
+        if entry.get("status") not in {"success", "error", "missing_dataset_dir"}:
+            continue
+        summary.append(
+            {
+                "dataset": combo.dataset,
+                "model": combo.model,
+                "peft": combo.peft,
+                "max_batch_size": entry.get("max_batch_size"),
+            }
+        )
+    return summary
+
+
+def write_results(path: Path, payload: dict[str, Any], combinations: list[ProbeCombination]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
-    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    tmp_path.write_text(
+        json.dumps(build_summary_results(payload, combinations), indent=2) + "\n",
+        encoding="utf-8",
+    )
     tmp_path.replace(path)
 
 
@@ -449,7 +476,6 @@ def append_attempt(
     combo: ProbeCombination,
     entry: dict[str, Any],
     attempt: dict[str, Any],
-    output_json: Path,
 ) -> None:
     entry.setdefault("attempts", []).append(attempt)
     if attempt["status"] == "success":
@@ -458,7 +484,6 @@ def append_attempt(
             entry["current_max_batch_size"] = attempt["batch_size"]
     entry["last_attempt_at"] = now_iso()
     payload["results"][combo.key] = entry
-    write_results(output_json, payload)
 
 
 def find_max_batch_size(
@@ -466,6 +491,7 @@ def find_max_batch_size(
     combo: ProbeCombination,
     payload: dict[str, Any],
     entry: dict[str, Any],
+    combinations: list[ProbeCombination],
 ) -> tuple[int | None, str | None]:
     initial_batch_size = choose_probe_batch_size(entry["initial_batch_size"])
     current = initial_batch_size
@@ -474,7 +500,7 @@ def find_max_batch_size(
 
     while True:
         attempt = run_probe_once(args=args, combo=combo, batch_size=current)
-        append_attempt(payload, combo, entry, attempt, args.output_json)
+        append_attempt(payload, combo, entry, attempt)
 
         if attempt["status"] == "success":
             low_success = current
@@ -483,7 +509,7 @@ def find_max_batch_size(
             high_failure = current
             if current <= 2:
                 single_attempt = run_probe_once(args=args, combo=combo, batch_size=1)
-                append_attempt(payload, combo, entry, single_attempt, args.output_json)
+                append_attempt(payload, combo, entry, single_attempt)
                 if single_attempt["status"] == "success":
                     return 1, None
                 if single_attempt["status"] == "oom":
@@ -506,7 +532,7 @@ def find_max_batch_size(
             break
 
         attempt = run_probe_once(args=args, combo=combo, batch_size=candidate)
-        append_attempt(payload, combo, entry, attempt, args.output_json)
+        append_attempt(payload, combo, entry, attempt)
         if attempt["status"] == "success":
             low_success = candidate
             continue
@@ -528,7 +554,7 @@ def find_max_batch_size(
             break
 
         attempt = run_probe_once(args=args, combo=combo, batch_size=candidate)
-        append_attempt(payload, combo, entry, attempt, args.output_json)
+        append_attempt(payload, combo, entry, attempt)
         if attempt["status"] == "success":
             low_success = candidate
         elif attempt["status"] == "oom":
@@ -540,13 +566,16 @@ def find_max_batch_size(
 
 
 def main() -> int:
+    global VERBOSE
     args = parse_args()
+    VERBOSE = args.verbose
     combinations = build_combinations()
     payload = load_results(args, combinations)
     log(
         f"loaded {len(combinations)} combinations "
         f"samples_per_class={args.samples_per_class} trial={args.trial} "
-        f"output_json={args.output_json}"
+        f"output_json={args.output_json}",
+        always=args.verbose,
     )
 
     with tqdm(total=len(combinations), desc="Batch-size combos", unit="combo") as progress_bar:
@@ -590,14 +619,18 @@ def main() -> int:
                 f"initial_batch_size={initial_batch_size}"
             )
             payload["results"][combo.key] = entry
-            write_results(args.output_json, payload)
 
             if not dataset_dir.exists():
                 log(f"missing dataset directory for {combo.key}: {dataset_dir}")
                 entry["status"] = "missing_dataset_dir"
                 entry["error"] = f"Missing dataset directory: {dataset_dir}"
                 payload["results"][combo.key] = entry
-                write_results(args.output_json, payload)
+                log(
+                    f"failed combo dataset={combo.dataset} model={combo.model} "
+                    f"peft={combo.peft} error=missing_dataset_dir",
+                    always=True,
+                )
+                write_results(args.output_json, payload, combinations)
                 progress_bar.update(1)
                 continue
 
@@ -606,6 +639,7 @@ def main() -> int:
                 combo=combo,
                 payload=payload,
                 entry=entry,
+                combinations=combinations,
             )
             entry["finished_at"] = now_iso()
             if error is None:
@@ -616,20 +650,30 @@ def main() -> int:
                     f"dataset={combo.dataset} model={combo.model} peft={combo.peft} "
                     f"max_batch_size={max_batch_size}"
                 )
+                log(
+                    f"found max batch size dataset={combo.dataset} model={combo.model} "
+                    f"peft={combo.peft} max_batch_size={max_batch_size}",
+                    always=True,
+                )
             else:
                 entry["status"] = "error"
-                entry["max_batch_size"] = max_batch_size
+                entry["max_batch_size"] = None
                 entry["error"] = error
                 log(
                     f"combination failed {index}/{len(combinations)} "
                     f"dataset={combo.dataset} model={combo.model} peft={combo.peft} "
                     f"max_batch_size={max_batch_size} error={error}"
                 )
+                log(
+                    f"failed combo dataset={combo.dataset} model={combo.model} "
+                    f"peft={combo.peft} error={error}",
+                    always=True,
+                )
             payload["results"][combo.key] = entry
-            write_results(args.output_json, payload)
+            write_results(args.output_json, payload, combinations)
             progress_bar.update(1)
 
-    log("all combinations processed")
+    log("all combinations processed", always=True)
     return 0
 
 
