@@ -107,6 +107,7 @@ class BaseDataModule(LightningDataModule):
         self._fraction_applied = True
 
     def train_dataloader(self):
+        persistent_workers = self.num_workers > 0
         if not self.random_batches:
             trainloader = DataLoader(
                 self.train_dataset,
@@ -115,7 +116,7 @@ class BaseDataModule(LightningDataModule):
                 num_workers=self.num_workers,
                 pin_memory=True,
                 worker_init_fn=seed_worker,
-                persistent_workers=True,
+                persistent_workers=persistent_workers,
             )
 
         else:
@@ -131,13 +132,14 @@ class BaseDataModule(LightningDataModule):
                 num_workers=self.num_workers,
                 pin_memory=True,
                 worker_init_fn=seed_worker,
-                persistent_workers=True,
+                persistent_workers=persistent_workers,
                 sampler=random_sampler,
             )
 
         return trainloader
 
     def val_dataloader(self):
+        persistent_workers = self.num_workers > 0
         valloader = DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
@@ -145,12 +147,13 @@ class BaseDataModule(LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
             worker_init_fn=seed_worker,
-            persistent_workers=True,
+            persistent_workers=persistent_workers,
         )
 
         return valloader
 
     def test_dataloader(self):
+        persistent_workers = self.num_workers > 0
         testloader = DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
@@ -158,12 +161,13 @@ class BaseDataModule(LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
             worker_init_fn=seed_worker,
-            persistent_workers=True,
+            persistent_workers=persistent_workers,
         )
 
         return testloader
 
     def predict_dataloader(self):
+        persistent_workers = self.num_workers > 0
         predictloader = DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
@@ -171,7 +175,7 @@ class BaseDataModule(LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
             worker_init_fn=seed_worker,
-            persistent_workers=True,
+            persistent_workers=persistent_workers,
         )
 
         return predictloader
