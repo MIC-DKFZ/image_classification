@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import csv
 import json
 import random
 from pathlib import Path
@@ -8,12 +9,7 @@ from pathlib import Path
 
 DEFAULT_ROOT = Path("synergy_unit/data/datasets")
 DEFAULT_OUTPUT_DIRNAME = "subsets"
-REQUIRED_FILES = (
-    "sample_per_class_stats.json",
-    "labels.json",
-    "class_map.json",
-    "splits.json",
-)
+REQUIRED_FILES = ("splits.json",)
 SAMPLES_PER_CLASS_VALUES = [10, 20, 30, 40, 50]
 NUM_TRIALS = 5
 
@@ -64,20 +60,71 @@ def normalize_label(value, id_to_class):
     return id_to_class.get(str(value))
 
 
-def build_train_samples_by_class(labels, class_map, splits):
-    class_items = sort_class_items(class_map)
-    id_to_class = {str(class_id): class_name for class_name, class_id in class_items}
-    ordered_class_names = [class_name for class_name, _ in class_items]
+def sort_class_names(class_names):
+    try:
+        return sorted(class_names, key=lambda value: int(value))
+    except (TypeError, ValueError):
+        return sorted(class_names, key=str)
+
+
+def load_label_mapping(dataset_dir):
+    labels_path = dataset_dir / "labels.json"
+    class_map_path = dataset_dir / "class_map.json"
+    train_labels_csv_path = dataset_dir / "trainLabels.csv"
+
+    if labels_path.exists() and class_map_path.exists():
+        labels = load_json(labels_path)
+        class_map = load_json(class_map_path)
+        if not isinstance(labels, dict):
+            raise ValueError(f"{labels_path} must contain a JSON object")
+        if not isinstance(class_map, dict):
+            raise ValueError(f"{class_map_path} must contain a JSON object")
+
+        class_items = sort_class_items(class_map)
+        id_to_class = {str(class_id): class_name for class_name, class_id in class_items}
+        ordered_class_names = [class_name for class_name, _ in class_items]
+        return labels, ordered_class_names, id_to_class
+
+    if train_labels_csv_path.exists():
+        labels = {}
+        class_names = set()
+        with train_labels_csv_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None:
+                raise ValueError(f"{train_labels_csv_path} must contain a header row")
+
+            image_column = "image" if "image" in reader.fieldnames else reader.fieldnames[0]
+            label_column = "level" if "level" in reader.fieldnames else reader.fieldnames[-1]
+
+            for row in reader:
+                sample_id = row.get(image_column)
+                class_name = row.get(label_column)
+                if sample_id in {None, ""} or class_name in {None, ""}:
+                    continue
+                labels[str(sample_id)] = str(class_name)
+                class_names.add(str(class_name))
+
+        ordered_class_names = sort_class_names(class_names)
+        id_to_class = {class_name: class_name for class_name in ordered_class_names}
+        return labels, ordered_class_names, id_to_class
+
+    return None, None, None
+
+
+def build_train_samples_by_class(labels, ordered_class_names, id_to_class, splits):
     samples_by_class = {class_name: [] for class_name in ordered_class_names}
 
     for sample_id in splits["train"]:
-        if sample_id not in labels:
+        label_key = sample_id
+        if label_key not in labels:
+            label_key = Path(sample_id).stem
+        if label_key not in labels:
             raise ValueError(f"Train sample '{sample_id}' is missing from labels.json")
 
-        class_name = normalize_label(labels[sample_id], id_to_class)
+        class_name = normalize_label(labels[label_key], id_to_class)
         if class_name is None:
             raise ValueError(
-                f"Could not map label '{labels[sample_id]}' for train sample '{sample_id}'"
+                f"Could not map label '{labels[label_key]}' for train sample '{sample_id}'"
             )
 
         samples_by_class[class_name].append(sample_id)
@@ -110,29 +157,27 @@ def process_dataset(dataset_dir, output_dirname):
     if missing_files:
         return False, f"skipped {dataset_dir.name}: missing {', '.join(missing_files)}"
 
-    sample_stats = load_json(required_paths["sample_per_class_stats.json"])
-    labels = load_json(required_paths["labels.json"])
-    class_map = load_json(required_paths["class_map.json"])
     splits = load_json(required_paths["splits.json"])
 
-    if not isinstance(sample_stats, dict):
-        raise ValueError(f"{required_paths['sample_per_class_stats.json']} must contain a JSON object")
-    if not isinstance(labels, dict):
-        raise ValueError(f"{required_paths['labels.json']} must contain a JSON object")
-    if not isinstance(class_map, dict):
-        raise ValueError(f"{required_paths['class_map.json']} must contain a JSON object")
     if not isinstance(splits, dict):
         raise ValueError(f"{required_paths['splits.json']} must contain a JSON object")
     if "train" not in splits or not isinstance(splits["train"], list):
         raise ValueError(f"{required_paths['splits.json']} must contain a train split array")
+    if "val" not in splits or not isinstance(splits["val"], list):
+        raise ValueError(f"{required_paths['splits.json']} must contain a val split array")
+    if "test" not in splits or not isinstance(splits["test"], list):
+        raise ValueError(f"{required_paths['splits.json']} must contain a test split array")
 
-    train_counts = sample_stats.get("counts_per_split", {}).get("train")
-    if not isinstance(train_counts, dict):
-        raise ValueError(
-            f"{required_paths['sample_per_class_stats.json']} must contain counts_per_split.train"
-        )
+    labels, ordered_class_names, id_to_class = load_label_mapping(dataset_dir)
+    if labels is None:
+        return False, f"skipped {dataset_dir.name}: missing labels.json/class_map.json or trainLabels.csv"
 
-    samples_by_class, ordered_class_names = build_train_samples_by_class(labels, class_map, splits)
+    samples_by_class, ordered_class_names = build_train_samples_by_class(
+        labels, ordered_class_names, id_to_class, splits
+    )
+    train_counts = {
+        class_name: len(samples_by_class[class_name]) for class_name in ordered_class_names
+    }
     output_dir = dataset_dir / output_dirname
     output_dir.mkdir(parents=True, exist_ok=True)
     for existing_file in output_dir.glob("samples_per_class_*.json"):
