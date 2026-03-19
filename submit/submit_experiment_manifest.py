@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 from pathlib import Path
 import sys
@@ -80,6 +81,41 @@ def fraction_label(value: float) -> str:
     return f"{value:.1f}".replace(".", "_")
 
 
+def load_reference_batch_sizes(data_dir: str) -> dict[tuple[str, str], int]:
+    reference_path = Path(data_dir) / "reference_batch_sizes.json"
+    if not reference_path.exists():
+        raise FileNotFoundError(f"Missing reference batch size file: {reference_path}")
+
+    payload = json.loads(reference_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError(f"{reference_path} must contain a JSON list")
+
+    mapping: dict[tuple[str, str], int] = {}
+    for item in payload:
+        if not isinstance(item, dict):
+            raise ValueError(f"{reference_path} entries must be JSON objects")
+        model = item.get("model")
+        peft = item.get("peft")
+        max_batch_size = item.get("max_batch_size")
+        if not isinstance(model, str) or not isinstance(peft, str):
+            raise ValueError(f"{reference_path} entries must contain string model and peft fields")
+        if max_batch_size is None:
+            continue
+        if not isinstance(max_batch_size, int):
+            raise ValueError(f"{reference_path} max_batch_size must be an integer or null")
+
+        key = (model, peft)
+        existing = mapping.get(key)
+        if existing is not None and existing != max_batch_size:
+            raise ValueError(
+                f"Inconsistent max_batch_size for model={model}, peft={peft}: "
+                f"{existing} vs {max_batch_size}"
+            )
+        mapping[key] = max_batch_size
+
+    return mapping
+
+
 def build_split_file_override(args: argparse.Namespace, experiment: dict[str, object]) -> str:
     data_fraction = experiment.get("data_fraction")
     samples_per_class = experiment.get("samples_per_class")
@@ -100,10 +136,20 @@ def build_split_file_override(args: argparse.Namespace, experiment: dict[str, ob
     return f"subsets/samples_per_class_{samples_per_class}_trial_{trial}.json"
 
 
-def build_python_command(args: argparse.Namespace, experiment: dict[str, object]) -> str:
+def build_python_command(
+    args: argparse.Namespace,
+    experiment: dict[str, object],
+    reference_batch_sizes: dict[tuple[str, str], int],
+) -> str:
     split_file = build_split_file_override(args, experiment)
     data_fraction = experiment.get("data_fraction")
     samples_per_class = experiment.get("samples_per_class")
+    batch_size_key = (str(experiment["model"]), str(experiment["peft"]))
+    if batch_size_key not in reference_batch_sizes:
+        raise KeyError(
+            f"Missing reference max batch size for model={batch_size_key[0]}, peft={batch_size_key[1]}"
+        )
+    max_batch_size = reference_batch_sizes[batch_size_key]
 
     parts = [
         "python",
@@ -116,6 +162,7 @@ def build_python_command(args: argparse.Namespace, experiment: dict[str, object]
         f"data={experiment['dataset']}",
         f"peft={experiment['peft']}",
         f"trainer.max_epochs={experiment['max_epochs']}",
+        f"data.module.batch_size={max_batch_size}",
         "data.module.data_fraction=null",
         f"+data.module.split_file={split_file}",
         f"+dataset={experiment['dataset']}",
@@ -186,6 +233,7 @@ def main() -> int:
     args = parse_args()
     manifest = read_manifest(args.manifest)
     experiments = manifest["experiments"]
+    reference_batch_sizes = load_reference_batch_sizes(args.data_dir)
 
     if args.subset:
         start, end = parse_subset_arg(args.subset, len(experiments))
@@ -195,7 +243,7 @@ def main() -> int:
     failures: list[tuple[str, subprocess.CompletedProcess[str]]] = []
 
     for experiment in tqdm(experiments, desc=progress_label):
-        python_command = build_python_command(args, experiment)
+        python_command = build_python_command(args, experiment, reference_batch_sizes)
         submit_command = build_submit_command(args, experiment, python_command)
 
         if args.dry_run:
