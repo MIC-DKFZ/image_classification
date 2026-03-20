@@ -358,6 +358,15 @@ class BaseModel(L.LightningModule):
         return y, y_hat
 
     def on_validation_epoch_end(self) -> None:
+        self.log(
+            "epoch_1based",
+            float(self.current_epoch + 1),
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
+            logger=True,
+            sync_dist=True,
+        )
         if self.metric_computation_mode == "epochwise":
             metrics_res = self.val_metrics.compute()
             if "val_F1_per_class" in metrics_res.keys():

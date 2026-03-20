@@ -119,18 +119,19 @@ class ConfusionMatrix(Metric):
         # Normalized Confusion Matrix
         confmat_norm = np.around(confmat.astype("float") / confmat.sum(axis=1)[:, np.newaxis], decimals=2)
         figure_norm = mat_to_figure(confmat_norm, "Confusion Matrix (normalized)", norm_colorbar=True)
+        display_epoch = trainer.current_epoch + 1
 
         for logger in trainer.loggers if hasattr(trainer, "loggers") else [trainer.logger]:
             if isinstance(logger, pl.loggers.tensorboard.TensorBoardLogger):
                 logger.experiment.add_figure(
                     "{}_ConfusionMatrix_normalized/ConfusionMatrix".format(split),
                     figure_norm,
-                    trainer.current_epoch,
+                    display_epoch,
                 )
                 logger.experiment.add_figure(
                     "{}_ConfusionMatrix_absolute/ConfusionMatrix".format(split),
                     figure,
-                    trainer.current_epoch,
+                    display_epoch,
                 )
             elif isinstance(logger, pl.loggers.mlflow.MLFlowLogger):
                 logger.experiment.log_figure(
@@ -147,10 +148,10 @@ class ConfusionMatrix(Metric):
                 logger.log_image(
                     key="{}_ConfusionMatrix_normalized".format(split),
                     images=[figure_norm],
-                    step=trainer.current_epoch,
+                    step=display_epoch,
                 )
                 logger.log_image(
                     key="{}_ConfusionMatrix_absolute".format(split),
                     images=[figure],
-                    step=trainer.current_epoch,
+                    step=display_epoch,
                 )
