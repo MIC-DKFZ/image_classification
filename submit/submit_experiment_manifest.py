@@ -74,6 +74,14 @@ def parse_args() -> argparse.Namespace:
             "from the manifest record is used."
         ),
     )
+    parser.add_argument(
+        "--small",
+        action="store_true",
+        help=(
+            "Use reference_batch_sizes_small.json and add '-q gpu -m 1' to the "
+            "submission command."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -81,8 +89,9 @@ def fraction_label(value: float) -> str:
     return f"{value:.1f}".replace(".", "_")
 
 
-def load_reference_batch_sizes(data_dir: str) -> dict[tuple[str, str], int]:
-    reference_path = Path(data_dir) / "reference_batch_sizes.json"
+def load_reference_batch_sizes(data_dir: str, *, small: bool = False) -> dict[tuple[str, str], int]:
+    filename = "reference_batch_sizes_small.json" if small else "reference_batch_sizes.json"
+    reference_path = Path(data_dir) / filename
     if not reference_path.exists():
         raise FileNotFoundError(f"Missing reference batch size file: {reference_path}")
 
@@ -187,7 +196,7 @@ def build_python_command(
 def build_submit_command(
     args: argparse.Namespace, experiment: dict[str, object], python_command: str
 ) -> list[str]:
-    return [
+    command = [
         args.conda_path,
         "-i",
         str(experiment["id"]),
@@ -195,9 +204,11 @@ def build_submit_command(
         "synergy",
         "-e",
         "synergy",
-        "-c",
-        python_command,
     ]
+    if args.small:
+        command.extend(["-q", "gpu", "-m", "1"])
+    command.extend(["-c", python_command])
+    return command
 
 
 def format_submit_command(submit_command: list[str]) -> str:
@@ -236,7 +247,7 @@ def main() -> int:
     args = parse_args()
     manifest = read_manifest(args.manifest)
     experiments = manifest["experiments"]
-    reference_batch_sizes = load_reference_batch_sizes(args.data_dir)
+    reference_batch_sizes = load_reference_batch_sizes(args.data_dir, small=args.small)
 
     if args.subset:
         start, end = parse_subset_arg(args.subset, len(experiments))
