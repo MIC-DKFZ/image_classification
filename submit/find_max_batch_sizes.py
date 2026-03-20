@@ -32,24 +32,15 @@ DEFAULT_SAMPLES_PER_CLASS = 50
 DEFAULT_TRIAL = 0
 DEFAULT_MAX_EPOCHS = 1
 DEFAULT_MAX_BATCH_SIZE_CAP = 4096
+DEFAULT_MAX_VRAM_GB = 40.0
 DEFAULT_TIMEOUT_SECONDS = 1800
 DEFAULT_LIMIT_TRAIN_BATCHES = 1
 DEFAULT_LIMIT_VAL_BATCHES = 1
 DEFAULT_JOB_LABEL = "batch_size_probe"
 BATCH_SIZE_GRANULARITY = 16
 VERBOSE = False
-DATASETS = [
-    "aid",
-    "zooscannet",
-    "chestxray14",
-    "neudet",
-    "rxrx1",
-    "flowers102",
-    "resisc45",
-    "pcam",
-    "diabetic_retina",
-    "fgvc_aircraft",
-]
+REFERENCE_DATASET = "aid"
+DATASETS = [REFERENCE_DATASET]
 MODELS = [
     "supervised",
     "mae_timm",
@@ -70,6 +61,20 @@ OOM_MARKERS = (
     "cudnn_status_alloc_failed",
     "cublas_status_alloc_failed",
 )
+MAIN_WRAPPER_CODE = """
+import os
+import runpy
+import sys
+
+limit = os.environ.get("BATCH_PROBE_CUDA_MEMORY_FRACTION")
+if limit is not None:
+    import torch
+
+    torch.cuda.set_per_process_memory_fraction(float(limit), 0)
+
+sys.argv = ["main.py", *sys.argv[1:]]
+runpy.run_path("main.py", run_name="__main__")
+""".strip()
 
 
 @dataclass(frozen=True)
@@ -120,6 +125,15 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=DEFAULT_MAX_BATCH_SIZE_CAP,
         help=f"Upper batch-size cap during search. Defaults to {DEFAULT_MAX_BATCH_SIZE_CAP}.",
+    )
+    parser.add_argument(
+        "--max-vram-gb",
+        type=float,
+        default=DEFAULT_MAX_VRAM_GB,
+        help=(
+            "Maximum GPU VRAM budget in GB used for the probe subprocess. "
+            f"Defaults to {DEFAULT_MAX_VRAM_GB}."
+        ),
     )
     parser.add_argument(
         "--timeout-seconds",
@@ -225,7 +239,7 @@ def load_results(args: argparse.Namespace, combinations: list[ProbeCombination])
         raw_results = json.loads(args.output_json.read_text(encoding="utf-8"))
         payload = {"combinations": [asdict(combo) for combo in combinations], "results": {}}
         for item in raw_results:
-            key = f"{item['dataset']}__{item['model']}__{item['peft']}"
+            key = f"{REFERENCE_DATASET}__{item['model']}__{item['peft']}"
             max_batch_size = item.get("max_batch_size")
             if max_batch_size is not None:
                 payload["results"][key] = {"status": "success", "max_batch_size": max_batch_size}
@@ -247,7 +261,6 @@ def build_summary_results(payload: dict[str, Any], combinations: list[ProbeCombi
             continue
         summary.append(
             {
-                "dataset": combo.dataset,
                 "model": combo.model,
                 "peft": combo.peft,
                 "max_batch_size": entry.get("max_batch_size"),
@@ -284,6 +297,27 @@ def choose_probe_batch_size(initial_batch_size: int) -> int:
     return max(BATCH_SIZE_GRANULARITY, granularity_floor(initial_batch_size))
 
 
+def resolve_memory_fraction(max_vram_gb: float) -> float | None:
+    if max_vram_gb <= 0:
+        return None
+
+    try:
+        import torch
+    except ImportError:
+        return None
+
+    if not torch.cuda.is_available():
+        return None
+
+    total_memory_bytes = torch.cuda.get_device_properties(0).total_memory
+    if total_memory_bytes <= 0:
+        return None
+
+    requested_bytes = max_vram_gb * (1024 ** 3)
+    fraction = min(1.0, requested_bytes / total_memory_bytes)
+    return max(0.0, fraction)
+
+
 def build_probe_command(
     args: argparse.Namespace,
     combo: ProbeCombination,
@@ -294,7 +328,8 @@ def build_probe_command(
     run_name = f"{args.job_label}__{combo.dataset}__{combo.model}__{combo.peft}__bs{batch_size}"
     return [
         sys.executable,
-        "main.py",
+        "-c",
+        MAIN_WRAPPER_CODE,
         "env=cluster",
         f"+wandb.name={run_name}",
         f"model={combo.model}",
@@ -355,6 +390,14 @@ def run_probe_once(
     env["WANDB_MODE"] = "disabled"
     env["WANDB_SILENT"] = "true"
     env["PYTHONUNBUFFERED"] = "1"
+    memory_fraction = resolve_memory_fraction(args.max_vram_gb)
+    if memory_fraction is not None and memory_fraction < 1.0:
+        env["BATCH_PROBE_CUDA_MEMORY_FRACTION"] = str(memory_fraction)
+        log(
+            f"using VRAM cap {args.max_vram_gb:.1f}GB "
+            f"(fraction={memory_fraction:.4f}) for dataset={combo.dataset} "
+            f"model={combo.model} peft={combo.peft}",
+        )
 
     start = time.monotonic()
     try:
