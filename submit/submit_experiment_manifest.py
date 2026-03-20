@@ -82,6 +82,11 @@ def parse_args() -> argparse.Namespace:
             "submission command."
         ),
     )
+    parser.add_argument(
+        "--disable-checkpointing",
+        action="store_true",
+        help="Append trainer.enable_checkpointing=false to the Python command.",
+    )
     return parser.parse_args()
 
 
@@ -188,6 +193,9 @@ def build_python_command(
             parts.append(f"{name}={value}")
         else:
             parts.append(f"++peft.{name}={value}")
+
+    if args.disable_checkpointing:
+        parts.append("trainer.enable_checkpointing=false")
 
     parts.extend(args.extra_override)
     return " ".join(parts)
