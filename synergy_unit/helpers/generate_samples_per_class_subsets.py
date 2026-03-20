@@ -136,12 +136,10 @@ def build_subset_split_payload(splits, samples_per_class, ordered_class_names, s
     selected_train_samples = []
     for class_name in ordered_class_names:
         class_samples = samples_by_class[class_name]
-        if len(class_samples) < samples_per_class:
-            raise ValueError(
-                f"class '{class_name}' has only {len(class_samples)} "
-                f"train samples, but {samples_per_class} were requested"
-            )
-        selected_train_samples.extend(rng.sample(class_samples, samples_per_class))
+        if not class_samples:
+            raise ValueError(f"class '{class_name}' has no train samples")
+        target_count = min(len(class_samples), samples_per_class)
+        selected_train_samples.extend(rng.sample(class_samples, target_count))
 
     rng.shuffle(selected_train_samples)
     return {
@@ -183,20 +181,7 @@ def process_dataset(dataset_dir, output_dirname):
     for existing_file in output_dir.glob("samples_per_class_*.json"):
         existing_file.unlink()
 
-    supported_values = []
-    skipped_values = []
-
     for samples_per_class in SAMPLES_PER_CLASS_VALUES:
-        is_supported = True
-        for class_name in ordered_class_names:
-            if train_counts.get(class_name, 0) < samples_per_class:
-                is_supported = False
-                break
-
-        if not is_supported:
-            skipped_values.append(samples_per_class)
-            continue
-
         for trial_index in range(NUM_TRIALS):
             rng = random.Random(f"{dataset_dir.name}:{samples_per_class}:{trial_index}")
             payload = build_subset_split_payload(
@@ -210,15 +195,15 @@ def process_dataset(dataset_dir, output_dirname):
             with output_path.open("w", encoding="utf-8") as handle:
                 json.dump(payload, handle, indent=2, sort_keys=False)
                 handle.write("\n")
-        supported_values.append(samples_per_class)
-
-    if not supported_values:
-        return False, f"skipped {dataset_dir.name}: no requested samples_per_class values are supported"
-
-    total_written = len(supported_values) * NUM_TRIALS
+    total_written = len(SAMPLES_PER_CLASS_VALUES) * NUM_TRIALS
+    constrained_classes = {
+        class_name: train_counts[class_name]
+        for class_name in ordered_class_names
+        if train_counts[class_name] < max(SAMPLES_PER_CLASS_VALUES)
+    }
     message = f"wrote {output_dir} ({total_written} subset files)"
-    if skipped_values:
-        message += f"; skipped unsupported values {skipped_values}"
+    if constrained_classes:
+        message += f"; capped by availability for classes {constrained_classes}"
     return True, message
 
 
