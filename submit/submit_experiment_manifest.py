@@ -15,6 +15,15 @@ if __package__ in {None, ""}:
 from submit.experiment_manifest import read_manifest
 from submit.wandb_run_lookup import get_skippable_run_names
 
+CONFIG_OVERRIDE_PATHS = {
+    "max_epochs": "trainer.max_epochs",
+    "lr": "model.lr",
+    "classification_head_dropout": "model.classification_head_dropout",
+    "label_smoothing": "model.label_smoothing",
+    "warmstart": "model.warmstart",
+    "gradient_clip_val": "trainer.gradient_clip_val",
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -186,6 +195,8 @@ def build_python_command(
         f"peft={experiment['peft']}",
         f"trainer.max_epochs={experiment['max_epochs']}",
         f"data.module.batch_size={max_batch_size}",
+        f"model.classification_head_dropout={experiment['classification_head_dropout']}",
+        f"model.label_smoothing={experiment['label_smoothing']}",
         "data.module.data_fraction=null",
         f"+data.module.split_file={split_file}",
         f"+dataset={experiment['dataset']}",
@@ -198,8 +209,8 @@ def build_python_command(
 
     peft_params = experiment.get("peft_params", {})
     for name, value in peft_params.items():
-        if "." in name:
-            parts.append(f"{name}={value}")
+        if name in CONFIG_OVERRIDE_PATHS:
+            parts.append(f"{CONFIG_OVERRIDE_PATHS[name]}={value}")
         else:
             parts.append(f"++peft.{name}={value}")
 
