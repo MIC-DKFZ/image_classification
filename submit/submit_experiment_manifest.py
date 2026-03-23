@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 
 from tqdm import tqdm
+import wandb
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -87,11 +88,81 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Append trainer.enable_checkpointing=false to the Python command.",
     )
+    parser.add_argument(
+        "--no-skip-completed",
+        action="store_true",
+        help=(
+            "Disable the default behavior of skipping experiments whose W&B run "
+            "name already exists in state 'finished'."
+        ),
+    )
     return parser.parse_args()
 
 
 def fraction_label(value: float) -> str:
     return f"{value:.1f}".replace(".", "_")
+
+
+SKIPPABLE_WANDB_STATES = {"finished", "running"}
+
+
+def get_skippable_run_names(entity: str, project: str) -> set[str]:
+    print(
+        f"Fetching W&B runs for {entity}/{project} to identify completed or running experiments...",
+        flush=True,
+    )
+    api = wandb.Api()
+
+    try:
+        runs = api.runs(f"{entity}/{project}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch runs: {e}")
+
+    run_names = {
+        run.name
+        for run in runs
+        if run.name and run.state in SKIPPABLE_WANDB_STATES
+    }
+    print(
+        f"W&B lookup complete: found {len(run_names)} completed/running run names to skip.",
+        flush=True,
+    )
+    return run_names
+
+
+def has_successful_run(
+    entity: str,
+    project: str,
+    run_name: str,
+    *,
+    finished_run_names: set[str] | None = None,
+) -> bool:
+    """
+    Check if any W&B run with the given name exists and finished successfully.
+
+    Args:
+        entity: W&B entity (user or team)
+        project: W&B project name
+        run_name: Human-readable run name
+
+    Returns:
+        True if at least one matching run has state "finished" or "running", else False
+    """
+    if finished_run_names is not None:
+        return run_name in finished_run_names
+
+    api = wandb.Api()
+
+    try:
+        runs = api.runs(f"{entity}/{project}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch runs: {e}")
+
+    for run in runs:
+        if run.name == run_name and run.state in SKIPPABLE_WANDB_STATES:
+            return True
+
+    return False
 
 
 def load_reference_batch_sizes(data_dir: str, *, small: bool = False) -> dict[tuple[str, str], int]:
@@ -263,13 +334,35 @@ def main() -> int:
 
     progress_label = "Printing commands" if args.dry_run else "Submitting jobs"
     failures: list[tuple[str, subprocess.CompletedProcess[str]]] = []
+    skipped_completed = 0
+    submitted_count = 0
+    skip_completed = not args.no_skip_completed
+    finished_run_names = (
+        get_skippable_run_names(args.wandb_entity, args.wandb_project)
+        if skip_completed
+        else None
+    )
+    if skip_completed:
+        print("Skipping experiments already marked finished or currently running in W&B.", flush=True)
+    else:
+        print("W&B skip check disabled; all manifest experiments will be considered for submission.", flush=True)
 
     for experiment in tqdm(experiments, desc=progress_label):
+        if skip_completed and has_successful_run(
+            args.wandb_entity,
+            args.wandb_project,
+            str(experiment["id"]),
+            finished_run_names=finished_run_names,
+        ):
+            skipped_completed += 1
+            continue
+
         python_command = build_python_command(args, experiment, reference_batch_sizes)
         submit_command = build_submit_command(args, experiment, python_command)
 
         if args.dry_run:
             print(format_submit_command(submit_command))
+            submitted_count += 1
             continue
 
         completed = subprocess.run(
@@ -281,9 +374,13 @@ def main() -> int:
         )
         if completed.returncode != 0:
             failures.append((str(experiment["id"]), completed))
+        else:
+            submitted_count += 1
 
     if args.dry_run:
-        print(f"Dry run complete: {len(experiments)} commands generated.")
+        print(
+            f"Dry run complete: submitted={submitted_count} skipped={skipped_completed}"
+        )
         return 0
 
     if failures:
@@ -297,9 +394,10 @@ def main() -> int:
             )
         if len(failures) > 10:
             print(f"... and {len(failures) - 10} more failures.")
+        print(f"Summary: submitted={submitted_count} skipped={skipped_completed}")
         return 1
 
-    print(f"Submitted {len(experiments)} jobs.")
+    print(f"Submitted {submitted_count} jobs. Skipped {skipped_completed} completed experiments.")
     return 0
 
 
