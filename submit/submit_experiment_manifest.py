@@ -6,6 +6,7 @@ import json
 import subprocess
 from pathlib import Path
 import sys
+from typing import Iterable
 
 from tqdm import tqdm
 import wandb
@@ -104,65 +105,68 @@ def fraction_label(value: float) -> str:
 
 
 SKIPPABLE_WANDB_STATES = {"finished", "running"}
+WANDB_RUN_QUERY_BATCH_SIZE = 1000
 
 
-def get_skippable_run_names(entity: str, project: str) -> set[str]:
+def chunked(items: list[str], size: int) -> Iterable[list[str]]:
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
+
+
+def get_skippable_run_names(entity: str, project: str, run_names: Iterable[str]) -> set[str]:
+    target_run_names = sorted(set(run_names))
+    if not target_run_names:
+        return set()
+
     print(
         f"Fetching W&B runs for {entity}/{project} to identify completed or running experiments...",
         flush=True,
     )
     api = wandb.Api()
 
-    try:
-        runs = api.runs(f"{entity}/{project}")
-    except Exception as e:
-        raise RuntimeError(f"Failed to fetch runs: {e}")
-
-    run_names = {
-        run.name
-        for run in runs
-        if run.name and run.state in SKIPPABLE_WANDB_STATES
-    }
     print(
-        f"W&B lookup complete: found {len(run_names)} completed/running run names to skip.",
+        f"W&B lookup will query {len(target_run_names)} run names in "
+        f"{(len(target_run_names) + WANDB_RUN_QUERY_BATCH_SIZE - 1) // WANDB_RUN_QUERY_BATCH_SIZE} batches.",
         flush=True,
     )
-    return run_names
 
+    found_run_names: set[str] = set()
+    for batch_index, batch in enumerate(chunked(target_run_names, WANDB_RUN_QUERY_BATCH_SIZE), start=1):
+        print(
+            f"W&B lookup batch {batch_index}: querying {len(batch)} run names...",
+            flush=True,
+        )
+        try:
+            runs = api.runs(
+                f"{entity}/{project}",
+                filters={
+                    "$and": [
+                        {"state": {"$in": sorted(SKIPPABLE_WANDB_STATES)}},
+                        {"display_name": {"$in": batch}},
+                    ]
+                },
+                include_sweeps=False,
+                per_page=len(batch),
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to fetch runs: {e}")
 
-def has_successful_run(
-    entity: str,
-    project: str,
-    run_name: str,
-    *,
-    finished_run_names: set[str] | None = None,
-) -> bool:
-    """
-    Check if any W&B run with the given name exists and finished successfully.
+        batch_found = {
+            run.name
+            for run in runs
+            if run.name and run.state in SKIPPABLE_WANDB_STATES
+        }
+        found_run_names.update(batch_found)
+        print(
+            f"W&B lookup batch {batch_index} complete: matched {len(batch_found)} runs.",
+            flush=True,
+        )
 
-    Args:
-        entity: W&B entity (user or team)
-        project: W&B project name
-        run_name: Human-readable run name
-
-    Returns:
-        True if at least one matching run has state "finished" or "running", else False
-    """
-    if finished_run_names is not None:
-        return run_name in finished_run_names
-
-    api = wandb.Api()
-
-    try:
-        runs = api.runs(f"{entity}/{project}")
-    except Exception as e:
-        raise RuntimeError(f"Failed to fetch runs: {e}")
-
-    for run in runs:
-        if run.name == run_name and run.state in SKIPPABLE_WANDB_STATES:
-            return True
-
-    return False
+    print(
+        f"W&B lookup complete: found {len(found_run_names)} completed/running run names to skip.",
+        flush=True,
+    )
+    return found_run_names
 
 
 def load_reference_batch_sizes(data_dir: str, *, small: bool = False) -> dict[tuple[str, str], int]:
@@ -337,8 +341,9 @@ def main() -> int:
     skipped_completed = 0
     submitted_count = 0
     skip_completed = not args.no_skip_completed
+    target_run_names = [str(experiment["id"]) for experiment in experiments]
     finished_run_names = (
-        get_skippable_run_names(args.wandb_entity, args.wandb_project)
+        get_skippable_run_names(args.wandb_entity, args.wandb_project, target_run_names)
         if skip_completed
         else None
     )
@@ -348,12 +353,7 @@ def main() -> int:
         print("W&B skip check disabled; all manifest experiments will be considered for submission.", flush=True)
 
     for experiment in tqdm(experiments, desc=progress_label):
-        if skip_completed and has_successful_run(
-            args.wandb_entity,
-            args.wandb_project,
-            str(experiment["id"]),
-            finished_run_names=finished_run_names,
-        ):
+        if skip_completed and str(experiment["id"]) in finished_run_names:
             skipped_completed += 1
             continue
 
