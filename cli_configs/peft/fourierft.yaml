@@ -1,0 +1,10 @@
+# @package _global_
+peft:
+  _target_: peft_models.fourierft.FourierFT
+  peft: FourierFT
+  fourierft_n_frequency: 1000     # number of frequency components learned per weight matrix
+  fourierft_scaling: 150.0        # output scaling factor (equivalent to lora_alpha / r)
+  fourierft_target_modules: ['attn.q_proj', 'attn.k_proj', 'attn.v_proj', 'attn.proj', 'mlp.fc1', 'mlp.fc2']
+
+model:
+  lr: 0.0001

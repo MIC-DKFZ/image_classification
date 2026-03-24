@@ -1,0 +1,7 @@
+# @package _global_
+peft:
+  _target_: peft_models.ssf.SSF
+  peft: SSF
+
+model:
+  lr: 0.0001

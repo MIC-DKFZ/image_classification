@@ -1,0 +1,7 @@
+# @package _global_
+peft:
+  _target_: peft_models.ln_tuning.LNTuning
+  peft: LNTuning
+
+model:
+  lr: 0.0001

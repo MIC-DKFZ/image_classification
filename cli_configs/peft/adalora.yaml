@@ -1,0 +1,12 @@
+# @package _global_
+peft:
+  _target_: peft_models.adalora.AdaLoRA
+  peft: AdaLoRA
+  adalora_rank: 4                  # target rank after pruning
+  adalora_init_rank: 12            # initial rank before pruning; should be >= adalora_rank
+  adalora_alpha: 32
+  adalora_dropout: 0.0
+  adalora_target_modules: ['attn.q_proj', 'attn.k_proj', 'attn.v_proj', 'attn.proj', 'mlp.fc1', 'mlp.fc2']
+
+model:
+  lr: 0.0001

@@ -1,0 +1,14 @@
+# @package _global_
+peft:
+  _target_: peft_models.boft.BOFT
+  peft: BOFT
+  boft_block_size: 8               # size of each butterfly block
+  boft_n_butterfly_factor: 1       # depth of butterfly factorisation; higher = more expressive
+  boft_dropout: 0.0
+  boft_target_modules: ['attn.q_proj', 'attn.k_proj', 'attn.v_proj', 'attn.proj', 'mlp.fc1', 'mlp.fc2']
+
+model:
+  lr: 0.0001
+
+trainer:
+  precision: 32

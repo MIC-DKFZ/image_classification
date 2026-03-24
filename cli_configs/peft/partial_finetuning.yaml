@@ -1,0 +1,8 @@
+# @package _global_
+peft:
+  _target_: peft_models.partial_finetuning.PartialFinetuning
+  peft: PartialFinetuning
+  num_frozen_layers: 6   # freeze first 6 of 12 blocks (ViT-B); tune last 6 + head
+
+model:
+  lr: 0.0001

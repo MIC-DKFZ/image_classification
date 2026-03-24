@@ -1,0 +1,8 @@
+# @package _global_
+peft:
+  _target_: peft_models.fact.FacT
+  peft: FacT
+  fact_r: 4
+
+model:
+  lr: 0.0001
