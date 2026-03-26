@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import itertools
 import json
+import math
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -35,7 +36,18 @@ GLOBALS = {
     "max_epochs": [20],  # [5, 10, 20, 40, 100]
     "lr": [0.1, 0.05, 0.01, 0.005, 0.001],
     "classification_head_dropout": [0.3],
-    "label_smoothing": [0.1],
+    "warmstart": [0.1],
+    "gradient_clip_val": [None],
+    "layer_wise_lr_decay": [None],
+    "undecay_norm": [False],
+    "drop_path_rate": [None],
+    "token_aggregation_method": ["cls_token"],
+    "probing_location": [[-1]],
+    "optimizer": ["AdamW"],
+    "scheduler": ["CosineAnneal"],
+    "weight_decay": [0.05],
+    "compile": [True],
+    "label_smoothing": [0.0],
 }
 
 MODELS = [
@@ -65,6 +77,7 @@ PEFTS = {
     "full_finetuning": {
         "warmstart": [10],
         "gradient_clip_val": [1.0],
+        "num_first_frozen_layers": [0],
     },
     "gps": {
         "gps_percent": [1, 4, 16],
@@ -96,14 +109,21 @@ PEFT_CONFIG_DIR = REPO_ROOT / "cli_configs" / "peft"
 RESERVED_SWEEP_KEYS = {
     *GLOBALS.keys(),
 }
-MANIFEST_ONLY_KEYS = {"trial", "data_fraction", "samples_per_class"}
+SPLIT_AXIS_KEYS = {"trial", "data_fraction", "samples_per_class"}
+SUBMISSION_IGNORED_KEYS = {"drop_path_rate", "token_aggregation_method", "probing_location"}
 CONFIG_OVERRIDE_PATHS = {
     "max_epochs": "trainer.max_epochs",
     "lr": "model.lr",
     "classification_head_dropout": "model.classification_head_dropout",
-    "label_smoothing": "model.label_smoothing",
     "warmstart": "model.warmstart",
     "gradient_clip_val": "trainer.gradient_clip_val",
+    "layer_wise_lr_decay": "model.layer_wise_lr_decay",
+    "undecay_norm": "model.undecay_norm",
+    "optimizer": "model.optimizer",
+    "scheduler": "model.scheduler",
+    "weight_decay": "model.weight_decay",
+    "compile": "model.compile",
+    "label_smoothing": "model.label_smoothing",
 }
 
 
@@ -154,16 +174,23 @@ def normalize_sweep_values(key: str, configured_values: Any) -> list[Any]:
 
 def resolve_peft_default_value(peft_name: str, key: str) -> Any:
     if key in RESERVED_SWEEP_KEYS:
-        if key in MANIFEST_ONLY_KEYS:
+        if key in SPLIT_AXIS_KEYS:
+            defaults = get_sweep_default_values(key)
+            if len(defaults) != 1:
+                raise ValueError(
+                    f"Split axis key '{key}' cannot be resolved to a single default value"
+                )
+            return defaults[0]
+        config_key = CONFIG_OVERRIDE_PATHS.get(key)
+        if config_key is None and key not in SUBMISSION_IGNORED_KEYS:
+            raise KeyError(f"Missing config override path mapping for '{key}'")
+        if config_key is None:
             defaults = get_sweep_default_values(key)
             if len(defaults) != 1:
                 raise ValueError(
                     f"Manifest-only key '{key}' cannot be resolved to a single default value"
                 )
             return defaults[0]
-        config_key = CONFIG_OVERRIDE_PATHS.get(key)
-        if config_key is None:
-            raise KeyError(f"Missing config override path mapping for '{key}'")
         return get_nested_value(TRAIN_CONFIG_DEFAULTS, config_key)
 
     if key in CONFIG_OVERRIDE_PATHS:
@@ -249,6 +276,17 @@ class ExperimentSpec:
     samples_per_class: int | None
     lr: float
     classification_head_dropout: float
+    warmstart: int
+    gradient_clip_val: float | None
+    layer_wise_lr_decay: float | None
+    undecay_norm: bool
+    drop_path_rate: float | None
+    token_aggregation_method: str
+    probing_location: list[int]
+    optimizer: str
+    scheduler: str
+    weight_decay: float
+    compile: bool
     label_smoothing: float
     peft_params: dict[str, object]
 
@@ -274,6 +312,12 @@ def iter_peft_variants() -> Iterable[tuple[str, dict[str, object], dict[str, Any
             yield peft_name, resolved_params, sweep_overrides
 
 
+def resolve_warmstart_epochs(max_epochs: int, warmstart_fraction: float) -> int:
+    if warmstart_fraction <= 0:
+        return 0
+    return max(1, math.ceil(max_epochs * warmstart_fraction))
+
+
 def iter_experiments() -> Iterable[ExperimentSpec]:
     for peft, peft_params, sweep_overrides in iter_peft_variants():
         trial_values = normalize_sweep_values("trial", sweep_overrides.get("trial"))
@@ -284,7 +328,7 @@ def iter_experiments() -> Iterable[ExperimentSpec]:
             "samples_per_class", sweep_overrides.get("samples_per_class")
         )
         config_global_keys = [
-            key for key in GLOBALS if key not in MANIFEST_ONLY_KEYS
+            key for key in GLOBALS if key not in SPLIT_AXIS_KEYS
         ]
         global_values = {
             key: normalize_sweep_values(key, sweep_overrides.get(key))
@@ -318,16 +362,43 @@ def iter_experiments() -> Iterable[ExperimentSpec]:
             DATASETS,
         ):
             global_payload = dict(zip(config_global_keys, global_combo, strict=True))
+            max_epochs = int(global_payload["max_epochs"])
             yield ExperimentSpec(
                 model=model,
                 dataset=dataset,
                 peft=peft,
                 trial=int(trial),
-                max_epochs=int(global_payload["max_epochs"]),
+                max_epochs=max_epochs,
                 data_fraction=sweep_variant["data_fraction"],
                 samples_per_class=sweep_variant["samples_per_class"],
                 lr=float(global_payload["lr"]),
                 classification_head_dropout=float(global_payload["classification_head_dropout"]),
+                warmstart=resolve_warmstart_epochs(
+                    max_epochs=max_epochs,
+                    warmstart_fraction=float(global_payload["warmstart"]),
+                ),
+                gradient_clip_val=(
+                    None
+                    if global_payload["gradient_clip_val"] is None
+                    else float(global_payload["gradient_clip_val"])
+                ),
+                layer_wise_lr_decay=(
+                    None
+                    if global_payload["layer_wise_lr_decay"] is None
+                    else float(global_payload["layer_wise_lr_decay"])
+                ),
+                undecay_norm=bool(global_payload["undecay_norm"]),
+                drop_path_rate=(
+                    None
+                    if global_payload["drop_path_rate"] is None
+                    else float(global_payload["drop_path_rate"])
+                ),
+                token_aggregation_method=str(global_payload["token_aggregation_method"]),
+                probing_location=[int(value) for value in global_payload["probing_location"]],
+                optimizer=str(global_payload["optimizer"]),
+                scheduler=str(global_payload["scheduler"]),
+                weight_decay=float(global_payload["weight_decay"]),
+                compile=bool(global_payload["compile"]),
                 label_smoothing=float(global_payload["label_smoothing"]),
                 peft_params=peft_params,
             )

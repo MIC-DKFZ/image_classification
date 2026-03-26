@@ -19,10 +19,40 @@ CONFIG_OVERRIDE_PATHS = {
     "max_epochs": "trainer.max_epochs",
     "lr": "model.lr",
     "classification_head_dropout": "model.classification_head_dropout",
-    "label_smoothing": "model.label_smoothing",
     "warmstart": "model.warmstart",
     "gradient_clip_val": "trainer.gradient_clip_val",
+    "layer_wise_lr_decay": "model.layer_wise_lr_decay",
+    "undecay_norm": "model.undecay_norm",
+    "optimizer": "model.optimizer",
+    "scheduler": "model.scheduler",
+    "weight_decay": "model.weight_decay",
+    "compile": "model.compile",
+    "label_smoothing": "model.label_smoothing",
 }
+MANIFEST_SUBMIT_KEYS = [
+    "max_epochs",
+    "lr",
+    "classification_head_dropout",
+    "warmstart",
+    "gradient_clip_val",
+    "layer_wise_lr_decay",
+    "undecay_norm",
+    "optimizer",
+    "scheduler",
+    "weight_decay",
+    "compile",
+    "label_smoothing",
+]
+
+
+def format_override_value(value: object) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return json.dumps(value)
+    return str(value)
 
 
 def parse_args() -> argparse.Namespace:
@@ -193,26 +223,27 @@ def build_python_command(
         f"model={experiment['model']}",
         f"data={experiment['dataset']}",
         f"peft={experiment['peft']}",
-        f"trainer.max_epochs={experiment['max_epochs']}",
         f"data.module.batch_size={max_batch_size}",
-        f"model.classification_head_dropout={experiment['classification_head_dropout']}",
-        f"model.label_smoothing={experiment['label_smoothing']}",
         "data.module.data_fraction=null",
         f"+data.module.split_file={split_file}",
         f"+dataset={experiment['dataset']}",
         f"+data_fraction={data_fraction if data_fraction is not None else 'null'}",
         f"+samples_per_class={samples_per_class if samples_per_class is not None else 'null'}",
-        f"model.lr={experiment['lr']}",
         f"data_dir={args.data_dir}",
         f"exp_dir={args.exp_dir}",
     ]
 
+    for key in MANIFEST_SUBMIT_KEYS:
+        if key not in experiment:
+            continue
+        parts.append(f"{CONFIG_OVERRIDE_PATHS[key]}={format_override_value(experiment[key])}")
+
     peft_params = experiment.get("peft_params", {})
     for name, value in peft_params.items():
         if name in CONFIG_OVERRIDE_PATHS:
-            parts.append(f"{CONFIG_OVERRIDE_PATHS[name]}={value}")
+            parts.append(f"{CONFIG_OVERRIDE_PATHS[name]}={format_override_value(value)}")
         else:
-            parts.append(f"++peft.{name}={value}")
+            parts.append(f"++peft.{name}={format_override_value(value)}")
 
     if args.disable_checkpointing:
         parts.append("trainer.enable_checkpointing=false")
