@@ -27,12 +27,10 @@ REPA_TARGETS = {
         ("mlp.fc2",   "repa_fc2"),
     ],
     "DinoVisionTransformer": [
-        ("attn.q_proj", "repa_q"),
-        ("attn.k_proj", "repa_k"),
-        ("attn.v_proj", "repa_v"),
-        ("attn.proj",   "repa_proj"),
-        ("mlp.fc1",     "repa_fc1"),
-        ("mlp.fc2",     "repa_fc2"),
+        ("attn.qkv",  "repa_qkv"),   # fused Q,K,V
+        ("attn.proj", "repa_proj"),
+        ("mlp.fc1",   "repa_fc1"),
+        ("mlp.fc2",   "repa_fc2"),
     ],
     "DINOv3ViTModel": [
         ("attention.q_proj", "repa_q"),

@@ -22,9 +22,9 @@ MODULE_MAPPING = {
     },
     "DinoVisionTransformer": {
         "attn.proj": "attn.proj",
-        "attn.q_proj": "attn.q_proj",
-        "attn.k_proj": "attn.k_proj",
-        "attn.v_proj": "attn.v_proj",
+        "attn.q_proj": "attn.qkv",  # fused Q,K,V
+        "attn.k_proj": "attn.qkv",  # fused Q,K,V
+        "attn.v_proj": "attn.qkv",  # fused Q,K,V
         "mlp.fc1": "mlp.fc1",
         "mlp.fc1_g": "mlp.fc1_g",
         "mlp.fc1_x": "mlp.fc1_x",

@@ -28,14 +28,12 @@ DIFFFIT_TARGETS = {
         ("mlp.fc2",  "dff_fc2"),
     ],
     "DinoVisionTransformer": [
-        ("norm1",       "dff_norm1"),
-        ("attn.q_proj", "dff_q"),
-        ("attn.k_proj", "dff_k"),
-        ("attn.v_proj", "dff_v"),
-        ("attn.proj",   "dff_proj"),
-        ("norm2",       "dff_norm2"),
-        ("mlp.fc1",     "dff_fc1"),
-        ("mlp.fc2",     "dff_fc2"),
+        ("norm1",    "dff_norm1"),
+        ("attn.qkv", "dff_qkv"),    # fused Q,K,V → dim = 3*D
+        ("attn.proj","dff_proj"),
+        ("norm2",    "dff_norm2"),
+        ("mlp.fc1",  "dff_fc1"),
+        ("mlp.fc2",  "dff_fc2"),
     ],
     "DINOv3ViTModel": [
         ("norm1",            "dff_norm1"),

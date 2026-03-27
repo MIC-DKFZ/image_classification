@@ -29,14 +29,12 @@ SSF_TARGETS = {
         ("mlp.fc2",  "ssf_fc2"),
     ],
     "DinoVisionTransformer": [
-        ("norm1",       "ssf_norm1"),
-        ("attn.q_proj", "ssf_q"),
-        ("attn.k_proj", "ssf_k"),
-        ("attn.v_proj", "ssf_v"),
-        ("attn.proj",   "ssf_proj"),
-        ("norm2",       "ssf_norm2"),
-        ("mlp.fc1",     "ssf_fc1"),
-        ("mlp.fc2",     "ssf_fc2"),
+        ("norm1",    "ssf_norm1"),
+        ("attn.qkv", "ssf_qkv"),    # fused Q,K,V → dim = 3*D
+        ("attn.proj","ssf_proj"),
+        ("norm2",    "ssf_norm2"),
+        ("mlp.fc1",  "ssf_fc1"),
+        ("mlp.fc2",  "ssf_fc2"),
     ],
     "DINOv3ViTModel": [
         ("norm1",            "ssf_norm1"),

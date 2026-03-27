@@ -28,9 +28,7 @@ FACT_TARGETS = {
         ("fc2",  "mlp.fc2"),
     ],
     "DinoVisionTransformer": [
-        ("q",    "attn.q_proj"),
-        ("k",    "attn.k_proj"),
-        ("v",    "attn.v_proj"),
+        ("qkv",  "attn.qkv"),   # fused Q,K,V; shared up/down dim = (3D, D)
         ("proj", "attn.proj"),
         ("fc1",  "mlp.fc1"),
         ("fc2",  "mlp.fc2"),

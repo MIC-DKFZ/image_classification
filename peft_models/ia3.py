@@ -18,7 +18,7 @@ IA3_TARGETS = {
         "ff_modules":   ["mlp.fc1"],
     },
     "DinoVisionTransformer": {
-        "attn_modules": ["attn.k_proj", "attn.v_proj"],
+        "attn_modules": ["attn.qkv"],       # fused Q,K,V — scales the full 3D output
         "ff_modules":   ["mlp.fc1"],
     },
     "DINOv3ViTModel": {
