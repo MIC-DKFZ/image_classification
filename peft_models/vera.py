@@ -74,6 +74,6 @@ class Vera:
             param.requires_grad = False
 
         for name, param in self.model.named_parameters():
-            if any(sub in name for sub in ["head", "classifier", "cls_head", "vera"]):
+            if any(sub in name for sub in ["head", "classifier", "cls_head", "vera_lambda"]):
                 param.requires_grad = True
 
