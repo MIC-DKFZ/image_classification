@@ -127,12 +127,6 @@ def attach_convpass_with_hooks(
         blk.convpass = ConvpassModule(d_model=d_model, bottleneck=bottleneck, dropout=dropout)
         blk._convpass_adapt_x = None
 
-        if freeze_backbone:
-            for p in blk.parameters():
-                p.requires_grad = False
-            for p in blk.convpass.parameters():
-                p.requires_grad = True
-
         # PRE-HOOK on norm2: capture x before LayerNorm, run conv bypass (no residual)
         def _pre_hook(parent, mod, inputs):
             (x,) = inputs
@@ -157,6 +151,13 @@ def attach_convpass_with_hooks(
 
     if not hooked:
         raise RuntimeError("Convpass: no ViT-like blocks found in model.")
+
+    if freeze_backbone:
+        for p in model.parameters():
+            p.requires_grad = False
+        for name, p in model.named_parameters():
+            if "convpass" in name:
+                p.requires_grad = True
 
 
 def _get_module(module: nn.Module, name: str) -> nn.Module:

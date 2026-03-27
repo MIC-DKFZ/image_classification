@@ -136,12 +136,6 @@ def attach_adapters_with_hooks(
             adapter_layernorm_option=adapter_layernorm_option,
         )
 
-        if freeze_backbone:
-            for p in blk.parameters():
-                p.requires_grad = False
-            for p in blk.adapter.parameters():
-                p.requires_grad = True
-
         run_adapter = None
         if target_arch == "DINOv3ViTModel":
             run_adapter = False
@@ -185,6 +179,14 @@ def attach_adapters_with_hooks(
 
     if not hooked:
         raise RuntimeError("No ViT-like blocks found.")
+
+    if freeze_backbone:
+        for p in model.parameters():
+            p.requires_grad = False
+        for name, p in model.named_parameters():
+            if "adapter" in name:
+                p.requires_grad = True
+
     return hooked
 
 
