@@ -21,6 +21,9 @@ hydra:
 
 seed: False
 
+tqdm: True                # if True, use TQDMProgressBar instead of RichProgressBar
+tqdm_cluster_mode: True   # if True (and tqdm=True), throttle progress bar output for LSF/SLURM logs
+
 model:
   finetune_method: full
   optimizer: AdamW

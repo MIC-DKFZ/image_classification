@@ -3,6 +3,5 @@ exp_dir: ???
 data_dir: ???
 
 trainer:
-  enable_progress_bar: False
   callbacks:
     progressbar: ~

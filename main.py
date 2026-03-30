@@ -37,6 +37,14 @@ def main(cfg):
     if cfg.trainer.devices > 1 and cfg.trainer.accelerator == "gpu":
         cfg.trainer.sync_batchnorm = True
 
+    # swap RichProgressBar for TQDMProgressBar / ClusterTQDMProgressBar if requested
+    if cfg.tqdm:
+        cluster_mode = cfg.tqdm_cluster_mode
+        cfg.trainer.callbacks.progressbar = OmegaConf.create({
+            "_target_": "callbacks.ClusterTQDMProgressBar",
+            "cluster_mode": cluster_mode,
+        })
+
     # remove callbacks that are not enabled
     cfg.trainer.callbacks = [i for i in cfg.trainer.callbacks.values() if i]
     if not cfg.trainer["enable_checkpointing"]:
