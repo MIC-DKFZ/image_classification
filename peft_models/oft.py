@@ -86,6 +86,8 @@ class OFT:
         oft_target_modules,
         oft_coft,
         oft_eps,
+        oft_bias,
+        oft_use_cayley_neumann,
         *args, **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -102,6 +104,8 @@ class OFT:
             target_modules=oft_target_modules,
             coft=oft_coft,
             eps=oft_eps,
+            bias=oft_bias,
+            use_cayley_neumann=oft_use_cayley_neumann,
         )
 
         self.model = get_peft_model(self.model, oft_config)
@@ -109,6 +113,12 @@ class OFT:
         for param in self.model.parameters():
             param.requires_grad = False
 
+        unfreeze_subs = ["head", "classifier", "cls_head", "oft_"]
+        if oft_bias == "all":
+            unfreeze_subs.append(".bias")
+        elif oft_bias == "oft_only":
+            unfreeze_subs.append("base_layer.bias")
+
         for name, param in self.model.named_parameters():
-            if any(sub in name for sub in ["head", "classifier", "cls_head", "oft_"]):
+            if any(sub in name for sub in unfreeze_subs):
                 param.requires_grad = True

@@ -7,6 +7,8 @@ peft:
   oft_target_modules: ['attn.q_proj', 'attn.k_proj', 'attn.v_proj', 'attn.proj', 'mlp.fc1', 'mlp.fc2']
   oft_coft: False
   oft_eps: 6e-5                      # constraint tolerance for coft; only active when oft_coft=True
+  oft_bias: "none"
+  oft_use_cayley_neumann: True       # use Cayley-Neumann approximation for orthogonal matrix parametrisation
 
 model:
   lr: 0.0001
