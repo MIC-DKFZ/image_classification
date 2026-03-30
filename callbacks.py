@@ -1,4 +1,43 @@
-from lightning.pytorch.callbacks import TQDMProgressBar
+import math
+
+from lightning.pytorch.callbacks import Callback, TQDMProgressBar
+
+
+class NaNLossCallback(Callback):
+    """Raises RuntimeError if train or val loss is NaN for `patience` consecutive iterations."""
+
+    def __init__(self, patience: int = 3):
+        self.patience = patience
+        self._train_nan_count = 0
+        self._val_nan_count = 0
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        loss = outputs["loss"] if isinstance(outputs, dict) else outputs
+        if loss is not None and (math.isnan(float(loss)) or math.isinf(float(loss))):
+            self._train_nan_count += 1
+            if self._train_nan_count >= self.patience:
+                raise RuntimeError(
+                    f"Training loss has been NaN/Inf for {self.patience} consecutive iterations. Aborting."
+                )
+        else:
+            self._train_nan_count = 0
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        self._train_nan_count = 0
+
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+        val_loss = trainer.callback_metrics.get("val_loss")
+        if val_loss is not None and (math.isnan(float(val_loss)) or math.isinf(float(val_loss))):
+            self._val_nan_count += 1
+            if self._val_nan_count >= self.patience:
+                raise RuntimeError(
+                    f"Validation loss has been NaN/Inf for {self.patience} consecutive iterations. Aborting."
+                )
+        else:
+            self._val_nan_count = 0
+
+    def on_validation_epoch_start(self, trainer, pl_module):
+        self._val_nan_count = 0
 
 
 class ClusterTQDMProgressBar(TQDMProgressBar):

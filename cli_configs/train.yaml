@@ -78,9 +78,12 @@ metrics:
 
 trainer:
   _target_: lightning.pytorch.Trainer
-  callbacks: 
+  callbacks:
     progressbar:
       _target_: lightning.pytorch.callbacks.RichProgressBar
+    nan_loss:
+      _target_: callbacks.NaNLossCallback
+      patience: 3
     lr_monitor:
       _target_: lightning.pytorch.callbacks.LearningRateMonitor
       logging_interval: epoch
