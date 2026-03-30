@@ -89,6 +89,11 @@ class AdaLoRA:
         use_rslora,
         init_lora_weights,
         lora_bias,
+        adalora_orth_reg_weight,
+        adalora_beta1,
+        adalora_beta2,
+        adalora_tinit,
+        adalora_deltaT,
         *args, **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -108,6 +113,11 @@ class AdaLoRA:
             use_rslora=use_rslora,
             init_lora_weights=init_lora_weights,
             bias=lora_bias,
+            orth_reg_weight=adalora_orth_reg_weight,
+            beta1=adalora_beta1,
+            beta2=adalora_beta2,
+            tinit=adalora_tinit,
+            deltaT=adalora_deltaT,
         )
 
         self.model = get_peft_model(self.model, adalora_config)

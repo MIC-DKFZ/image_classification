@@ -10,6 +10,11 @@ peft:
   use_rslora: False
   init_lora_weights: True
   lora_bias: "none"
+  adalora_orth_reg_weight: 0.5
+  adalora_beta1: 0.85
+  adalora_beta2: 0.85
+  adalora_tinit: 0
+  adalora_deltaT: 1
 
 model:
   lr: 0.0001
