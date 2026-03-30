@@ -84,6 +84,8 @@ class OFT:
         oft_r,                 # number of OFT blocks (block size = out_dim / r)
         oft_dropout,
         oft_target_modules,
+        oft_coft,
+        oft_eps,
         *args, **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -98,6 +100,8 @@ class OFT:
             r=oft_r,
             module_dropout=oft_dropout,
             target_modules=oft_target_modules,
+            coft=oft_coft,
+            eps=oft_eps,
         )
 
         self.model = get_peft_model(self.model, oft_config)

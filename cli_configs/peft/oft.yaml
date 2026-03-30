@@ -5,6 +5,8 @@ peft:
   oft_r: 8                         # number of OFT blocks; block size = out_dim / r
   oft_dropout: 0.0
   oft_target_modules: ['attn.q_proj', 'attn.k_proj', 'attn.v_proj', 'attn.proj', 'mlp.fc1', 'mlp.fc2']
+  oft_coft: False
+  oft_eps: 6e-5                      # constraint tolerance for coft; only active when oft_coft=True
 
 model:
   lr: 0.0001
