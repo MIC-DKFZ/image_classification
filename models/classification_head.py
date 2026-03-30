@@ -13,8 +13,9 @@ class ClassificationHead(nn.Module):
             num_classes (int): Number of output classes.
             dropout (float): Dropout rate applied before the output layer.
             patch_aggregation_method (string): "cls_token" for taking the class token,
-                "avg" or "sum" for aggregating the individual token vectors, and "joint"
-                for combining class token and average patch token.
+                "avg" or "sum" for aggregating the patch tokens (excl. cls), "mean_all"
+                for averaging all tokens including cls, and "joint" for combining class
+                token and average patch token.
         """
         super(ClassificationHead, self).__init__()
         
@@ -33,6 +34,8 @@ class ClassificationHead(nn.Module):
             x = x[:, 1:].mean(dim=1)
         elif self.patch_aggregation_method == "sum":
             x = x[:, 1:].sum(dim=1)
+        elif self.patch_aggregation_method == "mean_all":
+            x = x.mean(dim=1)
         elif self.patch_aggregation_method == "joint":
             x = torch.cat([x[:, 0], x[:, 1:].mean(dim=1)], dim=1)
 

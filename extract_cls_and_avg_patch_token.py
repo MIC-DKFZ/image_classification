@@ -21,6 +21,8 @@ def aggregate_features(x, method: str):
         x = x[:, 1:].mean(dim=1)
     elif method == "sum":
         x = x[:, 1:].sum(dim=1)
+    elif method == "mean_all":
+        x = x.mean(dim=1)
     elif method == "joint":
         x = torch.cat([x[:, 0], x[:, 1:].mean(dim=1)], dim=1)
     return x
