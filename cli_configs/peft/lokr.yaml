@@ -5,6 +5,8 @@ peft:
   lokr_rank: 4                     # Kronecker factor rank; parameter count is independent of weight matrix size
   lokr_alpha: 1.0
   lokr_dropout: 0.0
+  lokr_rank_dropout: 0.0
+  lokr_decompose_factor: -1            # -1 = automatic (square-ish split); positive values fix one factor dimension
   lokr_target_modules: ['attn.q_proj', 'attn.k_proj', 'attn.v_proj', 'attn.proj', 'mlp.fc1_g', 'mlp.fc1_x', 'mlp.fc2']
 
 model:

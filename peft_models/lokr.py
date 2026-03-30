@@ -106,6 +106,8 @@ class LoKr:
         lokr_rank,
         lokr_alpha,
         lokr_dropout,
+        lokr_rank_dropout,
+        lokr_decompose_factor,
         lokr_target_modules,
         *args, **kwargs,
     ):
@@ -121,6 +123,8 @@ class LoKr:
             r=lokr_rank,
             alpha=lokr_alpha,
             module_dropout=lokr_dropout,
+            rank_dropout=lokr_rank_dropout,
+            decompose_factor=lokr_decompose_factor,
             target_modules=lokr_target_modules,
         )
 
