@@ -70,32 +70,135 @@ DATASETS = [
 ]
 
 PEFTS = {
-    "adapt_former": {
-        "bottleneck": [16, 64, 256],
-        # "dropout": [0.0, 0.05, 0.1],
-    },
+    # ── No tunable hparams ────────────────────────────────────────────────
+    "linear_probing": {},
+    "bitfit": {},
+    "ln_tuning": {},
+    "ssf": {},
+    "difffit": {},
+    "ia3": {},
+
+    # ── Global-override only ───────────────────────────────────────────────
     "full_finetuning": {
-        "warmstart": [10],
-        "gradient_clip_val": [1.0],
+        "warmstart": [10],               # 0, 5, 10, 20
+        "gradient_clip_val": [1.0],      # None, 0.5, 1.0, 5.0
         "num_first_frozen_layers": [0],
     },
-    "gps": {
-        "gps_percent": [1, 4, 16],
-        "gps_calib_batches": [4], # [1, 2, 4],
+
+    # ── Partial finetuning ────────────────────────────────────────────────
+    "partial_finetuning": {
+        "num_frozen_layers": [6],        # 0, 3, 6, 9, 11
     },
-    "linear_probing": {},
+
+    # ── LoRA family ───────────────────────────────────────────────────────
     "lora": {
-        # "lora_rank": [4, 8, 16],
-        # "lora_alpha": [8, 16, 32],
+        "lora_rank": [8],                # 2, 4, 8, 16, 32
+        "lora_alpha": [16],              # 4, 8, 16, 32, 64  (typically 2× rank)
+        "lora_dropout": [0.0],           # 0.0, 0.05, 0.1, 0.2
+        "use_rslora": [False],           # False, True
+        "init_lora_weights": [True],     # True, "pissa", "loftq"
+        "lora_bias": ["none"],           # "none", "all", "lora_only"
+    },
+    "dora": {
+        "lora_rank": [8],                # 2, 4, 8, 16, 32
+        "lora_alpha": [16],              # 4, 8, 16, 32, 64  (typically 2× rank)
+        "lora_dropout": [0.0],           # 0.0, 0.05, 0.1, 0.2
+        "use_rslora": [False],           # False, True
+        "init_lora_weights": [True],     # True, "pissa", "loftq"
+        "lora_bias": ["none"],           # "none", "all", "lora_only"
+    },
+    "adalora": {
+        "adalora_rank": [4],             # 2, 4, 8, 12, 16
+        "adalora_init_rank": [12],       # 8, 12, 16, 24  (must be ≥ adalora_rank)
+        "adalora_alpha": [32],           # 8, 16, 32, 64
+        "adalora_dropout": [0.0],        # 0.0, 0.05, 0.1, 0.2
+        "use_rslora": [False],           # False, True
+        "init_lora_weights": [True],     # True, "pissa", "loftq"
+        "lora_bias": ["none"],           # "none", "all", "lora_only"
+        "adalora_orth_reg_weight": [0.5],# 0.0, 0.1, 0.5, 1.0
+        "adalora_beta1": [0.85],         # 0.85, 0.9, 0.95
+        "adalora_beta2": [0.85],         # 0.85, 0.9, 0.95
+        "adalora_tinit": [0],            # 0, 50, 100, 200
+        "adalora_deltaT": [1],           # 1, 5, 10
     },
     "vera": {
-        "vera_rank": [256],
-        # "vera_dropout": [0.0, 0.01, 0.05],
+        "vera_rank": [256],              # 64, 256, 1024
+        "vera_dropout": [0.0],           # 0.0, 0.05, 0.1, 0.2
+        "vera_projection_prng_key": [0], # 0, 1, 42
     },
-    "visual_prompt_tuning": {
-        "deep": [True, False],
-        # "num_tokens": [8, 20, 40],
-        # "dropout": [0.0, 0.05, 0.1],
+
+    # ── Orthogonal methods ────────────────────────────────────────────────
+    "boft": {
+        "boft_block_size": [8],          # 4, 8, 16, 32
+        "boft_n_butterfly_factor": [1],  # 1, 2, 3
+        "boft_dropout": [0.0],           # 0.0, 0.05, 0.1, 0.2
+        "boft_bias": ["none"],           # "none", "all", "boft_only"
+    },
+    "oft": {
+        "oft_r": [8],                    # 4, 8, 16, 32
+        "oft_dropout": [0.0],            # 0.0, 0.05, 0.1, 0.2
+        "oft_coft": [False],             # False, True
+        "oft_eps": [6e-5],               # 1e-5, 6e-5, 1e-4  (only active when oft_coft=True)
+        "oft_bias": ["none"],            # "none", "all", "oft_only"
+        "oft_use_cayley_neumann": [True],# True, False
+    },
+
+    # ── LyCORIS variants ──────────────────────────────────────────────────
+    "loha": {
+        "loha_rank": [4],                # 2, 4, 8, 16
+        "loha_alpha": [1.0],             # 1.0, 2.0, 4.0, 8.0
+        "loha_dropout": [0.0],           # 0.0, 0.05, 0.1, 0.2
+        "loha_rank_dropout": [0.0],      # 0.0, 0.1, 0.2
+    },
+    "lokr": {
+        "lokr_rank": [4],                # 2, 4, 8, 16
+        "lokr_alpha": [1.0],             # 1.0, 2.0, 4.0, 8.0
+        "lokr_dropout": [0.0],           # 0.0, 0.05, 0.1, 0.2
+        "lokr_rank_dropout": [0.0],      # 0.0, 0.1, 0.2
+        "lokr_decompose_factor": [-1],   # -1, 2, 4, 8
+    },
+
+    # ── Fourier / spectral ────────────────────────────────────────────────
+    "fourierft": {
+        "fourierft_n_frequency": [1000], # 100, 500, 1000, 2000, 5000
+        "fourierft_scaling": [150.0],    # 50.0, 100.0, 150.0, 300.0
+    },
+
+    # ── Shared-factorisation ──────────────────────────────────────────────
+    "fact": {
+        "fact_r": [4],                   # 2, 4, 8, 16, 32
+    },
+
+    # ── Adapter methods ───────────────────────────────────────────────────
+    "adapt_former": {
+        "bottleneck": [64],              # 8, 16, 32, 64, 128, 256
+        "dropout": [0.0],                # 0.0, 0.05, 0.1, 0.2
+        "adapter_scalar": [1.0],         # 0.1, 0.5, 1.0, "learnable_scalar"
+    },
+    "convpass": {
+        "bottleneck": [64],              # 8, 16, 32, 64, 128, 256
+        "dropout": [0.0],                # 0.0, 0.05, 0.1, 0.2
+    },
+    "rep_adapter": {
+        "repadapter_bottleneck": [8],    # 4, 8, 16, 32, 64
+        "repadapter_groups": [2],        # 1, 2, 4, 8
+        "repadapter_scale_init": [0.001],# 1e-4, 1e-3, 1e-2, 0.1
+    },
+
+    # ── Sparse / selection ────────────────────────────────────────────────
+    "gps": {
+        "gps_percent": [4],              # 1, 2, 4, 8, 16
+        "gps_calib_batches": [4],        # 1, 2, 4, 8
+    },
+
+    # ── Visual prompt tuning ──────────────────────────────────────────────
+    "visual_prompt_tuning": {            # deep=True (set in yaml)
+        "num_tokens": [20],              # 5, 10, 20, 50, 100
+        "dropout": [0.0],                # 0.0, 0.05, 0.1, 0.2
+    },
+    "visual_prompt_tuning_shallow": {    # deep=False (set in yaml)
+        "num_tokens": [20],              # 5, 10, 20, 50, 100
+        "dropout": [0.0],                # 0.0, 0.05, 0.1, 0.2
     },
 }
 
