@@ -1,6 +1,6 @@
 import timm
-import torch
 from base_model import BaseModel
+from models.classification_head import ClassificationHead
 
 
 class TimmModel(BaseModel):
@@ -11,30 +11,27 @@ class TimmModel(BaseModel):
             type,
             pretrained=kwargs["pretrained"],
             in_chans=kwargs["input_channels"],
-            num_classes=kwargs["num_classes"],
-        ) 
-        
-        if kwargs.get("classification_head_dropout", None) is not None:
-            if hasattr(self.model, "head_drop") and isinstance(self.model.head_drop, torch.nn.Dropout):
-                self.model.head_drop.p = kwargs["classification_head_dropout"]
-            if hasattr(self.model, "head"):
-                for name, module in self.model.head.named_children():
-                    if isinstance(module, torch.nn.Dropout):
-                        module.p = kwargs["classification_head_dropout"]
-    
+            num_classes=0,  # strip timm's head; we use ClassificationHead
+        )
+
+        self.cls_head = ClassificationHead(
+            self.model.num_features,
+            kwargs["num_classes"],
+            dropout=kwargs["classification_head_dropout"],
+            patch_aggregation_method=kwargs["token_aggregation_method"],
+        )
+
     @property
     def encoder_params(self):
-        return [
-            param for name, param in self.model.named_parameters() if "head" not in name
-        ]
-    
+        return self.model.parameters()
+
     @property
     def cls_head_params(self):
-        return [param for name, param in self.model.named_parameters() if "head" in name]
+        return self.cls_head.parameters()
 
     def forward(self, x):
-        return self.model(x)
-    
+        x = self.model.forward_features(x)
+        return self.cls_head(x)
+
     def extract_features(self, x):
-        # This works for most models in timm
         return self.model.forward_features(x)
