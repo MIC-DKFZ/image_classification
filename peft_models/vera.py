@@ -54,7 +54,7 @@ MODULE_MAPPING = {
 
 
 class Vera:
-    def __init__(self, vera_rank, vera_dropout, vera_target_modules, *args, **kwargs):
+    def __init__(self, vera_rank, vera_dropout, vera_target_modules, vera_projection_prng_key, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         target_arch = MODEL_TO_ARCH_MAPPING[self.model.__class__.__name__]
@@ -65,6 +65,7 @@ class Vera:
             r=vera_rank,
             vera_dropout=vera_dropout,
             target_modules=vera_target_modules,
+            projection_prng_key=vera_projection_prng_key,
         )
 
         self.model = get_peft_model(self.model, vera_config)
