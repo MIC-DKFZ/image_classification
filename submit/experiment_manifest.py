@@ -30,24 +30,24 @@ ESTIMATION_ASSUMPTIONS = [
 ]
 
 GLOBALS = {
-    "trial": [0],
-    "data_fraction": [],  # [0.1, 0.2, 0.4, 0.6, 0.8, 1.0]
-    "samples_per_class": [50],  # [10, 20, 30, 40, 50]
-    "max_epochs": [20],  # [5, 10, 20, 40, 100]
-    "lr": [0.1, 0.05, 0.01, 0.005, 0.001],
-    "classification_head_dropout": [0.3],
-    "warmstart": [0.1],
-    "gradient_clip_val": [None],
-    "layer_wise_lr_decay": [None],
-    "undecay_norm": [False],
-    "drop_path_rate": [None],
-    "token_aggregation_method": ["cls_token"],
-    "probing_location": [[-1]],
-    "optimizer": ["AdamW"],
-    "scheduler": ["CosineAnneal"],
-    "weight_decay": [0.05],
-    "compile": [True],
-    "label_smoothing": [0.0],
+    "trial": [0],                                    # [0, 1, 2]  — repeat index for statistical robustness
+    "data_fraction": [],                             # [0.1, 0.2, 0.4, 0.6, 0.8, 1.0]
+    "samples_per_class": [50],                       # [10, 20, 30, 40, 50]  — low-data regime sweep
+    "max_epochs": [20],                              # [10, 20, 40, 100]
+    "lr": [0.1, 0.05, 0.01, 0.005, 0.001],           # [1e-4, 3e-4, 1e-3, 3e-3, 1e-2]  — PEFT methods typically want higher LR than full FT
+    "classification_head_dropout": [0.3],            # [0.0, 0.1, 0.3, 0.5]
+    "warmstart": [0.1],                              # [0.0, 0.05, 0.1, 0.2]  — fraction of max_epochs used as linear warmup
+    "gradient_clip_val": [None],                     # [None, 0.5, 1.0, 5.0]
+    "layer_wise_lr_decay": [None],                   # [None, 0.65, 0.75, 0.85, 0.95]  — BERT-style decay; most useful for full/partial FT
+    "undecay_norm": [False],                         # [False, True]  — exclude norm/bias from weight decay
+    "drop_path_rate": [None],                        # [None, 0.1, 0.2, 0.3]  — stochastic depth; not yet wired to submission
+    "token_aggregation_method": ["cls_token"],       # ["cls_token", "avg", "mean_all", "joint"]
+    "probing_location": [[-1]],                      # [[-1], [-1, -2, -3, -4]]  — not yet implemented in codebase
+    "optimizer": ["AdamW"],                          # ["AdamW", "Adam", "SGD"]
+    "scheduler": ["CosineAnneal"],                   # ["CosineAnneal", "Step", "MultiStep"]
+    "weight_decay": [0.05],                          # [0.0, 0.01, 0.05, 0.1]
+    "compile": [True],                               # [True, False]
+    "label_smoothing": [0.0],                        # [0.0, 0.05, 0.1, 0.2]
 }
 
 MODELS = [
