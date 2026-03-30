@@ -104,6 +104,7 @@ class LoHa:
         loha_rank,
         loha_alpha,
         loha_dropout,
+        loha_rank_dropout,
         loha_target_modules,
         *args, **kwargs,
     ):
@@ -119,6 +120,7 @@ class LoHa:
             r=loha_rank,
             alpha=loha_alpha,
             module_dropout=loha_dropout,
+            rank_dropout=loha_rank_dropout,
             target_modules=loha_target_modules,
         )
 
