@@ -6,6 +6,7 @@ peft:
   boft_n_butterfly_factor: 1       # depth of butterfly factorisation; higher = more expressive
   boft_dropout: 0.0
   boft_target_modules: ['attn.q_proj', 'attn.k_proj', 'attn.v_proj', 'attn.proj', 'mlp.fc1', 'mlp.fc2']
+  boft_bias: "none"
 
 model:
   lr: 0.0001

@@ -88,6 +88,7 @@ class BOFT:
         boft_n_butterfly_factor,  # depth of butterfly factorisation (e.g. 1 or 2)
         boft_dropout,
         boft_target_modules,
+        boft_bias,
         *args, **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -103,6 +104,7 @@ class BOFT:
             boft_n_butterfly_factor=boft_n_butterfly_factor,
             boft_dropout=boft_dropout,
             target_modules=boft_target_modules,
+            bias=boft_bias,
         )
 
         self.model = get_peft_model(self.model, boft_config)
@@ -110,6 +112,12 @@ class BOFT:
         for param in self.model.parameters():
             param.requires_grad = False
 
+        unfreeze_subs = ["head", "classifier", "cls_head", "boft_"]
+        if boft_bias == "all":
+            unfreeze_subs.append(".bias")
+        elif boft_bias == "boft_only":
+            unfreeze_subs.append("base_layer.bias")
+
         for name, param in self.model.named_parameters():
-            if any(sub in name for sub in ["head", "classifier", "cls_head", "boft_"]):
+            if any(sub in name for sub in unfreeze_subs):
                 param.requires_grad = True
