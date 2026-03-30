@@ -65,7 +65,8 @@ MODULE_MAPPING = {
 
 
 class LoRA:
-    def __init__(self, lora_rank, lora_alpha, lora_dropout, lora_target_modules, use_dora, *args, **kwargs):
+    def __init__(self, lora_rank, lora_alpha, lora_dropout, lora_target_modules, use_dora,
+                 use_rslora, init_lora_weights, lora_bias, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         target_arch = MODEL_TO_ARCH_MAPPING[self.model.__class__.__name__]
@@ -73,11 +74,14 @@ class LoRA:
         lora_target_modules = [module_mapping[module] for module in lora_target_modules]
 
         lora_config = LoraConfig(
-            r=lora_rank,  # LoRA rank
-            lora_alpha=lora_alpha,  # Scaling factor
+            r=lora_rank,
+            lora_alpha=lora_alpha,
             lora_dropout=lora_dropout,
             target_modules=lora_target_modules,
-            use_dora=use_dora
+            use_dora=use_dora,
+            use_rslora=use_rslora,
+            init_lora_weights=init_lora_weights,
+            bias=lora_bias,
         )
 
         self.model = get_peft_model(self.model, lora_config)
@@ -86,7 +90,13 @@ class LoRA:
         for param in self.model.parameters():
             param.requires_grad = False
 
+        unfreeze_subs = ["head", "classifier", "cls_head", "lora"]
+        if lora_bias == "all":
+            unfreeze_subs.append(".bias")
+        elif lora_bias == "lora_only":
+            unfreeze_subs.append("base_layer.bias")
+
         for name, param in self.model.named_parameters():
-            if any(sub in name for sub in ["head", "classifier", "cls_head", "lora"]):
+            if any(sub in name for sub in unfreeze_subs):
                 param.requires_grad = True
 

@@ -5,3 +5,6 @@ lora_alpha: 16
 lora_dropout: 0.01
 lora_target_modules: ['attn.q_proj', 'attn.k_proj', 'attn.v_proj', 'attn.proj', 'mlp.fc1_g', 'mlp.fc1_x', 'mlp.fc2']  # attn.q_proj, attn.k_proj, attn.v_proj, attn.proj, mlp.fc1_g, mlp.fc1_x, mlp.fc2
 use_dora: False
+use_rslora: False
+init_lora_weights: True
+lora_bias: "none"

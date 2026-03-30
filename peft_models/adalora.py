@@ -86,6 +86,9 @@ class AdaLoRA:
         adalora_alpha,
         adalora_dropout,
         adalora_target_modules,
+        use_rslora,
+        init_lora_weights,
+        lora_bias,
         *args, **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -102,6 +105,9 @@ class AdaLoRA:
             lora_alpha=adalora_alpha,
             lora_dropout=adalora_dropout,
             target_modules=adalora_target_modules,
+            use_rslora=use_rslora,
+            init_lora_weights=init_lora_weights,
+            bias=lora_bias,
         )
 
         self.model = get_peft_model(self.model, adalora_config)
@@ -109,8 +115,14 @@ class AdaLoRA:
         for param in self.model.parameters():
             param.requires_grad = False
 
+        unfreeze_subs = ["head", "classifier", "cls_head", "lora"]
+        if lora_bias == "all":
+            unfreeze_subs.append(".bias")
+        elif lora_bias == "lora_only":
+            unfreeze_subs.append("base_layer.bias")
+
         for name, param in self.model.named_parameters():
-            if any(sub in name for sub in ["head", "classifier", "cls_head", "lora"]):
+            if any(sub in name for sub in unfreeze_subs):
                 param.requires_grad = True
 
     def on_train_start(self):
