@@ -213,7 +213,7 @@ RESERVED_SWEEP_KEYS = {
     *GLOBALS.keys(),
 }
 SPLIT_AXIS_KEYS = {"trial", "data_fraction", "samples_per_class"}
-SUBMISSION_IGNORED_KEYS = {"drop_path_rate", "token_aggregation_method", "probing_location"}
+SUBMISSION_IGNORED_KEYS = {"drop_path_rate", "probing_location"}
 CONFIG_OVERRIDE_PATHS = {
     "max_epochs": "trainer.max_epochs",
     "lr": "model.lr",
@@ -227,6 +227,7 @@ CONFIG_OVERRIDE_PATHS = {
     "weight_decay": "model.weight_decay",
     "compile": "model.compile",
     "label_smoothing": "model.label_smoothing",
+    "token_aggregation_method": "model.token_aggregation_method",
 }
 
 

@@ -28,6 +28,7 @@ CONFIG_OVERRIDE_PATHS = {
     "weight_decay": "model.weight_decay",
     "compile": "model.compile",
     "label_smoothing": "model.label_smoothing",
+    "token_aggregation_method": "model.token_aggregation_method",
 }
 MANIFEST_SUBMIT_KEYS = [
     "max_epochs",
@@ -42,6 +43,7 @@ MANIFEST_SUBMIT_KEYS = [
     "weight_decay",
     "compile",
     "label_smoothing",
+    "token_aggregation_method",
 ]
 
 
