@@ -7,6 +7,12 @@ import torch
 from pathlib import Path
 
 
+def _resolve_train_transform(module):
+    if hasattr(module, "build_train_transform"):
+        return module.build_train_transform()
+    raise AttributeError("Policy module must expose build_train_transform")
+
+
 class TestDatasetStructure:
     """Test dataset class structure and interface."""
 
@@ -135,13 +141,12 @@ class TestDatasetLoading:
         policy_name = f"augmentation.policies.{dataset_config['policy']}"
 
         dataset_module = __import__(module_name, fromlist=[class_name])
-        policy_module = __import__(policy_name, fromlist=["get_train_transforms"])
+        policy_module = __import__(policy_name, fromlist=["TrainTransform"])
 
         dataset_class = getattr(dataset_module, class_name)
-        get_train_transforms = getattr(policy_module, "get_train_transforms")
 
         try:
-            transforms = get_train_transforms()
+            transforms = _resolve_train_transform(policy_module)
             dataset = dataset_class(
                 root=str(dataset_path),
                 split="train",

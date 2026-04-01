@@ -34,14 +34,14 @@ Augmentation policies for all 10 datasets following best practices for each doma
 ## Usage
 
 ```python
-from augmentation.policies.zooscannet import TrainTransform, TestTransform
+from augmentation.policies.zooscannet import build_test_transform, build_train_transform
 
 # For training
-train_transform = TrainTransform()()
+train_transform = build_train_transform()
 train_dataset = ZooScanNetData(root="...", split="train", transform=train_transform)
 
 # For validation/test
-test_transform = TestTransform()()
+test_transform = build_test_transform()
 val_dataset = ZooScanNetData(root="...", split="val", transform=test_transform)
 ```
 

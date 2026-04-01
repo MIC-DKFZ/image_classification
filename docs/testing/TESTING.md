@@ -200,13 +200,13 @@ pip install torch torchvision pillow numpy h5py tqdm scikit-learn
 ### Augmentation issues
 ```python
 # Test augmentation directly
-from augmentation.policies.aid import get_train_transforms
+from augmentation.policies.aid import build_train_transform
 import torch
 
-transforms = get_train_transforms()
-dummy_img = torch.randint(0, 256, (3, 500, 500), dtype=torch.uint8)
-result = transforms(**{"image": dummy_img})
-print(result["image"].shape, result["image"].dtype)
+transforms = build_train_transform()
+dummy_img = torch.randint(0, 256, (500, 500, 3), dtype=torch.uint8).numpy()
+result = transforms(dummy_img)
+print(result.shape, result.dtype)
 ```
 
 ## Performance Tips
@@ -223,14 +223,14 @@ If you add a new dataset, include the test block:
 ```python
 if __name__ == '__main__':
     from torch.utils.data import DataLoader
-    from augmentation.policies.YOUR_POLICY import get_train_transforms, get_val_transforms
+    from augmentation.policies.YOUR_POLICY import build_test_transform, build_train_transform
 
     print("="*80)
     print("Testing YourDataset Dataset")
     print("="*80)
 
-    train_aug = get_train_transforms()
-    val_aug = get_val_transforms()
+    train_aug = build_train_transform()
+    val_aug = build_test_transform()
 
     # Test train set
     print("\n[Train Set with Augmentations]")

@@ -1,2 +1,0 @@
-_target_: models.dynamic_vgg.VGG16
-cifar_size: ???

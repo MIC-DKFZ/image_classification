@@ -2,103 +2,94 @@ import albumentations as A
 import cv2
 from albumentations.pytorch import ToTensorV2
 
-from .base_transform import AlbumentationsTransformAdapter, BaseTransform
+from .base_transform import AlbumentationsTransformAdapter
 
 MEAN_IMGNET, STD_IMGNET = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
 
 
-class TrainTransform(BaseTransform):
-    """
-    PCam training transforms.
-    Rotation-invariant augmentations for histopathology patches.
-    Native resolution is 96x96.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-
-    def __call__(self):
-        return AlbumentationsTransformAdapter(
-            A.Compose(
-                [
-                    A.SmallestMaxSize(max_size=256),
-                    A.RandomCrop(height=224, width=224),
-                    A.HorizontalFlip(p=0.5),
-                    A.VerticalFlip(p=0.5),
-                    A.Rotate(limit=(-180, 180), border_mode=cv2.BORDER_REFLECT, p=0.5),
-                    A.ColorJitter(
-                        brightness=0.15,
-                        contrast=0.15,
-                        saturation=0.15,
-                        hue=0.0,
-                        p=0.5,
-                    ),
-                    A.Normalize(MEAN_IMGNET, STD_IMGNET),
-                    ToTensorV2(),
-                ]
-            )
+def build_train_transform():
+    return AlbumentationsTransformAdapter(
+        A.Compose(
+            [
+                A.SmallestMaxSize(max_size=256),
+                A.RandomCrop(height=224, width=224),
+                A.HorizontalFlip(p=0.5),
+                A.VerticalFlip(p=0.5),
+                A.Rotate(limit=(-180, 180), border_mode=cv2.BORDER_REFLECT, p=0.5),
+                A.ColorJitter(
+                    brightness=0.15,
+                    contrast=0.15,
+                    saturation=0.15,
+                    hue=0.0,
+                    p=0.5,
+                ),
+                A.Normalize(MEAN_IMGNET, STD_IMGNET),
+                ToTensorV2(),
+            ]
         )
+    )
 
 
-class TrainTransformNative(BaseTransform):
-    """
-    PCam training transforms keeping native 96x96 resolution.
-    Use this if your model supports smaller inputs.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-
-    def __call__(self):
-        return AlbumentationsTransformAdapter(
-            A.Compose(
-                [
-                    A.HorizontalFlip(p=0.5),
-                    A.VerticalFlip(p=0.5),
-                    A.Rotate(limit=(-180, 180), border_mode=cv2.BORDER_REFLECT, p=0.5),
-                    A.ColorJitter(
-                        brightness=0.15,
-                        contrast=0.15,
-                        saturation=0.15,
-                        hue=0.0,
-                        p=0.5,
-                    ),
-                    A.Normalize(MEAN_IMGNET, STD_IMGNET),
-                    ToTensorV2(),
-                ]
-            )
+def build_train_transform_native():
+    return AlbumentationsTransformAdapter(
+        A.Compose(
+            [
+                A.HorizontalFlip(p=0.5),
+                A.VerticalFlip(p=0.5),
+                A.Rotate(limit=(-180, 180), border_mode=cv2.BORDER_REFLECT, p=0.5),
+                A.ColorJitter(
+                    brightness=0.15,
+                    contrast=0.15,
+                    saturation=0.15,
+                    hue=0.0,
+                    p=0.5,
+                ),
+                A.Normalize(MEAN_IMGNET, STD_IMGNET),
+                ToTensorV2(),
+            ]
         )
+    )
 
 
-class TestTransform(BaseTransform):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-
-    def __call__(self):
-        return AlbumentationsTransformAdapter(
-            A.Compose(
-                [
-                    A.SmallestMaxSize(max_size=256),
-                    A.CenterCrop(height=224, width=224),
-                    A.Normalize(MEAN_IMGNET, STD_IMGNET),
-                    ToTensorV2(),
-                ]
-            )
+def build_test_transform():
+    return AlbumentationsTransformAdapter(
+        A.Compose(
+            [
+                A.SmallestMaxSize(max_size=256),
+                A.CenterCrop(height=224, width=224),
+                A.Normalize(MEAN_IMGNET, STD_IMGNET),
+                ToTensorV2(),
+            ]
         )
+    )
 
 
-class TestTransformNative(BaseTransform):
-    """Native 96x96 resolution for test."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-
-    def __call__(self):
-        return AlbumentationsTransformAdapter(
-            A.Compose(
-                [
-                    A.Normalize(MEAN_IMGNET, STD_IMGNET),
-                    ToTensorV2(),
-                ]
-            )
+def build_test_transform_native():
+    return AlbumentationsTransformAdapter(
+        A.Compose(
+            [
+                A.Normalize(MEAN_IMGNET, STD_IMGNET),
+                ToTensorV2(),
+            ]
         )
+    )
+
+
+class TrainTransform:
+    def __call__(self):
+        return build_train_transform()
+
+
+class TrainTransformNative:
+    def __call__(self):
+        return build_train_transform_native()
+
+
+class TestTransform:
+    def __call__(self):
+        return build_test_transform()
+
+
+class TestTransformNative:
+    def __call__(self):
+        return build_test_transform_native()

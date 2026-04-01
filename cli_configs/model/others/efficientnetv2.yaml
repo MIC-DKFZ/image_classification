@@ -1,3 +1,0 @@
-_target_: models.efficientnetv2.EfficientNetV2
-type: S
-stochastic_depth: 0.2

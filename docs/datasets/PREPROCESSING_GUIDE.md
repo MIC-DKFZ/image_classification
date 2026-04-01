@@ -249,16 +249,16 @@ train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=4)
 ```
 
 Available dataset classes:
-- `AIDData`, `AIDDataModule`
-- `ZooScanNetData`, `ZooScanNetDataModule`
-- `ChestXray14Data`, `ChestXray14DataModule`
-- `NEUDETData`, `NEUDETDataModule`
-- `RxRx1Data`, `RxRx1DataModule`
-- `Flowers102Data`, `Flowers102DataModule`
-- `RESISC45Data`, `RESISC45DataModule`
-- `PCamData`, `PCamDataModule`
-- `EyePACSData`, `EyePACSDataModule` (DiabeticRetinopathy)
-- `FGVCAircraftData`, `FGVCAircraftDataModule`
+- `AIDData`
+- `ZooScanNetData`
+- `ChestXray14Data`
+- `NEUDETData`
+- `RxRx1Data`
+- `Flowers102Data`
+- `RESISC45Data`
+- `PCamData`
+- `EyePACSData` (DiabeticRetinopathy)
+- `FGVCAircraftData`
 
 ---
 

@@ -1,9 +1,0 @@
-_target_: peft_models.adapt_former.AdaptFormer
-peft: AdaptFormer
-mode: parallel
-bottleneck: 64
-dropout: 0.0
-init_option: lora
-adapter_scalar: 1.0
-adapter_layernorm_option: in
-freeze_backbone: True

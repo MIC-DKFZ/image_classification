@@ -10,7 +10,7 @@ tests/
 ├── conftest.py              # Shared fixtures and configuration
 ├── test_datasets.py         # Dataset class tests
 ├── test_augmentations.py    # Augmentation policy tests
-└── test_datamodules.py      # PyTorch Lightning DataModule tests
+└── test_datamodules.py      # Dataset factory / dataloader tests
 ```
 
 ## Running Tests
@@ -84,7 +84,7 @@ Tests are organized with markers for easy filtering:
 | `requires_data` | Tests requiring dataset files | `pytest -m requires_data` |
 | `slow` | Slow-running tests | `pytest -m "not slow"` |
 | `augmentation` | Augmentation policy tests | `pytest -m augmentation` |
-| `datamodule` | DataModule tests | `pytest -m datamodule` |
+| `datamodule` | Dataset factory tests | `pytest -m datamodule` |
 
 ## Test Categories
 
@@ -121,19 +121,16 @@ Tests are organized with markers for easy filtering:
 - ✓ `test_train_is_stochastic` - Verify train augmentations are random
 - ✓ `test_val_is_deterministic` - Verify val transforms are deterministic
 
-### DataModule Tests (`test_datamodules.py`)
+### Dataset Factory Tests (`test_datamodules.py`)
 
-#### TestDataModuleStructure
-- ✓ `test_datamodule_class_exists` - Verify DataModule can be imported
-- ✓ `test_datamodule_has_required_methods` - Check required methods exist
+#### TestDatasetFactoryStructure
+- ✓ `test_dataset_registered` - Verify dataset exists in factory registry
+- ✓ `test_dataset_config_class_exists` - Verify matching DataConfig exists
 
-#### TestDataModuleInitialization
-- ✓ `test_datamodule_can_initialize` - Initialize DataModule
-- ✓ `test_datamodule_setup` - Test setup creates train/val datasets
-
-#### TestDataModuleDataLoaders
-- ✓ `test_train_dataloader` - Test train DataLoader
-- ✓ `test_val_dataloader` - Test val DataLoader
+#### TestDatasetFactoryIntegration
+- ✓ `test_factory_builds_dataloaders` - Build train/val/test loaders from config
+- ✓ `test_factory_train_batch_shape` - Validate one train batch
+- ✓ `test_factory_val_batch_shape` - Validate one val batch
 
 ## Fixtures
 
@@ -218,7 +215,7 @@ Uses custom split format, some split tests are skipped.
 "YourDataset": {
     "module": "your_module",
     "class": "YourDatasetData",
-    "datamodule": "YourDatasetDataModule",
+    "config_class": "YourDatasetConfig",
     "policy": "your_policy",
     "num_classes": 10,
     "expected_shape": (3, 224, 224),

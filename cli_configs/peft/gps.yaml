@@ -1,3 +1,0 @@
-_target_: peft_models.gps.GPS
-peft: GPS
-gps_percent: 1

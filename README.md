@@ -65,21 +65,20 @@ AUROC: 0.651
 
 <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/-Python 3.10-3776AB?&logo=python&logoColor=white"></a>
 <a href="https://pytorch.org/get-started/locally/"><img alt="PyTorch" src="https://img.shields.io/badge/-PyTorch 2.0-EE4C2C?logo=pytorch&logoColor=white"></a>
-<a href="https://pytorchlightning.ai/"><img alt="Lightning" src="https://img.shields.io/badge/-Pytorch Lightning 2.0-792EE5?logo=pytorchlightning&logoColor=white"></a>
+<a href="https://huggingface.co/docs/accelerate/index"><img alt="Accelerate" src="https://img.shields.io/badge/-Accelerate-111827"></a>
 
-<a href="https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.loggers.wandb.html#wandb"><img alt="Weights&Biases" src="https://img.shields.io/badge/Logging-Weigths%26Biases-yellow"></a>
+<a href="https://wandb.ai/site"><img alt="Weights&Biases" src="https://img.shields.io/badge/Logging-Weigths%26Biases-yellow"></a>
 <a href="https://hydra.cc/"><img alt="L: Hydra" src="https://img.shields.io/badge/Hydra 1.3-89b8cd" ></a>
 <a href="https://black.readthedocs.io/en/stable"><img alt="L: Hydra" src="https://img.shields.io/badge/Code Style-Black-black" ></a>
 </div>
 
 
-This repository contains a framework for training deep learning-based classification and regression models 
-with Pytorch Lightning. \
+This repository contains a framework for training deep learning-based classification and regression models. \
 It comprises several architectures, regularization, augmentation and training techniques and
 aims to provide easy-to-use baselines for experimenting with a lot of different setups. \
 You can also integrate your own model and/or dataset and benefit from the features of this repository! \
 Results of experiments on CIFAR-10 comparing different architectures in different training settings are shown below. \
-Everything can be run via the Command Line Interface and with Hydra config files. Logging is accomplished by Weights&Biases. \
+Everything can be run via the command line. Logging is accomplished by Weights & Biases and training is handled with PyTorch and Accelerate. \
 Training uses mixed precision, torch.compile and `torch.backends.cudnn.benchmark=True` by default to increase training speed. \
 Detailed CIFAR results and used configurations can be seen in [CIFAR Results](#cifar-results).
 Best performance is achieved with a PyramidNet using RandAugment augmentation, Shakedrop and Mixup.
@@ -215,11 +214,11 @@ The following models and parameters are available out of the box:
     * ```model=resnet```
     --------------------
   * ResNet152
-    * ```model._target_=models.dynamic_resnet.ResNet152```
+    * ```use the generic timm or torchvision encoder adapter```
   * ResNet50
-    * ```model._target_=models.dynamic_resnet.ResNet50```
+    * ```use the generic timm or torchvision encoder adapter```
   * ResNet34
-    * ```model._target_=models.dynamic_resnet.ResNet34```
+    * ```use the generic timm or torchvision encoder adapter```
   * ResNet18
     * ```default```
   --------------------
@@ -243,7 +242,7 @@ The following models and parameters are available out of the box:
   * VGG16 (uses batch norm, does not include the fully connected layers at the end)
     * ```default```
   * VGG19 (uses batch norm, does not include the fully connected layers at the end)
-    * ```model._target_=models.dynamic_vgg.VGG19```
+    * ```use the generic torchvision encoder adapter```
   
 </details>
 
@@ -410,7 +409,7 @@ For including your own models follow these steps:
 
     ```python
     from my_custom_models import custom_model  # your model
-    from base_model import BaseModel  # customized LightningModule
+    from base_model import BaseModel  # customized torch.nn.Module wrapper
 
     class CustomModel(BaseModel):
         def __init__(self, **kwargs):
@@ -447,52 +446,29 @@ python main.py model=custom_model model.lr=0.0001 model.optimizer=Madgrad model.
 # Including other datasets
 
 For including your own dataset follow these steps:
-1. In the ```dataset``` directory create a new file that implements the [torch dataset](https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files) class for your data.
-2. Additionally, create the [DataModule](https://lightning.ai/docs/pytorch/stable/data/datamodule.html) for your dataset by writing a class that inherits from `BaseDataModule`. Write the `init` and `setup` functions for your dataset. The dataloaders are already defined by the `BaseDataModule`. An example could look like this:
-    ```python
-    from .base_datamodule import BaseDataModule
+1. In the `datasets` directory create a plain [PyTorch Dataset](https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files) class for your data.
+2. Add augmentation classes in `augmentation/policies/<your-data>.py` (typically `TrainTransform` and `TestTransform`).
+3. Add a `DataConfig` class in `src/configs/data.py` and include it in the `DataConfig` union.
+4. Register your dataset in `datasets/factory.py` by adding one entry to `_DATASET_REGISTRY`.
 
-    class CustomDataModule(BaseDataModule):
-      def __init__(self, **params):
-          super(CustomDataModule, self).__init__(**params)
+Most datasets can use `_build_generic_split_datasets(...)` with:
+- dataset module + class
+- policy module
+- optional transform class names if they differ from `TrainTransform` / `TestTransform`
 
-      def setup(self, stage: str):
-          self.train_dataset = YourCustomPytorchDataset(
-              data_path=self.data_path,
-              split="train",
-              transform=self.train_transforms,
-          )
-          self.val_dataset = YourCustomPytorchDataset(
-              data_path=self.data_path,
-              split="val",
-              transform=self.test_transforms,
-          )
-    ```
-    Note that the `__init__` function takes `**params` and passes them to the super init. By doing so the attributes `self.data_path`, `self.train_transforms` and `self.test_transforms` are already set automatically and can be used in the `setup` function. The `self.data_path` is a joined path consisting of the configs `data.module.data_root_dir` and `data.module.name`. 
-    Custom transforms can be added in `./augmentation/policies/<your-data>.py`. They need to inherit from the `BaseTransform` class. See the existing transforms for examples!
-3. Add a `<your-data>.yaml` file to the data config group, defining some data-specific variables. For CIFAR-10 it looks like this:
-    ```yaml
-    # @package _global_
-    data:
-      module:
-        _target_: datasets.cifar.CIFAR10DataModule
-        name: CIFAR10
-        batch_size: 128
-        train_transforms: 
-          _target_: augmentation.policies.cifar.RandAugmentTransform
-          cutout_size: 8
-        test_transforms: 
-          _target_: augmentation.policies.cifar.TestTransform
+Example registry entry:
+```python
+"my_dataset": DatasetSpec(
+    build_datasets=lambda cfg: _build_generic_split_datasets(
+        cfg,
+        dataset_module="datasets.my_dataset",
+        dataset_class="MyDataset",
+        policy_module="augmentation.policies.my_dataset",
+    )
+)
+```
 
-      num_classes: 10
-
-    model:
-      task: 'Classification'
-      cifar_size: True
-    ```
-    The `data.module._target_` defines the path to your `DataModule`. Note that the first line of the file needs to be `# @package _global_` in order for Hydra to read the config properly.
-
-That's it! You can now use all training pipelines, regularization techniques and models with your dataset.
+The training runtime uses `build_dataloaders(config)` from `datasets/factory.py`, so no per-dataset DataModule class is required.
 
 # CIFAR Results
 
@@ -545,7 +521,7 @@ of epochs) and Cosine Annealing without warmstart. Every combination of LR, opti
 For reproducing e.g. the best SGD - SAM run which yielded more than 0.97 accuracy you can run:
 
 ```shell
-python main.py model=resnet model._target_=models.dynamic_resnet.ResNet34 model.lr=0.1 model.optimizer=SGD model.sam=True model.scheduler=CosineAnneal data.module._target_=augmentation.policies.cifar.AutoAugmentTransform trainer.max_epochs=200
+python train.py --model.encoder.encoder_type torchvision --model.encoder.type resnet34 --training.epochs 200
 ```
 
 It can be seen that optimizer and LR are highly dependent on each other. While SGD performs better with higher LRs like 0.1, 

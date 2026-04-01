@@ -1,2 +1,0 @@
-_target_: models.preact_resnet.PreActResNet18
-bottleneck: False

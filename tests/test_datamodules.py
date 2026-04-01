@@ -1,250 +1,102 @@
-"""
-Unit tests for PyTorch Lightning DataModules.
-"""
+"""Tests for dataset factory / dataloader wiring."""
+
+from pathlib import Path
 
 import pytest
 import torch
 from torch.utils.data import DataLoader
 
+from datasets.factory import _DATASET_REGISTRY, build_dataloaders
+from src.configs import data as data_cfg_module
 
-class TestDataModuleStructure:
-    """Test DataModule class structure."""
+
+def _build_data_config(dataset_config, dataset_path: Path):
+    config_cls = getattr(data_cfg_module, dataset_config["config_class"])
+    return config_cls(
+        data_root_dir=dataset_path,
+        batch_size=8,
+        num_workers=0,
+        data_fraction=1.0,
+    )
+
+
+class TestDatasetFactoryStructure:
+    @pytest.mark.unit
+    @pytest.mark.datamodule
+    def test_dataset_registered(self, dataset_config):
+        dataset_key = dataset_config["dataset_key"]
+        assert dataset_key in _DATASET_REGISTRY
 
     @pytest.mark.unit
     @pytest.mark.datamodule
-    def test_datamodule_class_exists(self, dataset_config):
-        """Test that DataModule class can be imported."""
-        module_name = f"datasets.{dataset_config['module']}"
-        class_name = dataset_config['datamodule']
-
-        module = __import__(module_name, fromlist=[class_name])
-        assert hasattr(module, class_name), f"{class_name} not found in {module_name}"
-
-    @pytest.mark.unit
-    @pytest.mark.datamodule
-    def test_datamodule_has_required_methods(self, dataset_config):
-        """Test that DataModule has required methods."""
-        module_name = f"datasets.{dataset_config['module']}"
-        class_name = dataset_config['datamodule']
-
-        module = __import__(module_name, fromlist=[class_name])
-        datamodule_class = getattr(module, class_name)
-
-        # Check required methods from PyTorch Lightning DataModule
-        assert hasattr(datamodule_class, 'setup')
-        assert hasattr(datamodule_class, 'train_dataloader')
-        assert hasattr(datamodule_class, 'val_dataloader')
+    def test_dataset_config_class_exists(self, dataset_config):
+        assert hasattr(data_cfg_module, dataset_config["config_class"])
 
 
-class TestDataModuleInitialization:
-    """Test DataModule initialization."""
-
+class TestDatasetFactoryIntegration:
     @pytest.mark.requires_data
     @pytest.mark.integration
     @pytest.mark.datamodule
-    def test_datamodule_can_initialize(self, dataset_name, dataset_config, data_root):
-        """Test that DataModule can be initialized."""
-        # Skip PCam if not preprocessed
+    def test_factory_builds_dataloaders(self, dataset_name, dataset_config, data_root):
         if dataset_name == "PCam":
             pcam_images = data_root / dataset_name / "images"
             if not pcam_images.exists():
-                pytest.skip(f"PCam requires H5 extraction")
+                pytest.skip("PCam requires H5 extraction")
 
         dataset_path = data_root / dataset_name
         if not dataset_path.exists():
             pytest.skip(f"Dataset {dataset_name} not found")
 
-        # Import DataModule class and augmentation policy
-        module_name = f"datasets.{dataset_config['module']}"
-        class_name = dataset_config['datamodule']
-        policy_name = f"augmentation.policies.{dataset_config['policy']}"
+        cfg = _build_data_config(dataset_config, dataset_path)
+        train_loader, val_loader, test_loader = build_dataloaders(cfg)
 
-        dataset_module = __import__(module_name, fromlist=[class_name])
-        policy_module = __import__(policy_name, fromlist=["get_train_transforms", "get_val_transforms"])
-
-        datamodule_class = getattr(dataset_module, class_name)
-        get_train_transforms = getattr(policy_module, "get_train_transforms")
-        get_val_transforms = getattr(policy_module, "get_val_transforms")
-
-        try:
-            # Initialize DataModule
-            dm = datamodule_class(
-                data_path=str(dataset_path),
-                train_transforms=get_train_transforms(),
-                test_transforms=get_val_transforms(),
-                batch_size=16,
-                num_workers=0,  # Use 0 for testing
-            )
-            assert dm is not None
-
-        except FileNotFoundError:
-            pytest.skip(f"Dataset files missing")
-        except TypeError as e:
-            # Some DataModules might have different initialization
-            pytest.skip(f"DataModule initialization error: {e}")
-
-    @pytest.mark.requires_data
-    @pytest.mark.integration
-    @pytest.mark.datamodule
-    def test_datamodule_setup(self, dataset_name, dataset_config, data_root):
-        """Test that DataModule setup works."""
-        # Skip PCam if not preprocessed
-        if dataset_name == "PCam":
-            pcam_images = data_root / dataset_name / "images"
-            if not pcam_images.exists():
-                pytest.skip(f"PCam requires H5 extraction")
-
-        dataset_path = data_root / dataset_name
-        if not dataset_path.exists():
-            pytest.skip(f"Dataset {dataset_name} not found")
-
-        # Import DataModule class and augmentation policy
-        module_name = f"datasets.{dataset_config['module']}"
-        class_name = dataset_config['datamodule']
-        policy_name = f"augmentation.policies.{dataset_config['policy']}"
-
-        dataset_module = __import__(module_name, fromlist=[class_name])
-        policy_module = __import__(policy_name, fromlist=["get_train_transforms", "get_val_transforms"])
-
-        datamodule_class = getattr(dataset_module, class_name)
-        get_train_transforms = getattr(policy_module, "get_train_transforms")
-        get_val_transforms = getattr(policy_module, "get_val_transforms")
-
-        try:
-            dm = datamodule_class(
-                data_path=str(dataset_path),
-                train_transforms=get_train_transforms(),
-                test_transforms=get_val_transforms(),
-                batch_size=16,
-                num_workers=0,
-            )
-
-            # Call setup
-            dm.setup(stage="fit")
-
-            # Check that train and val datasets were created
-            assert hasattr(dm, 'train_dataset'), "DataModule should have train_dataset after setup"
-            assert hasattr(dm, 'val_dataset'), "DataModule should have val_dataset after setup"
-            assert len(dm.train_dataset) > 0, "Train dataset should not be empty"
-            assert len(dm.val_dataset) > 0, "Val dataset should not be empty"
-
-        except FileNotFoundError:
-            pytest.skip(f"Dataset files missing")
-        except TypeError:
-            pytest.skip(f"DataModule initialization error")
-
-
-class TestDataModuleDataLoaders:
-    """Test DataModule dataloaders."""
+        assert isinstance(train_loader, DataLoader)
+        assert isinstance(val_loader, DataLoader)
+        assert isinstance(test_loader, DataLoader)
 
     @pytest.mark.requires_data
     @pytest.mark.integration
     @pytest.mark.datamodule
     @pytest.mark.slow
-    def test_train_dataloader(self, dataset_name, dataset_config, data_root):
-        """Test that train dataloader works."""
-        # Skip PCam if not preprocessed
+    def test_factory_train_batch_shape(self, dataset_name, dataset_config, data_root):
         if dataset_name == "PCam":
             pcam_images = data_root / dataset_name / "images"
             if not pcam_images.exists():
-                pytest.skip(f"PCam requires H5 extraction")
+                pytest.skip("PCam requires H5 extraction")
 
         dataset_path = data_root / dataset_name
         if not dataset_path.exists():
             pytest.skip(f"Dataset {dataset_name} not found")
 
-        # Import DataModule class and augmentation policy
-        module_name = f"datasets.{dataset_config['module']}"
-        class_name = dataset_config['datamodule']
-        policy_name = f"augmentation.policies.{dataset_config['policy']}"
+        cfg = _build_data_config(dataset_config, dataset_path)
+        train_loader, _, _ = build_dataloaders(cfg)
+        images, labels = next(iter(train_loader))
 
-        dataset_module = __import__(module_name, fromlist=[class_name])
-        policy_module = __import__(policy_name, fromlist=["get_train_transforms", "get_val_transforms"])
-
-        datamodule_class = getattr(dataset_module, class_name)
-        get_train_transforms = getattr(policy_module, "get_train_transforms")
-        get_val_transforms = getattr(policy_module, "get_val_transforms")
-
-        try:
-            dm = datamodule_class(
-                data_path=str(dataset_path),
-                train_transforms=get_train_transforms(),
-                test_transforms=get_val_transforms(),
-                batch_size=8,  # Smaller batch for testing
-                num_workers=0,
-            )
-
-            dm.setup(stage="fit")
-            train_loader = dm.train_dataloader()
-
-            assert isinstance(train_loader, DataLoader), "Should return DataLoader"
-
-            # Get one batch
-            batch_imgs, batch_labels = next(iter(train_loader))
-
-            assert isinstance(batch_imgs, torch.Tensor)
-            assert isinstance(batch_labels, torch.Tensor)
-            assert batch_imgs.shape[0] <= 8, "Batch size should be <= 8"
-            assert batch_imgs.shape[1] == 3, "Should have 3 channels"
-            assert batch_imgs.dtype == torch.float32, "Images should be float32"
-            assert batch_labels.dtype == torch.int64, "Labels should be int64"
-
-        except FileNotFoundError:
-            pytest.skip(f"Dataset files missing")
-        except TypeError:
-            pytest.skip(f"DataModule initialization error")
+        assert isinstance(images, torch.Tensor)
+        assert isinstance(labels, torch.Tensor)
+        assert images.shape[0] <= cfg.batch_size
+        assert images.shape[1] == 3
+        assert images.dtype == torch.float32
 
     @pytest.mark.requires_data
     @pytest.mark.integration
     @pytest.mark.datamodule
     @pytest.mark.slow
-    def test_val_dataloader(self, dataset_name, dataset_config, data_root):
-        """Test that val dataloader works."""
-        # Skip PCam if not preprocessed
+    def test_factory_val_batch_shape(self, dataset_name, dataset_config, data_root):
         if dataset_name == "PCam":
             pcam_images = data_root / dataset_name / "images"
             if not pcam_images.exists():
-                pytest.skip(f"PCam requires H5 extraction")
+                pytest.skip("PCam requires H5 extraction")
 
         dataset_path = data_root / dataset_name
         if not dataset_path.exists():
             pytest.skip(f"Dataset {dataset_name} not found")
 
-        # Import DataModule class and augmentation policy
-        module_name = f"datasets.{dataset_config['module']}"
-        class_name = dataset_config['datamodule']
-        policy_name = f"augmentation.policies.{dataset_config['policy']}"
+        cfg = _build_data_config(dataset_config, dataset_path)
+        _, val_loader, _ = build_dataloaders(cfg)
+        images, labels = next(iter(val_loader))
 
-        dataset_module = __import__(module_name, fromlist=[class_name])
-        policy_module = __import__(policy_name, fromlist=["get_train_transforms", "get_val_transforms"])
-
-        datamodule_class = getattr(dataset_module, class_name)
-        get_train_transforms = getattr(policy_module, "get_train_transforms")
-        get_val_transforms = getattr(policy_module, "get_val_transforms")
-
-        try:
-            dm = datamodule_class(
-                data_path=str(dataset_path),
-                train_transforms=get_train_transforms(),
-                test_transforms=get_val_transforms(),
-                batch_size=8,
-                num_workers=0,
-            )
-
-            dm.setup(stage="fit")
-            val_loader = dm.val_dataloader()
-
-            assert isinstance(val_loader, DataLoader), "Should return DataLoader"
-
-            # Get one batch
-            batch_imgs, batch_labels = next(iter(val_loader))
-
-            assert isinstance(batch_imgs, torch.Tensor)
-            assert isinstance(batch_labels, torch.Tensor)
-            assert batch_imgs.dtype == torch.float32
-            assert batch_labels.dtype == torch.int64
-
-        except FileNotFoundError:
-            pytest.skip(f"Dataset files missing")
-        except TypeError:
-            pytest.skip(f"DataModule initialization error")
+        assert isinstance(images, torch.Tensor)
+        assert isinstance(labels, torch.Tensor)
+        assert images.shape[1] == 3
+        assert images.dtype == torch.float32

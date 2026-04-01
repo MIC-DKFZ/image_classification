@@ -86,12 +86,12 @@ pytest -k "AID" --pdb
 ```bash
 # Quick check
 python -c "
-from augmentation.policies.aid import get_train_transforms
+from augmentation.policies.aid import build_train_transform
 import torch
-t = get_train_transforms()
-img = torch.randint(0, 256, (3, 224, 224), dtype=torch.uint8)
-result = t(**{'image': img})
-print(result['image'].shape, result['image'].dtype)
+t = build_train_transform()
+img = torch.randint(0, 256, (224, 224, 3), dtype=torch.uint8).numpy()
+result = t(img)
+print(result.shape, result.dtype)
 "
 
 # Comprehensive check
@@ -108,7 +108,7 @@ classification_downstream/
 ├── tests/                    # Pytest tests
 │   ├── test_datasets.py      # Dataset tests
 │   ├── test_augmentations.py # Augmentation tests
-│   └── test_datamodules.py   # DataModule tests
+│   └── test_datamodules.py   # Dataset factory tests
 ├── test_all_datasets.py     # Convenience script
 ├── pytest.ini               # Pytest config
 └── TESTING_QUICK_START.md   # This file

@@ -1,7 +1,0 @@
-# @package _global_
-peft:
-  _target_: peft_models.ia3.IA3
-  peft: IA3
-
-model:
-  lr: 0.0001

@@ -1,7 +1,0 @@
-_target_: models.masked_autoencoder.MaskedAutoencoder
-backbone: MAEv2
-type: vit_base_patch16
-# weight_dir: /home/k539i/Documents/network_drives/cluster/dkfz/cluster/gpu/data/mic_data_common/masked_autoencoder/weights/mae_pretrain_vit_base.pth
-weight_dir: /home/k539i/Documents/network_drives/cluster/dkfz/cluster/gpu/data/mic_data_common/masked_autoencoder/weights/mae_finetuned_vit_base.pth
-token_aggregation_method: cls_token
-pretrained: True

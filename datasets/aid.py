@@ -9,7 +9,6 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
-from .base_datamodule import BaseDataModule
 
 
 class AIDData(Dataset):
@@ -133,29 +132,10 @@ class AIDData(Dataset):
         return len(self.img_paths)
 
 
-class AIDDataModule(BaseDataModule):
-    def __init__(self, **params):
-        super(AIDDataModule, self).__init__(**params)
-
-    def setup(self, stage: str):
-        self.train_dataset = AIDData(
-            self.data_path,
-            split="train",
-            transform=self.train_transforms,
-            split_file=self.split_file,
-        )
-        self.val_dataset = AIDData(
-            self.data_path,
-            split="val",
-            transform=self.test_transforms,
-            split_file=self.split_file,
-        )
-
-
 if __name__ == '__main__':
     import os
     from torch.utils.data import DataLoader
-    from augmentation.policies.aid import FlipRotateTransformImgNetNorm, TestTransformImgNetNorm
+    from augmentation.policies.aid import build_test_transform, build_train_transform
 
     # Get DATA_ROOT from environment or use default
     data_root = os.environ.get("DATA_ROOT", "./data")
@@ -165,9 +145,9 @@ if __name__ == '__main__':
     print(f"Using DATA_ROOT: {data_root}")
     print("="*80)
 
-    # Get augmentation transforms (instantiate the classes)
-    train_aug = FlipRotateTransformImgNetNorm()()
-    val_aug = TestTransformImgNetNorm()()
+    # Build augmentation transforms
+    train_aug = build_train_transform()
+    val_aug = build_test_transform()
 
     # Test train set with augmentations
     print("\n[Train Set with Augmentations]")

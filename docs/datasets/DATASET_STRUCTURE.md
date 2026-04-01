@@ -266,9 +266,12 @@ Or in Python:
 import os
 DATA_ROOT = os.environ.get("DATA_ROOT", "./data")
 
-# Load a dataset
-from datasets.aid import AIDDataModule
-dm = AIDDataModule(data_path=f"{DATA_ROOT}/AID", ...)
+# Build dataloaders through the registry factory
+from src.configs.data import AIDConfig
+from datasets.factory import build_dataloaders
+
+cfg = AIDConfig(data_root_dir=f"{DATA_ROOT}/AID", batch_size=32, num_workers=4)
+train_loader, val_loader, test_loader = build_dataloaders(cfg)
 ```
 
 ## Notes
@@ -280,4 +283,3 @@ dm = AIDDataModule(data_path=f"{DATA_ROOT}/AID", ...)
 - **ChestXray14**: Patient-level stratified splitting to prevent data leakage (68,749/22,125/21,246)
 - **ZooScanNet**: Adaptive image size filtering applied (478,236/159,412/159,413)
 - **RxRx1**: Uses existing train/test split, creates val from train (60,918/20,306/34,432)
-

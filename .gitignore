@@ -93,9 +93,11 @@ ENV/
 *.pdf
 *.model
 .vscode
-
+.codex
 .trash
-
+.delete_later
 datasets/imagenet_resize.py
-
-!cli_configs/*
+submit
+synergy_unit
+test_scripts
+.load_env*

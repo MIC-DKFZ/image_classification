@@ -1,5 +1,0 @@
-_target_: models.dinov2.Dinov2
-type: dinov2_vitb14_reg
-pretrained: True
-classification_head_dropout: 0.2
-token_aggregation_method: avg  # cls_token

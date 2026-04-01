@@ -1,7 +1,0 @@
-# @package _global_
-peft:
-  _target_: peft_models.bitfit.BitFit
-  peft: BitFit
-
-model:
-  lr: 0.0001

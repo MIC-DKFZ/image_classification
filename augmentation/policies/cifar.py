@@ -1,107 +1,65 @@
-from typing import Any, Callable
-
 import albumentations as A
 import torchvision.transforms as transforms
 from albumentations.pytorch import ToTensorV2
 
 from ..randaugment import CIFAR10Policy, Cutout, RandAugment
-from .base_transform import BaseTransform
+from .base_transform import AlbumentationsTransformAdapter
 
 MEAN, STD = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
 
 
-class BaselineTransform(BaseTransform):
-    def __init__(self, *args, **kwargs):
-        super(BaselineTransform, self).__init__()
-
-    def __call__(self):
-        transform_train = transforms.Compose(
-            [
-                transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize(MEAN, STD),
-            ]
-        )
-
-        return transform_train
+def build_baseline_transform():
+    return transforms.Compose(
+        [
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(MEAN, STD),
+        ]
+    )
 
 
-class BaselineCutoutTransform(BaseTransform):
-    def __init__(self, cutout_size: int, *args, **kwargs):
-        super(BaselineCutoutTransform, self).__init__()
-        self.cutout_size = cutout_size
-
-    def __call__(self):
-        transform_train = transforms.Compose(
-            [
-                transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),
-                Cutout(size=self.cutout_size),
-                transforms.ToTensor(),
-                transforms.Normalize(MEAN, STD),
-            ]
-        )
-
-        return transform_train
+def build_baseline_cutout_transform(cutout_size: int):
+    return transforms.Compose(
+        [
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            Cutout(size=cutout_size),
+            transforms.ToTensor(),
+            transforms.Normalize(MEAN, STD),
+        ]
+    )
 
 
-class AutoAugmentTransform(BaseTransform):
-    def __init__(self, cutout_size: int, *args, **kwargs):
-        super(AutoAugmentTransform, self).__init__()
-        self.cutout_size = cutout_size
-
-    def __call__(self):
-        transform_train = transforms.Compose(
-            [
-                transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),
-                CIFAR10Policy(),
-                Cutout(size=self.cutout_size),
-                transforms.ToTensor(),
-                transforms.Normalize(MEAN, STD),
-                # Random Erase with p=1 is an alternative to Cutout but worked slightly worse
-                # transforms.RandomErasing(p=1,
-                #                        scale=(0.125, 0.2), # range for how big the cutout should be compared to original img
-                #                        ratio=(0.99, 1.0), # squares
-                #                        value=0, inplace=False)
-            ]
-        )
-
-        return transform_train
+def build_autoaugment_transform(cutout_size: int):
+    return transforms.Compose(
+        [
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            CIFAR10Policy(),
+            Cutout(size=cutout_size),
+            transforms.ToTensor(),
+            transforms.Normalize(MEAN, STD),
+        ]
+    )
 
 
-class RandAugmentTransform(BaseTransform):
-    def __init__(self, cutout_size: int, *args, **kwargs):
-        super(RandAugmentTransform, self).__init__()
-        self.cutout_size = cutout_size
-
-    def __call__(self):
-        transform_train = transforms.Compose(
-            [
-                transforms.RandomCrop(32, padding=4),
-                transforms.RandomHorizontalFlip(),
-                RandAugment(),
-                Cutout(size=self.cutout_size),
-                transforms.ToTensor(),
-                transforms.Normalize(MEAN, STD),
-                # Random Erase with p=1 is an alternative to Cutout but worked slightly worse
-                # transforms.RandomErasing(p=1,
-                #                        scale=(0.125, 0.2), # range for how big the cutout should be compared to original img
-                #                        ratio=(0.99, 1.0), # squares
-                #                        value=0, inplace=False)
-            ]
-        )
-
-        return transform_train
+def build_train_transform(cutout_size: int = 16):
+    return transforms.Compose(
+        [
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            RandAugment(),
+            Cutout(size=cutout_size),
+            transforms.ToTensor(),
+            transforms.Normalize(MEAN, STD),
+        ]
+    )
 
 
-class AlbumAugmentTransform(BaseTransform):
-    def __init__(self, *args, **kwargs):
-        super(AlbumAugmentTransform, self).__init__()
-
-    def __call__(self):
-        transform_train = A.Compose(
+def build_album_augment_transform():
+    return AlbumentationsTransformAdapter(
+        A.Compose(
             [
                 A.InvertImg(always_apply=False, p=0.2),
                 A.PadIfNeeded(
@@ -136,50 +94,92 @@ class AlbumAugmentTransform(BaseTransform):
                 ToTensorV2(),
             ]
         )
+    )
 
-        return transform_train
+
+def build_test_transform():
+    return transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize(MEAN, STD),
+        ]
+    )
 
 
-class TestTransform(BaseTransform):
-    def __init__(self, *args, **kwargs):
-        super(TestTransform, self).__init__()
+def build_test_transform_dino():
+    return transforms.Compose(
+        [
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(MEAN, STD),
+        ]
+    )
+
+
+def build_train_transform_dino():
+    return transforms.Compose(
+        [
+            transforms.Resize((224, 224)),
+            transforms.RandomHorizontalFlip(),
+            RandAugment(),
+            transforms.ToTensor(),
+            transforms.Normalize(MEAN, STD),
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Backward compatibility wrappers
+# ---------------------------------------------------------------------------
+
+
+class BaselineTransform:
+    def __call__(self):
+        return build_baseline_transform()
+
+
+class BaselineCutoutTransform:
+    def __init__(self, cutout_size: int, *args, **kwargs):
+        self.cutout_size = cutout_size
 
     def __call__(self):
-        transform_test = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(MEAN, STD),
-            ]
-        )
+        return build_baseline_cutout_transform(self.cutout_size)
 
-        return transform_test
-    
-    
-class TestTransform_dino(BaseTransform):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
+
+class AutoAugmentTransform:
+    def __init__(self, cutout_size: int, *args, **kwargs):
+        self.cutout_size = cutout_size
 
     def __call__(self):
-        transform_test = transforms.Compose([
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-                transforms.Normalize(MEAN, STD),
-            ])
-
-        return transform_test
+        return build_autoaugment_transform(self.cutout_size)
 
 
-class RandAugmentTransform_dino(BaseTransform):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
+class RandAugmentTransform:
+    def __init__(self, cutout_size: int = 16, *args, **kwargs):
+        self.cutout_size = cutout_size
 
     def __call__(self):
-        transform_test = transforms.Compose([
-                transforms.Resize((224, 224)),
-                transforms.RandomHorizontalFlip(),
-                RandAugment(),
-                transforms.ToTensor(),
-                transforms.Normalize(MEAN, STD),
-            ])
+        return build_train_transform(self.cutout_size)
 
-        return transform_test
+
+class AlbumAugmentTransform:
+    def __call__(self):
+        return build_album_augment_transform()
+
+
+class TestTransform:
+    def __call__(self):
+        return build_test_transform()
+
+
+class TestTransform_dino:
+    def __call__(self):
+        return build_test_transform_dino()
+
+
+class RandAugmentTransform_dino:
+    def __call__(self):
+        return build_train_transform_dino()
+
+
+TrainTransform = RandAugmentTransform

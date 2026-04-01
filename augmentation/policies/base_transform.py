@@ -1,14 +1,4 @@
-from typing import Any
-
 import numpy as np
-
-
-class BaseTransform(object):
-    def __init__(self):
-        pass
-
-    def __call__(self) -> Any:
-        pass
 
 
 class AlbumentationsTransformAdapter:

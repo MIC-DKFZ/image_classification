@@ -9,7 +9,6 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
-from .base_datamodule import BaseDataModule
 
 
 class PCamData(Dataset):
@@ -109,29 +108,10 @@ class PCamData(Dataset):
         return len(self.img_paths)
 
 
-class PCamDataModule(BaseDataModule):
-    def __init__(self, **params):
-        super(PCamDataModule, self).__init__(**params)
-
-    def setup(self, stage: str):
-        self.train_dataset = PCamData(
-            self.data_path,
-            split="train",
-            transform=self.train_transforms,
-            split_file=self.split_file,
-        )
-        self.val_dataset = PCamData(
-            self.data_path,
-            split="val",
-            transform=self.test_transforms,
-            split_file=self.split_file,
-        )
-
-
 if __name__ == '__main__':
     import os
     from torch.utils.data import DataLoader
-    from augmentation.policies.pcam import TrainTransform, TestTransform
+    from augmentation.policies.pcam import build_test_transform, build_train_transform
 
     # Get DATA_ROOT from environment or use default
     data_root = os.environ.get("DATA_ROOT", "./data")
@@ -141,9 +121,9 @@ if __name__ == '__main__':
     print(f"Using DATA_ROOT: {data_root}")
     print("="*80)
 
-    # Get augmentation transforms (instantiate the classes)
-    train_aug = TrainTransform()()
-    val_aug = TestTransform()()
+    # Build augmentation transforms
+    train_aug = build_train_transform()
+    val_aug = build_test_transform()
 
     # Test train set with augmentations
     print("\n[Train Set with Augmentations]")

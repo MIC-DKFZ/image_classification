@@ -1,5 +1,0 @@
-_target_: models.transformer.TransformerModel
-backbone: Dinov3
-type: facebook/dinov3-vitb16-pretrain-lvd1689m
-token_aggregation_method: cls_token
-pretrained: True

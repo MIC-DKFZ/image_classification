@@ -1,5 +1,0 @@
-_target_: models.timm.TimmModel
-backbone: MAE (Timm)
-type: timm/vit_base_patch16_224.mae  # timm/eva02_large_patch14_448.mim_m38m_ft_in22k #eva02_base_patch14_224.mim_in22k timm/convnext_small.fb_in22k  # timm/vit_base_patch16_224.mae
-pretrained: True
-token_aggregation_method: cls_token

@@ -24,7 +24,7 @@ tests/
 ├── conftest.py              # Fixtures and configuration
 ├── test_datasets.py         # 80+ dataset tests
 ├── test_augmentations.py    # 70+ augmentation tests
-├── test_datamodules.py      # 40+ datamodule tests
+├── test_datamodules.py      # dataset factory tests
 └── README.md               # Comprehensive guide
 ```
 
@@ -34,17 +34,8 @@ tests/
 - ✓ `TESTING_QUICK_START.md` - Quick reference guide
 - ✓ `tests/README.md` - Detailed testing documentation
 
-### 4. Helper Functions
-Added to all augmentation policy files:
-```python
-def get_train_transforms():
-    """Get training transforms with augmentations."""
-    ...
-
-def get_val_transforms():
-    """Get validation/test transforms."""
-    ...
-```
+### 4. Dataset Factory Coverage
+`tests/test_datamodules.py` validates the registry-based dataset factory and dataloader construction.
 
 ## Test Organization
 
@@ -54,7 +45,7 @@ def get_val_transforms():
 | `unit` | Fast, no data required | ~140 tests |
 | `integration` | Requires actual data | ~90 tests |
 | `augmentation` | Augmentation tests | ~70 tests |
-| `datamodule` | DataModule tests | ~40 tests |
+| `datamodule` | Dataset factory tests | see `tests/test_datamodules.py` |
 | `requires_data` | Needs dataset files | ~90 tests |
 | `slow` | Long-running tests | ~30 tests |
 
@@ -164,7 +155,7 @@ pytest -k "AID" -v
 | `tests/conftest.py` | Fixtures & config | ~180 |
 | `tests/test_datasets.py` | Dataset tests | ~230 |
 | `tests/test_augmentations.py` | Augmentation tests | ~200 |
-| `tests/test_datamodules.py` | DataModule tests | ~180 |
+| `tests/test_datamodules.py` | Dataset factory tests | current file |
 | `pytest.ini` | Pytest config | ~30 |
 | `TESTING_QUICK_START.md` | Quick guide | ~200 |
 | `tests/README.md` | Comprehensive docs | ~300 |
@@ -180,7 +171,7 @@ pytest -k "AID" -v
 ### For Quality Assurance
 - ✓ Verifies dataset loading works
 - ✓ Validates augmentation pipelines
-- ✓ Checks DataModule integration
+- ✓ Checks dataset factory integration
 - ✓ Ensures no split overlap
 
 ### For Documentation

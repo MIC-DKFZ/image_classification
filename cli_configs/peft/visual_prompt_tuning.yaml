@@ -1,8 +1,0 @@
-_target_: peft_models.visual_prompt_tuning.VisualPromptTuning
-peft: VisualPromptTuning
-num_tokens: 20
-deep: True
-project_dim: null
-dropout: 0.0
-init_scale: 1.0
-deep_layers: null

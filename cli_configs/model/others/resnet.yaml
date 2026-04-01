@@ -1,4 +1,0 @@
-_target_: models.dynamic_resnet.ResNet18
-cifar_size: ???
-se_rd_ratio: 0.25
-bottleneck: False

@@ -1,0 +1,77 @@
+from peft import get_peft_model, VeraConfig
+
+
+MODEL_TO_ARCH_MAPPING = {
+    "VisionTransformer": "VisionTransformer",
+    "DinoVisionTransformer": "DinoVisionTransformer",
+    "DINOv3ViTModel": "DINOv3ViTModel",
+    "ViTModel": "ViTModel",
+    "ViTMAEModel": "ViTModel",
+}
+
+MODULE_MAPPING = {
+    "VisionTransformer": {
+        "attn.proj": "attn.proj",
+        "attn.q_proj": "attn.qkv",  # only exists as qkv, q/k/v usually fused in timm
+        "attn.k_proj": "attn.qkv",  # only exists as qkv, q/k/v usually fused in timm
+        "attn.v_proj": "attn.qkv",  # only exists as qkv, q/k/v usually fused in timm
+        "mlp.fc1": "mlp.fc1",
+        "mlp.fc1_g": "mlp.fc1_g",  # exists only in gated variants
+        "mlp.fc1_x": "mlp.fc1_x",  # exists only in gated variants
+        "mlp.fc2":   "mlp.fc2",
+    },
+    "DinoVisionTransformer": {
+        "attn.proj": "attn.proj",
+        "attn.q_proj": "attn.qkv",  # fused Q,K,V
+        "attn.k_proj": "attn.qkv",  # fused Q,K,V
+        "attn.v_proj": "attn.qkv",  # fused Q,K,V
+        "mlp.fc1": "mlp.fc1",
+        "mlp.fc1_g": "mlp.fc1_g",
+        "mlp.fc1_x": "mlp.fc1_x",
+        "mlp.fc2":   "mlp.fc2",
+    },
+    "DINOv3ViTModel": {
+        "attn.proj": "attention.o_proj",
+        "attn.q_proj": "attention.q_proj",
+        "attn.k_proj": "attention.k_proj",
+        "attn.v_proj": "attention.v_proj",
+        "mlp.fc1": "mlp.up_proj",
+        "mlp.fc1_g": "mlp.up_proj",
+        "mlp.fc1_x": "mlp.up_proj",  # MLP is not gated
+        "mlp.fc2":   "mlp.down_proj",
+    },
+    "ViTModel": {
+        "attn.proj":  "attention.output.dense",
+        "attn.q_proj":"attention.attention.query",
+        "attn.k_proj":"attention.attention.key",
+        "attn.v_proj":"attention.attention.value",
+        "mlp.fc1": "intermediate.dense",
+        "mlp.fc1_g": "intermediate.dense",
+        "mlp.fc1_x": "intermediate.dense",  # MLP is not gated
+        "mlp.fc2":   "output.dense",
+    },
+}
+
+
+class Vera:
+    def __init__(self, vera_rank, vera_dropout, vera_target_modules, vera_projection_prng_key, *args, **kwargs):
+        target_arch = MODEL_TO_ARCH_MAPPING[self.model.__class__.__name__]
+        module_mapping = MODULE_MAPPING[target_arch]
+        vera_target_modules = [module_mapping[module] for module in vera_target_modules]
+
+        vera_config = VeraConfig(
+            r=vera_rank,
+            vera_dropout=vera_dropout,
+            target_modules=vera_target_modules,
+            projection_prng_key=vera_projection_prng_key,
+        )
+
+        self.model = get_peft_model(self.model, vera_config)
+
+        # Freeze all layers except LoRA-adapted ones
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+        for name, param in self.model.named_parameters():
+            if any(sub in name for sub in ["head", "classifier", "cls_head", "vera_lambda"]):
+                param.requires_grad = True

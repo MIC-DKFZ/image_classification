@@ -1,5 +1,0 @@
-_target_: models.transformer.TransformerModel
-backbone: Supervised
-type: google/vit-base-patch16-224-in21k  # google/vit-base-patch16-224
-token_aggregation_method: cls_token
-pretrained: True
