@@ -8,16 +8,15 @@ from torch.utils.data import DataLoader
 
 from datasets.factory import _DATASET_REGISTRY, build_dataloaders
 from src.configs import data as data_cfg_module
+from src.configs.dataloading import DataloadingConfig
 
 
 def _build_data_config(dataset_config, dataset_path: Path):
     config_cls = getattr(data_cfg_module, dataset_config["config_class"])
     return config_cls(
         data_root_dir=dataset_path,
-        batch_size=8,
-        num_workers=0,
         data_fraction=1.0,
-    )
+    ), DataloadingConfig(batch_size=8, eval_batch_size=8, num_workers=0)
 
 
 class TestDatasetFactoryStructure:
@@ -47,8 +46,8 @@ class TestDatasetFactoryIntegration:
         if not dataset_path.exists():
             pytest.skip(f"Dataset {dataset_name} not found")
 
-        cfg = _build_data_config(dataset_config, dataset_path)
-        train_loader, val_loader, test_loader = build_dataloaders(cfg)
+        cfg, dataloading = _build_data_config(dataset_config, dataset_path)
+        train_loader, val_loader, test_loader = build_dataloaders(cfg, dataloading)
 
         assert isinstance(train_loader, DataLoader)
         assert isinstance(val_loader, DataLoader)
@@ -68,13 +67,13 @@ class TestDatasetFactoryIntegration:
         if not dataset_path.exists():
             pytest.skip(f"Dataset {dataset_name} not found")
 
-        cfg = _build_data_config(dataset_config, dataset_path)
-        train_loader, _, _ = build_dataloaders(cfg)
+        cfg, dataloading = _build_data_config(dataset_config, dataset_path)
+        train_loader, _, _ = build_dataloaders(cfg, dataloading)
         images, labels = next(iter(train_loader))
 
         assert isinstance(images, torch.Tensor)
         assert isinstance(labels, torch.Tensor)
-        assert images.shape[0] <= cfg.batch_size
+        assert images.shape[0] <= dataloading.batch_size
         assert images.shape[1] == 3
         assert images.dtype == torch.float32
 
@@ -92,8 +91,8 @@ class TestDatasetFactoryIntegration:
         if not dataset_path.exists():
             pytest.skip(f"Dataset {dataset_name} not found")
 
-        cfg = _build_data_config(dataset_config, dataset_path)
-        _, val_loader, _ = build_dataloaders(cfg)
+        cfg, dataloading = _build_data_config(dataset_config, dataset_path)
+        _, val_loader, _ = build_dataloaders(cfg, dataloading)
         images, labels = next(iter(val_loader))
 
         assert isinstance(images, torch.Tensor)

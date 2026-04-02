@@ -126,7 +126,7 @@ class RxRx1Data(Dataset):
 if __name__ == '__main__':
     import os
     from torch.utils.data import DataLoader
-    from augmentation.policies.rxrx1 import build_test_transform, build_train_transform
+    from augmentation.policies.dataset_specific.rxrx1 import build_test_transform, build_train_transform
 
     # Get DATA_ROOT from environment or use default
     data_root = os.environ.get("DATA_ROOT", "./data")

@@ -1,127 +1,142 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import sys
 from pathlib import Path
+from typing import Literal, Optional
 
 import h5py
-import hydra
-from hydra.utils import instantiate
-from omegaconf import OmegaConf
 import torch
+import tyro
+from pydantic import BaseModel, Field
 from tqdm import tqdm
 
-from parsing_utils import make_omegaconf_resolvers
+sys.path.insert(0, str(Path(__file__).parent))
+
+from datasets.factory import build_dataloaders
+from models.factory import build_model
+from models.feature_aggregator import AGGREGATION_METHODS, aggregate_features
+from models.peft.registry import apply_peft
+from models.preprocessing import resolve_encoder_preprocessing_defaults
+from src.configs.data import DataConfig
+from src.configs.dataloading import DataloadingConfig
+from src.configs.model import ModelConfig
+from src.configs.peft import PeftConfig
 
 
-# from datasets.precomputed_features import FNAME_FORMAT_FEATURES
 FNAME_FORMAT_FEATURES = "agg_{method}_{model}_{dataset}_{split}_size{imgsize}_float{precision}.h5"
 
 
-def aggregate_features(x, method: str):
-    if method == "cls_token":
-        x = x[:, 0]
-    elif method == "avg":
-        x = x[:, 1:].mean(dim=1)
-    elif method == "sum":
-        x = x[:, 1:].sum(dim=1)
-    elif method == "mean_all":
-        x = x.mean(dim=1)
-    elif method == "joint":
-        x = torch.cat([x[:, 0], x[:, 1:].mean(dim=1)], dim=1)
-    return x
+class ExtractConfig(BaseModel):
+    data: DataConfig
+    model: ModelConfig
+    peft: PeftConfig
+    dataloading: DataloadingConfig = Field(default_factory=DataloadingConfig)
+    method: Literal["cls_token", "avg", "sum", "mean_all", "joint"] = "joint"
+    split: Optional[Literal["train", "val", "test"]] = None
+    precision: Literal[16, 32] = 16
+    compression: int = Field(default=4, ge=0, le=9)
+    output_dir: Path = Path("./precomputed_features")
+    use_eval_transform_for_train: bool = True
 
 
-@hydra.main(version_base=None, config_path="./cli_configs", config_name="train")
-def extract_features_hdf5(cfg):
-    # delete automatically created hydra logger
-    try:
-        Path(
-            "./main.log"
-        ).unlink()
-    except:
-        pass
-    
-    print(OmegaConf.to_yaml(cfg))
-    
-    assert cfg.data.module.data_fraction == 1
-    
-    cfg.data.module.train_transforms = cfg.data.module.test_transforms
+def _serialize_model_name(config: ModelConfig) -> str:
+    encoder = config.encoder
+    for attr in ("type", "variant", "encoder_type"):
+        value = getattr(encoder, attr, None)
+        if value is not None:
+            return str(value).replace("/", "_").replace(".", "_")
+    return type(encoder).__name__.replace("Config", "").lower()
 
-    # instantiate the model using this config
-    model = instantiate(cfg.model)
+
+def _make_extraction_data_config(config: ExtractConfig) -> DataConfig:
+    if not config.use_eval_transform_for_train:
+        return config.data
+    augmentation = config.data.augmentation.model_copy(
+        update={"train_policy": config.data.augmentation.test_policy}
+    )
+    return config.data.model_copy(update={"augmentation": augmentation})
+
+
+def _feature_imgsize(batch_x: torch.Tensor) -> str:
+    if batch_x.ndim >= 4:
+        return str(int(batch_x.shape[-1]))
+    return "na"
+
+
+def _iter_requested_splits(config: ExtractConfig):
+    if config.split is not None:
+        return [config.split]
+    return ["train", "val", "test"]
+
+
+@torch.no_grad()
+def main(config: ExtractConfig) -> None:
+    data_config = _make_extraction_data_config(config)
+    encoder_preprocessing = resolve_encoder_preprocessing_defaults(config.model.encoder).as_kwargs()
+    train_loader, val_loader, test_loader = build_dataloaders(
+        data_config,
+        config.dataloading,
+        encoder_preprocessing=encoder_preprocessing,
+    )
+    loaders = {"train": train_loader, "val": val_loader, "test": test_loader}
+
+    model = build_model(config.model, output_dim=getattr(config.data, "num_classes", 1))
+    model = apply_peft(model, config.peft)
     model.eval()
-    model.to("cuda")
-    # instantiate the dataset from the config
-    datamodule = instantiate(cfg.data).module
-    datamodule.setup()
 
-    # Sample batch
-    b = datamodule.val_dataset[0][0]
-    assert b.shape[1] == b.shape[2]
-    imgsize = b.shape[2]
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
 
-    # Infer feature size
-    f = model.extract_features(torch.randn(1, *b.shape).to("cuda"))
-    f = aggregate_features(f, method=cfg.model.token_aggregation_method)
-    feature_dim = f.shape[-1]
+    config.output_dir.mkdir(parents=True, exist_ok=True)
+    model_name = _serialize_model_name(config.model)
+    dataset_name = getattr(config.data, "dataset", "unknown")
 
-    for split in (("train", "test", "val") if not cfg.precomputed_features.split else [cfg.precomputed_features.split]):
-        if split == "train":
-            dataset = datamodule.train_dataset
-            dataloader = datamodule.train_dataloader()
-        elif split == "test":
-            try:
-                dataset = datamodule.test_dataset
-                dataloader = datamodule.test_dataloader()
-            except AttributeError:
-                print(f"No test dataset available for {datamodule.__class__.__name__}")
-                continue
-        elif split == "val":
-            dataset = datamodule.val_dataset
-            dataloader = datamodule.val_dataloader()
-        
-        fname = FNAME_FORMAT_FEATURES.format(
-            method=cfg.model.token_aggregation_method,
-            model=cfg.model.type.replace('/', '_').replace('.', '_'),
-            dataset=cfg.data.module.name,
+    for split in _iter_requested_splits(config):
+        loader = loaders[split]
+        try:
+            first_batch = next(iter(loader))
+        except StopIteration:
+            print(f"Skipping empty split: {split}")
+            continue
+
+        x0, _ = first_batch
+        imgsize = _feature_imgsize(x0)
+        sample_features = model.extract_features(x0.to(device))
+        sample_agg = aggregate_features(sample_features, config.method).detach().cpu()
+        feature_dim = int(sample_agg.shape[-1])
+        dataset_len = len(loader.dataset)
+
+        out_file = config.output_dir / FNAME_FORMAT_FEATURES.format(
+            method=config.method,
+            model=model_name,
+            dataset=dataset_name,
             split=split,
             imgsize=imgsize,
-            precision=cfg.precomputed_features.precision,
+            precision=config.precision,
         )
-        
-        out_dir = Path(cfg.data_dir) / "precomputed_features"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_file = out_dir / fname
-        print(f"Saving results to {str(out_file)}")
-        
-        with h5py.File(out_file, "w") as f:
-            num_samples = len(dataset)
-            print(f"{num_samples = }")
+        print(f"Saving {split} features to {out_file}")
 
+        with h5py.File(out_file, "w") as f:
             dset_features = f.create_dataset(
                 "features",
-                shape=(num_samples, feature_dim),
-                dtype=f"float{cfg.precomputed_features.precision}",
+                shape=(dataset_len, feature_dim),
+                dtype=f"float{config.precision}",
                 chunks=(1, feature_dim),
-                compression=cfg.precomputed_features.compression,
+                compression=config.compression,
             )
-            dset_labels = f.create_dataset(
-                "labels",
-                shape=(num_samples,),
-                dtype="int64",
-            )
+            dset_labels = f.create_dataset("labels", shape=(dataset_len,), dtype="int64")
 
             index = 0
-            for batch in tqdm(dataloader, desc=f"{split.upper()} Batches"):
-                x, y = batch
-                x = x.to("cuda")
-                features = aggregate_features(
-                    model.extract_features(x), method=cfg.model.token_aggregation_method
-                ).detach().cpu().numpy()
-                batch_size = len(y)
-                # Shape: (batch_size, feature_dim)
+            for x, y in tqdm(loader, desc=f"{split.upper()} Batches"):
+                x = x.to(device)
+                features = aggregate_features(model.extract_features(x), config.method).detach().cpu().numpy()
+                labels = y.detach().cpu().numpy()
+                batch_size = len(labels)
                 dset_features[index : index + batch_size] = features
-                dset_labels[index : index + batch_size] = y.numpy()
+                dset_labels[index : index + batch_size] = labels
                 index += batch_size
 
 
 if __name__ == "__main__":
-    make_omegaconf_resolvers()
-    extract_features_hdf5()
+    main(tyro.cli(ExtractConfig))

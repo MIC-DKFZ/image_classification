@@ -1,144 +1,90 @@
 # Augmentation Policies
 
-Augmentation policies for all 10 datasets following best practices for each domain.
+## Current Layout
 
-## Available Policies
+Augmentation behavior is split into three layers:
 
-### Remote Sensing
-- **[aid.py](aid.py)** - AID (600×600 → 224) - Rotation-invariant
-- **[resisc45.py](resisc45.py)** - RESISC45 (256×256 → 224) - Rotation-invariant
+1. user-facing defaults and overrides in [src/configs/augmentation.py](/home/s522r/Desktop/classification_downstream/src/configs/augmentation.py)
+2. dataset default policy selection in [src/configs/data.py](/home/s522r/Desktop/classification_downstream/src/configs/data.py)
+3. policy implementations in [augmentation/policies](/home/s522r/Desktop/classification_downstream/augmentation/policies)
 
-### Medical Imaging
-- **[chestxray14.py](chestxray14.py)** - ChestXray14 (1024×1024 → 224) - Minimal aug, no rotation
-- **[diabetic_retina.py](diabetic_retina.py)** - Diabetic Retinopathy (variable → 224) - Rotation-invariant
+Implementation folders:
 
-### Microscopy
-- **[zooscannet.py](zooscannet.py)** - ZooScanNet (variable 24-4911px → 224) - Rotation-invariant
-- **[rxrx1.py](rxrx1.py)** - RxRx1 (256×256 → 224) - Rotation-invariant
-- **[pcam.py](pcam.py)** - PCam (96×96 → 224 or native) - Rotation-invariant
+- shared 2D policies: [two_dim](/home/s522r/Desktop/classification_downstream/augmentation/policies/two_dim)
+- shared 3D policies: [three_dim](/home/s522r/Desktop/classification_downstream/augmentation/policies/three_dim)
+- dataset-specific policies: [dataset_specific](/home/s522r/Desktop/classification_downstream/augmentation/policies/dataset_specific)
 
-### Industrial
-- **[neudet.py](neudet.py)** - NEU-DET (200×200 → 224) - Simple upscale
+## Shared Policies
 
-### Fine-Grained
-- **[flowers102.py](flowers102.py)** - Flowers-102 (~500×500 → 224) - Standard aug
-- **[fgvc_aircraft.py](fgvc_aircraft.py)** - FGVC-Aircraft (variable → 224) - Standard aug
+2D train policies are defined in [two_dim/defaults.py](/home/s522r/Desktop/classification_downstream/augmentation/policies/two_dim/defaults.py):
 
-### General
-- **[elpv.py](elpv.py)** - ELPV (300×300 → 224)
-- **[imagenet.py](imagenet.py)** - ImageNet baseline
-- **[cifar.py](cifar.py)** - CIFAR baseline
+- `default_2d_1` to `default_2d_5`
+- `default_2d_randaugment`
 
----
+2D test policy:
 
-## Usage
+- `shared_default_2d`
 
-```python
-from augmentation.policies.zooscannet import build_test_transform, build_train_transform
+3D train policies are defined in [three_dim/defaults.py](/home/s522r/Desktop/classification_downstream/augmentation/policies/three_dim/defaults.py):
 
-# For training
-train_transform = build_train_transform()
-train_dataset = ZooScanNetData(root="...", split="train", transform=train_transform)
+- `default_3d_1` to `default_3d_4`
+- `default_nnunet`
+- `default_nnunet_DA5`
 
-# For validation/test
-test_transform = build_test_transform()
-val_dataset = ZooScanNetData(root="...", split="val", transform=test_transform)
+3D test policy:
+
+- `shared_default_3d`
+
+## Dataset Defaults
+
+Dataset-specific default train/test policy names live in the dataset config classes in [src/configs/data.py](/home/s522r/Desktop/classification_downstream/src/configs/data.py), not in the augmentation modules.
+
+Examples:
+
+- `Cifar10Config`: `train_policy="randaugment"`, `test_policy="default"`
+- `ImagenetConfig`: `train_policy="randaugment_448"`, `test_policy="default_448"`
+- `ChestXRay14Config`: `train_policy="default_2d_2"`, `test_policy="shared_default_2d"`
+
+## Runtime Resolution
+
+The active runtime path is:
+
+1. dataset config selects default train/test policy names
+2. user may override them via CLI:
+   - `--data.augmentation.train-policy ...`
+   - `--data.augmentation.test-policy ...`
+3. [registry.py](/home/s522r/Desktop/classification_downstream/augmentation/policies/registry.py) resolves those names to actual builders
+4. [datasets/factory.py](/home/s522r/Desktop/classification_downstream/datasets/factory.py) merges encoder preprocessing defaults with explicit augmentation overrides
+
+## CLI Examples
+
+```bash
+python train.py \
+  --data.dataset cifar10 \
+  --data.data-root-dir ./data \
+  --data.augmentation.train-policy randaugment \
+  --data.augmentation.test-policy default
 ```
 
----
-
-## Key Principles
-
-### 1. **ImageNet Normalization (Standard)**
-All policies use ImageNet statistics for pretrained model adaptation:
-```python
-MEAN_IMGNET = (0.485, 0.456, 0.406)
-STD_IMGNET = (0.229, 0.224, 0.225)
+```bash
+python train.py \
+  --data.dataset chestxray14 \
+  --data.data-root-dir ./data \
+  --data.augmentation.train-policy default_2d_3 \
+  --data.augmentation.test-policy shared_default_2d \
+  --data.augmentation.image-size 256 \
+  --data.augmentation.resize-size 320
 ```
 
-### 2. **Domain-Specific Augmentations**
+## Extending Policies
 
-| Domain | Horizontal Flip | Vertical Flip | Rotation | ColorJitter |
-|--------|----------------|---------------|----------|-------------|
-| Remote Sensing | ✅ | ✅ | ✅ 180° | ✅ Strong |
-| Medical (X-ray) | ✅ | ❌ | ❌ | ✅ Subtle |
-| Medical (Retinal) | ✅ | ✅ | ✅ 180° | ✅ Subtle |
-| Microscopy | ✅ | ✅ | ✅ 180° | ✅ Moderate |
-| Industrial | ✅ | ✅ | ❌ | ✅ Moderate |
-| Fine-Grained | ✅ | ❌ | ❌ | ✅ Strong |
+To add a new dataset-specific policy:
 
-### 3. **Resize Strategy**
+1. create or update `augmentation/policies/dataset_specific/<dataset>.py`
+2. export:
+   - `SPATIAL_DIM`
+   - `TRAIN_POLICIES`
+   - `TEST_POLICIES`
+3. set the dataset defaults in the matching config class in [src/configs/data.py](/home/s522r/Desktop/classification_downstream/src/configs/data.py)
 
-**Small native size (≤256px):**
-- Use `Resize(224)` directly
-- Examples: NEU-DET, RxRx1, RESISC45, ZooScanNet
-
-**Large native size (≥500px):**
-- Use `RandomResizedCrop(224)` for training
-- Use `Resize(256) → CenterCrop(224)` for test
-- Examples: AID, Flowers-102, ChestXray14, DiabeticRetinopathy, FGVC-Aircraft
-
-**Special case - PCam (96px):**
-- Option 1: `Resize(224)` for standard ViT
-- Option 2: Keep native 96×96 (use `TrainTransformNative`)
-
-### 4. **Augmentation Strength**
-
-**Minimal (Medical X-rays):**
-- Only horizontal flip
-- Subtle ColorJitter (0.1)
-- Preserve anatomical orientation
-
-**Moderate (Microscopy):**
-- All flips + 180° rotation
-- Moderate ColorJitter (0.15)
-- Rotation-invariant
-
-**Standard (Natural Images):**
-- Horizontal flip only
-- Strong ColorJitter (0.2)
-- Object-centric
-
-**Strong (Aerial/Remote Sensing):**
-- All flips + 180° rotation
-- Strong ColorJitter (0.2)
-- Rotation-invariant
-
----
-
-## Transform Order (Important!)
-
-### Training:
-```python
-1. Resize / RandomResizedCrop  # ← Do BEFORE rotation!
-2. RandomHorizontalFlip
-3. RandomVerticalFlip
-4. RandomRotation(180)
-5. ColorJitter
-6. ToTensor
-7. Normalize(MEAN_IMGNET, STD_IMGNET)
-```
-
-### Testing:
-```python
-1. Resize(256)
-2. CenterCrop(224)  # if needed
-3. ToTensor
-4. Normalize(MEAN_IMGNET, STD_IMGNET)
-```
-
-**Why resize before rotation?**
-- Avoids creating large empty corners
-- Better handling of variable-size inputs
-- More efficient
-
----
-
-## Notes
-
-- **No preprocessing needed**: All transforms are applied on-the-fly
-- **Consistent normalization**: Always use ImageNet stats for pretrained models
-- **Dataset-aware**: Augmentations respect domain characteristics
-- **Test-time consistency**: Always use deterministic transforms for eval
-
-See [../datasets/AUGMENTATION_STRATEGY.md](../../datasets/AUGMENTATION_STRATEGY.md) for detailed rationale.
+The registry does not own dataset defaults anymore; it only resolves available policy names.

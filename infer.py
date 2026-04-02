@@ -30,6 +30,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from datasets.factory import build_dataloaders
 from src.configs.data import DataConfig
+from src.configs.dataloading import DataloadingConfig
+from models.preprocessing import resolve_encoder_preprocessing_defaults
 
 
 class InferConfig(BaseModel):
@@ -38,6 +40,7 @@ class InferConfig(BaseModel):
     # Directory that contains checkpoints/ or fold sub-directories
     exp_dir: Path = Path("./experiments")
     data: DataConfig
+    dataloading: DataloadingConfig = Field(default_factory=DataloadingConfig)
     metrics: List[str] = Field(default_factory=lambda: ["acc", "f1"])
     # Evaluate a specific fold only (None = scan all folds)
     fold: Optional[str] = None
@@ -83,12 +86,30 @@ def _load_model(ckpt_path: Path) -> torch.nn.Module:
     return model
 
 
+def _load_run_config(ckpt_path: Path):
+    run_dir = ckpt_path.parent.parent
+    config_file = run_dir / "config.json"
+    if not config_file.exists():
+        raise FileNotFoundError(f"config.json not found at {config_file}")
+    from src.configs.root import RootConfig
+
+    return RootConfig.model_validate_json(config_file.read_text())
+
+
 @torch.no_grad()
 def run_inference(config: InferConfig) -> None:
     ckpt_paths = _collect_checkpoints(config.exp_dir, config.fold)
     print(f"Found {len(ckpt_paths)} checkpoint(s).")
 
-    _, _, test_loader = build_dataloaders(config.data)
+    reference_run_config = _load_run_config(ckpt_paths[0])
+    encoder_preprocessing = resolve_encoder_preprocessing_defaults(
+        reference_run_config.model.encoder
+    ).as_kwargs()
+    _, _, test_loader = build_dataloaders(
+        config.data,
+        config.dataloading,
+        encoder_preprocessing=encoder_preprocessing,
+    )
 
     all_logits: List[torch.Tensor] = []
     all_labels: Optional[torch.Tensor] = None

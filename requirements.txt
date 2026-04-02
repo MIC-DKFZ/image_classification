@@ -29,6 +29,7 @@ madgrad>=1.2                # MADGRAD optimiser
 wandb>=0.15.8
 
 # Data utilities
+h5py>=3.8.0                # HDF5 feature extraction / precomputed feature loading
 matplotlib>=3.6.2           # confusion matrix figures
 blosc2>=2.7.0               # compressed HDF5 feature storage (extract.py)
 scikit-learn>=1.0.0         # StratifiedShuffleSplit in data pipeline

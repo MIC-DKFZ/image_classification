@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from src.configs.data import DataConfig
+from src.configs.dataloading import DataloadingConfig
 from src.configs.model import ModelConfig
 from src.configs.optimizer import OptimizerConfig
 from src.configs.peft import PeftConfig
@@ -38,30 +38,35 @@ class RootConfig(BaseModel):
     # Optional blocks with sensible defaults
     task: TaskConfig = Field(default_factory=TaskConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
+    dataloading: DataloadingConfig = Field(default_factory=DataloadingConfig)
     optimizer: OptimizerConfig = Field(default_factory=OptimizerConfig)
     wandb: WandbConfig = Field(default_factory=WandbConfig)
 
     # Root directory for experiment outputs (checkpoints, logs)
     exp_dir: Path = Path("./experiments")
 
-    @model_validator(mode="after")
-    def auto_fill_wandb_group(self) -> "RootConfig":
-        """Fill dynamic W&B defaults derived from the selected config."""
-        if self.wandb.project is None:
-            self.wandb.project = getattr(self.data, "dataset", "default")
-
-        if self.wandb.group is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            encoder_name = type(self.model.encoder).__name__.replace("Config", "").lower()
-            head_name = type(self.model.head).__name__.replace("Config", "").lower()
-            peft_name = self.peft.method
-            unique_id = str(uuid4())[:8]
-            self.wandb.group = f"{timestamp}_{encoder_name}_{head_name}_{peft_name}_{unique_id}"
-        return self
-
     @property
-    def run_log_dir(self) -> Path:
+    def default_wandb_project(self) -> str:
+        """Default W&B project name derived from the selected dataset."""
+        return getattr(self.data, "dataset", "default")
+
+    def generate_wandb_group(self) -> str:
+        """Generate a stable per-run default group when the user did not set one."""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        encoder_name = type(self.model.encoder).__name__.replace("Config", "").lower()
+        head_name = type(self.model.head).__name__.replace("Config", "").lower()
+        peft_name = self.peft.method
+        unique_id = str(uuid4())[:8]
+        return f"{timestamp}_{encoder_name}_{head_name}_{peft_name}_{unique_id}"
+
+    def resolve_wandb_kwargs(self) -> dict:
+        """Return effective W&B init kwargs without mutating config state."""
+        kwargs = self.wandb.model_dump(exclude_none=True)
+        kwargs.setdefault("project", self.wandb.project or self.default_wandb_project)
+        kwargs.setdefault("group", self.wandb.group or self.generate_wandb_group())
+        return kwargs
+
+    def get_run_log_dir(self, group: str) -> Path:
         """Per-run log directory: exp_dir / dataset / group."""
         dataset = getattr(self.data, "dataset", "unknown")
-        group = self.wandb.group or "default"
         return self.exp_dir / dataset / group

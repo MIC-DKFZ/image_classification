@@ -5,6 +5,7 @@ import torch.nn as nn
 from models.encoder.dinov2 import Dinov2Encoder
 from models.encoder.dinov3 import Dinov3Encoder
 from models.encoder.dynamic import PrimusEncoder, ResidualEncoder
+from models.encoder.precomputed import PrecomputedEncoder
 from models.encoder.timm import TimmEncoder
 from models.encoder.torchvision import TorchvisionEncoder
 from models.encoder.transformer import TransformerEncoder
@@ -16,6 +17,7 @@ from src.configs.model import (
     Dinov2EncoderConfig,
     Dinov3EncoderConfig,
     ModelConfig,
+    PrecomputedEncoderConfig,
     PrimusEncoderConfig,
     RegressionHeadConfig,
     ResidualEncoderConfig,
@@ -107,6 +109,8 @@ def build_encoder(config) -> nn.Module:
             drop_path_rate=config.drop_path_rate,
             patch_drop_rate=config.patch_drop_rate,
         )
+    if isinstance(config, PrecomputedEncoderConfig):
+        return PrecomputedEncoder(feature_dim=config.feature_dim)
     raise ValueError(f"Unsupported encoder config: {type(config).__name__}")
 
 

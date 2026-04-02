@@ -5,21 +5,22 @@ from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
+from src.configs.augmentation import AugmentationConfig
+
 
 class BaseDataConfig(BaseModel):
     """Shared data-loading parameters for all datasets."""
 
     data_root_dir: Path
-    batch_size: int = Field(default=32, ge=1)
-    num_workers: int = Field(default=12, ge=0)
-    # Subsample training data to this fraction (None = use full dataset)
+    # Subsample training data to this fraction (None = use full dataset).
     data_fraction: Optional[float] = Field(default=None, gt=0.0, le=1.0)
     # Cross-validation fold identifier (e.g. "0", "1"). None = use default split.
     fold: Optional[str] = None
-    # If True, draw training batches with replacement (RandomSampler)
-    random_batches: bool = False
-    # Stratify the data-fraction subsample by class label
+    # Stratify the data-fraction subsample by class label when subsampling.
     stratified: bool = True
+    # User-facing augmentation defaults and overrides. Dataset-specific defaults
+    # are defined on the concrete dataset config classes below.
+    augmentation: AugmentationConfig = Field(default_factory=AugmentationConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +34,12 @@ class Cifar10Config(BaseDataConfig):
     num_classes: int = 10
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 128
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="randaugment",
+            test_policy="default",
+        )
+    )
 
 
 class Cifar100Config(BaseDataConfig):
@@ -41,7 +47,12 @@ class Cifar100Config(BaseDataConfig):
     num_classes: int = 100
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 128
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="randaugment",
+            test_policy="default",
+        )
+    )
 
 
 class ImagenetConfig(BaseDataConfig):
@@ -49,8 +60,13 @@ class ImagenetConfig(BaseDataConfig):
     num_classes: int = 1000
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 8
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="randaugment_448",
+            test_policy="default_448",
+        )
+    )
 
 
 class PCamConfig(BaseDataConfig):
@@ -58,8 +74,13 @@ class PCamConfig(BaseDataConfig):
     num_classes: int = 2
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="dataset_specific",
+            test_policy="shared_default_2d",
+        )
+    )
 
 
 class RxRx1Config(BaseDataConfig):
@@ -67,8 +88,13 @@ class RxRx1Config(BaseDataConfig):
     num_classes: int = 1139
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="dataset_specific",
+            test_policy="shared_default_2d",
+        )
+    )
 
 
 class NeuDetConfig(BaseDataConfig):
@@ -76,8 +102,13 @@ class NeuDetConfig(BaseDataConfig):
     num_classes: int = 6
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="dataset_specific",
+            test_policy="shared_default_2d",
+        )
+    )
 
 
 class ZooScanNetConfig(BaseDataConfig):
@@ -85,8 +116,13 @@ class ZooScanNetConfig(BaseDataConfig):
     num_classes: int = 20
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="dataset_specific",
+            test_policy="shared_default_2d",
+        )
+    )
 
 
 class AIDConfig(BaseDataConfig):
@@ -94,8 +130,13 @@ class AIDConfig(BaseDataConfig):
     num_classes: int = 30
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="aid_large_crop",
+            test_policy="default",
+        )
+    )
 
 
 class ChestXRay14Config(BaseDataConfig):
@@ -103,8 +144,13 @@ class ChestXRay14Config(BaseDataConfig):
     num_classes: int = 14
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multilabel"] = "multilabel"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="default_2d_2",
+            test_policy="shared_default_2d",
+        )
+    )
 
 
 class RESISC45Config(BaseDataConfig):
@@ -112,8 +158,13 @@ class RESISC45Config(BaseDataConfig):
     num_classes: int = 45
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="dataset_specific",
+            test_policy="shared_default_2d",
+        )
+    )
 
 
 class Flowers102Config(BaseDataConfig):
@@ -121,8 +172,13 @@ class Flowers102Config(BaseDataConfig):
     num_classes: int = 102
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="dataset_specific",
+            test_policy="shared_default_2d",
+        )
+    )
 
 
 class FGVCAircraftConfig(BaseDataConfig):
@@ -130,8 +186,13 @@ class FGVCAircraftConfig(BaseDataConfig):
     num_classes: int = 100
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="dataset_specific",
+            test_policy="shared_default_2d",
+        )
+    )
 
 
 class DiabeticRetinaConfig(BaseDataConfig):
@@ -139,8 +200,23 @@ class DiabeticRetinaConfig(BaseDataConfig):
     num_classes: int = 5
     task: Literal["Classification"] = "Classification"
     subtask: Literal["multiclass"] = "multiclass"
-    batch_size: int = 32
     data_fraction: Optional[float] = 0.1
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="dataset_specific",
+            test_policy="shared_default_2d",
+        )
+    )
+
+
+class PrecomputedFeaturesConfig(BaseDataConfig):
+    dataset: Literal["precomputed_features"] = "precomputed_features"
+    num_classes: int
+    task: Literal["Classification"] = "Classification"
+    subtask: Literal["multiclass"] = "multiclass"
+    train_features_file: Path
+    val_features_file: Path
+    test_features_file: Path | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -162,6 +238,7 @@ DataConfig = Annotated[
         Flowers102Config,
         FGVCAircraftConfig,
         DiabeticRetinaConfig,
+        PrecomputedFeaturesConfig,
     ],
     Field(discriminator="dataset"),
 ]

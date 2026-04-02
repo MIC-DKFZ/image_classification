@@ -78,6 +78,11 @@ class PrimusEncoderConfig(BaseModel):
     patch_drop_rate: float = Field(default=0.0, ge=0.0, lt=1.0)
 
 
+class PrecomputedEncoderConfig(BaseModel):
+    encoder_type: Literal["precomputed"] = "precomputed"
+    feature_dim: int = Field(ge=1)
+
+
 EncoderConfig = Annotated[
     Union[
         TimmEncoderConfig,
@@ -87,6 +92,7 @@ EncoderConfig = Annotated[
         Dinov3EncoderConfig,
         ResidualEncoderConfig,
         PrimusEncoderConfig,
+        PrecomputedEncoderConfig,
     ],
     Field(discriminator="encoder_type"),
 ]
