@@ -29,6 +29,38 @@ jobs:
       - name: Install build backend
         run: python -m pip install --upgrade build
 
+      - name: Generate temporary package for name reservation
+        run: |
+          mkdir -p glovita
+          cat <<'EOF' > glovita/__init__.py
+          __all__ = ["__version__"]
+          __version__ = "0.0.1"
+          EOF
+          cat <<'EOF' > README-PYPI.md
+          # glovita
+
+          Initial placeholder release used to reserve the `glovita` name on PyPI.
+          EOF
+          cat <<'EOF' > pyproject.toml
+          [build-system]
+          requires = ["setuptools>=69", "wheel"]
+          build-backend = "setuptools.build_meta"
+
+          [project]
+          name = "glovita"
+          version = "0.0.1"
+          description = "Initial placeholder release for the glovita PyPI project name."
+          readme = "README-PYPI.md"
+          requires-python = ">=3.9"
+          license = { text = "MIT" }
+          authors = [
+            { name = "glovita" }
+          ]
+
+          [tool.setuptools]
+          packages = ["glovita"]
+          EOF
+
       - name: Build distributions
         run: python -m build
 
