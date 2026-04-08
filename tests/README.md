@@ -1,6 +1,6 @@
 ## Test Suite
 
-Comprehensive pytest-based testing for the classification_downstream project.
+Comprehensive pytest-based testing for the GloViTa project.
 
 ## Structure
 

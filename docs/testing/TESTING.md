@@ -200,7 +200,7 @@ pip install torch torchvision pillow numpy h5py tqdm scikit-learn
 ### Augmentation issues
 ```python
 # Test augmentation directly
-from augmentation.policies.aid import build_train_transform
+from glovita.augmentation.policies.dataset_specific.aid import build_train_transform
 import torch
 
 transforms = build_train_transform()
@@ -223,7 +223,10 @@ If you add a new dataset, include the test block:
 ```python
 if __name__ == '__main__':
     from torch.utils.data import DataLoader
-    from augmentation.policies.YOUR_POLICY import build_test_transform, build_train_transform
+    from glovita.augmentation.policies.dataset_specific.YOUR_POLICY import (
+        build_test_transform,
+        build_train_transform,
+    )
 
     print("="*80)
     print("Testing YourDataset Dataset")

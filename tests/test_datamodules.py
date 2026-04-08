@@ -6,9 +6,9 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from datasets.factory import _DATASET_REGISTRY, build_dataloaders
-from src.configs import data as data_cfg_module
-from src.configs.dataloading import DataloadingConfig
+from glovita.datasets.factory import _DATASET_REGISTRY, build_dataloaders
+from glovita.configs import data as data_cfg_module
+from glovita.configs.dataloading import DataloadingConfig
 
 
 def _build_data_config(dataset_config, dataset_path: Path):

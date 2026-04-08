@@ -1,1 +1,1 @@
-"""Test suite for classification_downstream project."""
+"""Test suite for the GloViTa project."""

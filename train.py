@@ -32,26 +32,23 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import platform
+import sys
 from pathlib import Path
 from importlib.metadata import PackageNotFoundError, version
 
-# Ensure the project root is importable regardless of how the script is invoked
-sys.path.insert(0, str(Path(__file__).parent))
-
 import torch
-import tyro
 import wandb
 
-from src.configs.root import RootConfig
-from src.training.trainer import Trainer
-from src.training.optimizers import build_optimizer
-from src.training.schedulers import build_scheduler
-from datasets.factory import build_dataloaders, resolve_augmentation_config
-from models.factory import build_model
-from models.peft.registry import apply_peft
-from models.preprocessing import resolve_encoder_preprocessing_defaults
+from glovita.configs.cli import parse_root_cli
+from glovita.configs.root import RootConfig
+from glovita.training.trainer import Trainer
+from glovita.training.optimizers import build_optimizer
+from glovita.training.schedulers import build_scheduler
+from glovita.datasets.factory import build_dataloaders, resolve_augmentation_config
+from glovita.models.factory import build_model
+from glovita.models.peft.registry import apply_peft
+from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
 
 
 def _build_model(config: RootConfig) -> torch.nn.Module:
@@ -113,6 +110,7 @@ def _collect_runtime_metadata(
             "training": _serialize(config.training.model_dump()),
             "task": _serialize(config.task.model_dump()),
             "wandb": _serialize(effective_wandb),
+            "add_log": _serialize(config.add_log),
         },
     }
 
@@ -197,4 +195,4 @@ def main(config: RootConfig) -> None:
 
 
 if __name__ == "__main__":
-    main(tyro.cli(RootConfig))
+    main(parse_root_cli(RootConfig))

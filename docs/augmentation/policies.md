@@ -4,19 +4,19 @@
 
 Augmentation behavior is split into three layers:
 
-1. user-facing defaults and overrides in [src/configs/augmentation.py](/home/s522r/Desktop/classification_downstream/src/configs/augmentation.py)
-2. dataset default policy selection in [src/configs/data.py](/home/s522r/Desktop/classification_downstream/src/configs/data.py)
-3. policy implementations in [augmentation/policies](/home/s522r/Desktop/classification_downstream/augmentation/policies)
+1. user-facing defaults and overrides in [augmentation.py](/home/s522r/Desktop/classification_downstream/src/glovita/configs/augmentation.py)
+2. dataset default policy selection in [data.py](/home/s522r/Desktop/classification_downstream/src/glovita/configs/data.py)
+3. policy implementations in [policies](/home/s522r/Desktop/classification_downstream/src/glovita/augmentation/policies)
 
 Implementation folders:
 
-- shared 2D policies: [two_dim](/home/s522r/Desktop/classification_downstream/augmentation/policies/two_dim)
-- shared 3D policies: [three_dim](/home/s522r/Desktop/classification_downstream/augmentation/policies/three_dim)
-- dataset-specific policies: [dataset_specific](/home/s522r/Desktop/classification_downstream/augmentation/policies/dataset_specific)
+- shared 2D policies: [two_dim](/home/s522r/Desktop/classification_downstream/src/glovita/augmentation/policies/two_dim)
+- shared 3D policies: [three_dim](/home/s522r/Desktop/classification_downstream/src/glovita/augmentation/policies/three_dim)
+- dataset-specific policies: [dataset_specific](/home/s522r/Desktop/classification_downstream/src/glovita/augmentation/policies/dataset_specific)
 
 ## Shared Policies
 
-2D train policies are defined in [two_dim/defaults.py](/home/s522r/Desktop/classification_downstream/augmentation/policies/two_dim/defaults.py):
+2D train policies are defined in [defaults.py](/home/s522r/Desktop/classification_downstream/src/glovita/augmentation/policies/two_dim/defaults.py):
 
 - `default_2d_1` to `default_2d_5`
 - `default_2d_randaugment`
@@ -25,7 +25,7 @@ Implementation folders:
 
 - `shared_default_2d`
 
-3D train policies are defined in [three_dim/defaults.py](/home/s522r/Desktop/classification_downstream/augmentation/policies/three_dim/defaults.py):
+3D train policies are defined in [defaults.py](/home/s522r/Desktop/classification_downstream/src/glovita/augmentation/policies/three_dim/defaults.py):
 
 - `default_3d_1` to `default_3d_4`
 - `default_nnunet`
@@ -37,7 +37,7 @@ Implementation folders:
 
 ## Dataset Defaults
 
-Dataset-specific default train/test policy names live in the dataset config classes in [src/configs/data.py](/home/s522r/Desktop/classification_downstream/src/configs/data.py), not in the augmentation modules.
+Dataset-specific default train/test policy names live in the dataset config classes in [data.py](/home/s522r/Desktop/classification_downstream/src/glovita/configs/data.py), not in the augmentation modules.
 
 Examples:
 
@@ -53,8 +53,8 @@ The active runtime path is:
 2. user may override them via CLI:
    - `--data.augmentation.train-policy ...`
    - `--data.augmentation.test-policy ...`
-3. [registry.py](/home/s522r/Desktop/classification_downstream/augmentation/policies/registry.py) resolves those names to actual builders
-4. [datasets/factory.py](/home/s522r/Desktop/classification_downstream/datasets/factory.py) merges encoder preprocessing defaults with explicit augmentation overrides
+3. [registry.py](/home/s522r/Desktop/classification_downstream/src/glovita/augmentation/policies/registry.py) resolves those names to actual builders
+4. [factory.py](/home/s522r/Desktop/classification_downstream/src/glovita/datasets/factory.py) merges encoder preprocessing defaults with explicit augmentation overrides
 
 ## CLI Examples
 
@@ -85,6 +85,6 @@ To add a new dataset-specific policy:
    - `SPATIAL_DIM`
    - `TRAIN_POLICIES`
    - `TEST_POLICIES`
-3. set the dataset defaults in the matching config class in [src/configs/data.py](/home/s522r/Desktop/classification_downstream/src/configs/data.py)
+3. set the dataset defaults in the matching config class in [data.py](/home/s522r/Desktop/classification_downstream/src/glovita/configs/data.py)
 
 The registry does not own dataset defaults anymore; it only resolves available policy names.

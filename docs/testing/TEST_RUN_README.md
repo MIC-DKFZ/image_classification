@@ -7,11 +7,11 @@ in earlier versions of this document.
 
 Use:
 
-- [train.py](/home/s522r/Desktop/classification_downstream/train.py) for training
-- [infer.py](/home/s522r/Desktop/classification_downstream/infer.py) for evaluation
+- [train.py](../../train.py) for training
+- [infer.py](../../infer.py) for evaluation
 
 with tyro-generated CLI arguments from the pydantic config schema in
-[src/configs](/home/s522r/Desktop/classification_downstream/src/configs).
+[src/glovita/configs](../../src/glovita/configs).
 
 ## Example Smoke Test
 
@@ -35,4 +35,4 @@ For quick runtime validation, verify:
 - model + PEFT assembly runs
 - one short train/validation cycle completes
 
-For up-to-date testing guidance, prefer [TESTING.md](/home/s522r/Desktop/classification_downstream/docs/testing/TESTING.md) and the top-level [README.md](/home/s522r/Desktop/classification_downstream/README.md).
+For up-to-date testing guidance, prefer [TESTING.md](TESTING.md) and the top-level [README.md](../../README.md).

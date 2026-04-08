@@ -86,7 +86,7 @@ pytest -k "AID" --pdb
 ```bash
 # Quick check
 python -c "
-from augmentation.policies.aid import build_train_transform
+from glovita.augmentation.policies.dataset_specific.aid import build_train_transform
 import torch
 t = build_train_transform()
 img = torch.randint(0, 256, (224, 224, 3), dtype=torch.uint8).numpy()

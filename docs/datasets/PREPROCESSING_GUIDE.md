@@ -235,7 +235,7 @@ Each dataset has a corresponding Python module in `datasets/`:
 
 ```python
 from torch.utils.data import DataLoader
-from datasets.aid import AIDData
+from glovita.datasets.aid import AIDData
 
 # Load dataset
 train_ds = AIDData(

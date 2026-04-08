@@ -267,8 +267,8 @@ import os
 DATA_ROOT = os.environ.get("DATA_ROOT", "./data")
 
 # Build dataloaders through the registry factory
-from src.configs.data import AIDConfig
-from datasets.factory import build_dataloaders
+from glovita.configs.data import AIDConfig
+from glovita.datasets.factory import build_dataloaders
 
 cfg = AIDConfig(data_root_dir=f"{DATA_ROOT}/AID", batch_size=32, num_workers=4)
 train_loader, val_loader, test_loader = build_dataloaders(cfg)

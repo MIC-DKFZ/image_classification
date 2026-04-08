@@ -18,20 +18,17 @@ Ensemble over all fold checkpoints (scans sub-directories automatically):
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import List, Optional
 
 import torch
-import tyro
 from pydantic import BaseModel, Field
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from datasets.factory import build_dataloaders
-from src.configs.data import DataConfig
-from src.configs.dataloading import DataloadingConfig
-from models.preprocessing import resolve_encoder_preprocessing_defaults
+from glovita.configs.cli import parse_cli
+from glovita.datasets.factory import build_dataloaders
+from glovita.configs.data import DataConfig
+from glovita.configs.dataloading import DataloadingConfig
+from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
 
 
 class InferConfig(BaseModel):
@@ -71,8 +68,8 @@ def _load_model(ckpt_path: Path) -> torch.nn.Module:
             "Make sure the checkpoint was created by the new train.py."
         )
 
-    from src.configs.root import RootConfig
-    from models.peft.registry import apply_peft
+    from glovita.configs.root import RootConfig
+    from glovita.models.peft.registry import apply_peft
 
     config = RootConfig.model_validate_json(config_file.read_text())
 
@@ -91,7 +88,7 @@ def _load_run_config(ckpt_path: Path):
     config_file = run_dir / "config.json"
     if not config_file.exists():
         raise FileNotFoundError(f"config.json not found at {config_file}")
-    from src.configs.root import RootConfig
+    from glovita.configs.root import RootConfig
 
     return RootConfig.model_validate_json(config_file.read_text())
 
@@ -160,4 +157,4 @@ def run_inference(config: InferConfig) -> None:
 
 
 if __name__ == "__main__":
-    run_inference(tyro.cli(InferConfig))
+    run_inference(parse_cli(InferConfig))

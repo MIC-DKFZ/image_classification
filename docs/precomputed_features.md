@@ -4,7 +4,7 @@ The current runtime supports training from precomputed HDF5 feature files using:
 
 - dataset config: `precomputed_features`
 - encoder config: `precomputed`
-- the existing classification head in [models/heads/classification.py](/home/s522r/Desktop/classification_downstream/models/heads/classification.py)
+- the existing classification head in [classification.py](/home/s522r/Desktop/classification_downstream/src/glovita/models/heads/classification.py)
 
 This replaces the old dedicated linear model path. In the current architecture,
 the `precomputed` encoder behaves like an identity backbone, so the normal head
@@ -29,9 +29,9 @@ datasets `features` and `labels`.
 
 The active runtime path is implemented in:
 
-- [datasets/precomputed_features.py](/home/s522r/Desktop/classification_downstream/datasets/precomputed_features.py)
-- [models/encoder/precomputed.py](/home/s522r/Desktop/classification_downstream/models/encoder/precomputed.py)
-- [datasets/factory.py](/home/s522r/Desktop/classification_downstream/datasets/factory.py)
+- [precomputed_features.py](/home/s522r/Desktop/classification_downstream/src/glovita/datasets/precomputed_features.py)
+- [precomputed.py](/home/s522r/Desktop/classification_downstream/src/glovita/models/encoder/precomputed.py)
+- [factory.py](/home/s522r/Desktop/classification_downstream/src/glovita/datasets/factory.py)
 
 ## Training Example
 
@@ -70,7 +70,7 @@ If you have a separate test file:
 
 ## Feature Extraction
 
-[extract_cls_and_avg_patch_token.py](/home/s522r/Desktop/classification_downstream/extract_cls_and_avg_patch_token.py)
+[extract_features.py](/home/s522r/Desktop/classification_downstream/extract_features.py)
 has been rewritten for the current tyro+pydantic runtime. It now uses:
 
 - the current dataset factory
@@ -78,10 +78,15 @@ has been rewritten for the current tyro+pydantic runtime. It now uses:
 - the current PEFT registry
 - the shared feature aggregation implementation
 
+It supports two extraction modes:
+
+- explicit config mode: provide `data` + `model` and optionally `peft`
+- checkpoint mode: provide `--checkpoint-path` and the script reconstructs the saved run automatically
+
 Example extraction command:
 
 ```bash
-python extract_cls_and_avg_patch_token.py \
+python extract_features.py \
   --method joint \
   --output-dir ./precomputed_features \
   --data.dataset cifar10 \
@@ -93,8 +98,24 @@ python extract_cls_and_avg_patch_token.py \
   --dataloading.batch-size 128
 ```
 
+Extraction from a checkpoint saved by this repo:
+
+```bash
+python extract_features.py \
+  --checkpoint-path ./experiments/cifar10/my_run/0/checkpoints/last.pt \
+  --output-dir ./precomputed_features \
+  --output-filename "{checkpoint}_{dataset}_{split}_{method}.h5"
+```
+
 Notes:
 
 - `--method joint` reproduces the concatenated CLS-token + average patch-token representation.
-- by default the extraction script applies the test/eval transform to the train split as well, so extracted train features are deterministic
-- output files are written in the same `features` / `labels` HDF5 format documented above
+- `peft` now defaults to `full_finetuning`, so plain backbone extraction does not require an explicit PEFT flag.
+- if `--checkpoint-path` is provided, the script loads `config.json` from the checkpoint run directory and reconstructs the saved model/PEFT setup before loading the checkpoint weights.
+- you can still override `data`, `model`, or `peft` explicitly on the CLI if needed.
+- by default the extraction script applies the test/eval transform to the train split as well, so extracted train features are deterministic.
+- output files are written in the same `features` / `labels` HDF5 format documented above.
+- if `--output-filename` is unset, the script uses the default template:
+  `agg_{method}_{model}_{dataset}_{split}_size{imgsize}_float{precision}.h5`
+- `--output-filename` accepts a Python format string with placeholders:
+  `method`, `model`, `dataset`, `split`, `imgsize`, `precision`, `checkpoint`.
