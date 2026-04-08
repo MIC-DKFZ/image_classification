@@ -106,6 +106,27 @@ class ClassificationHeadConfig(BaseModel):
     dropout: float = Field(default=0.0, ge=0.0, lt=1.0)
 
 
+class ClamHeadConfig(BaseModel):
+    head_type: Literal["clam"] = "clam"
+    variant: Literal["sb", "mb"] = "sb"
+    gate: bool = True
+    size_arg: Literal["tiny", "small", "big"] = "small"
+    dropout: float = Field(default=0.0, ge=0.0, lt=1.0)
+    k_sample: int = Field(default=8, ge=1)
+    subtyping: bool = False
+    feature_prep: bool = True
+    l2_normalize_features: bool = True
+    layer_norm_eps: float = Field(default=1e-6, gt=0.0)
+    cosine_head: bool = True
+    cosine_scale: float = Field(default=20.0, gt=0.0)
+    instance_eval: bool = False
+    instance_loss_weight: float = Field(default=1.0, ge=0.0)
+    attn_drop: float = Field(default=0.0, ge=0.0, lt=1.0)
+    topk_k: int = Field(default=2, ge=1)
+    topk_tau: float = Field(default=0.25, gt=0.0)
+    stochastic_topk: bool = True
+
+
 class RegressionHeadConfig(BaseModel):
     head_type: Literal["regression"] = "regression"
     dropout: float = Field(default=0.0, ge=0.0, lt=1.0)
@@ -113,7 +134,7 @@ class RegressionHeadConfig(BaseModel):
 
 
 HeadConfig = Annotated[
-    Union[ClassificationHeadConfig, RegressionHeadConfig],
+    Union[ClassificationHeadConfig, ClamHeadConfig, RegressionHeadConfig],
     Field(discriminator="head_type"),
 ]
 

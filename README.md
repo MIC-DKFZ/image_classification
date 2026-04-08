@@ -124,6 +124,13 @@ Available encoder families include:
 - `dinov3`
 - `residual_encoder`
 - `primus`
+- `precomputed`
+
+Available heads include:
+
+- `classification`
+- `regression`
+- `clam`
 
 The active runtime builds the head output dimension from `config.data.num_classes` for classification tasks rather than duplicating it in the head config.
 
@@ -153,6 +160,20 @@ Datasets are plain torch `Dataset` classes assembled via [src/glovita/datasets/f
 3. optionally subsample the train split with `data_fraction`
 4. build PyTorch `DataLoader`s from [DataloadingConfig](src/glovita/configs/dataloading.py)
 
+Split membership comes from the dataset implementation. For the current
+datasets this is typically `splits.json` with `train` / `val` / `test` keys.
+Future fold-aware datasets can also use numeric keys such as `0`, `1`, ...
+when their dataset class interprets those keys explicitly.
+
+For `precomputed_features`, the runtime supports:
+
+- plain instance features `(N, D)`
+- fixed-size bags `(B, N, D)`
+- variable-size bags stored as concatenated features plus `bag_ptr` or `bag_lengths`
+
+Bag-style precomputed inputs are collated into padded `{features, mask}` batches
+and are intended for MIL heads such as `clam`.
+
 ## Runtime-Derived Values
 
 Several values are intentionally derived at runtime instead of being duplicated in config:
@@ -162,6 +183,10 @@ Several values are intentionally derived at runtime instead of being duplicated 
 - effective augmentation configuration after encoder-default + user-override merging
 - effective eval batch size and worker settings in dataloading
 - default W&B project/group names when the user does not set them
+- cross-validation behavior:
+  - `training.cv_folds > 1` runs folds sequentially as `0..N-1`
+  - `data.fold` forces a single fold run
+  - dataset-specific fold-key interpretation is handled by the dataset implementation
 
 Resolved runtime state is logged to each run directory and to W&B config for reproducibility.
 

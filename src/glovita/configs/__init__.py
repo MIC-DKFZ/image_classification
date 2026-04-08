@@ -5,6 +5,7 @@ from glovita.configs.training import TrainingConfig
 from glovita.configs.task import TaskConfig
 from glovita.configs.optimizer import OptimizerConfig
 from glovita.configs.model import (
+    ClamHeadConfig,
     ClassificationHeadConfig,
     Dinov2EncoderConfig,
     Dinov3EncoderConfig,
@@ -33,6 +34,7 @@ __all__ = [
     "ModelConfig",
     "HeadConfig",
     "ClassificationHeadConfig",
+    "ClamHeadConfig",
     "RegressionHeadConfig",
     "TimmEncoderConfig",
     "TransformerEncoderConfig",

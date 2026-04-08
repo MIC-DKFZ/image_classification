@@ -205,7 +205,7 @@ FGVCAircraft/
 ## File Format Standards
 
 ### splits.json
-Standard format across all datasets:
+Current standard format across the existing datasets:
 ```json
 {
   "train": ["image_id1", "image_id2", ...],
@@ -213,6 +213,15 @@ Standard format across all datasets:
   "test": ["image_id5", "image_id6", ...]
 }
 ```
+
+Future fold-aware datasets may instead use numeric string keys such as:
+```json
+{
+  "0": ["image_id1", "image_id2", ...],
+  "1": ["image_id3", "image_id4", ...]
+}
+```
+The exact meaning of the keys is defined by the dataset class that consumes the file.
 
 ### labels.json
 Standard format across all datasets:
@@ -223,7 +232,7 @@ Standard format across all datasets:
   ...
 }
 ```
-- Keys: String image paths (relative to dataset root or images folder)
+- Keys: String image paths or sample IDs, depending on the dataset class
 - Values: Integer class labels (0-indexed)
 
 ### class_map.json

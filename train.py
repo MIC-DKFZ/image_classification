@@ -115,12 +115,11 @@ def _collect_runtime_metadata(
     }
 
 
-def run_fold(config: RootConfig, fold: int) -> None:
+def run_fold(config: RootConfig, fold: str) -> None:
     """Train a single cross-validation fold (or the single no-CV run)."""
-    fold_str = str(fold) if config.training.cv_folds > 1 else "0"
     wandb_kwargs = config.resolve_wandb_kwargs()
     effective_group = wandb_kwargs["group"]
-    log_dir = config.get_run_log_dir(effective_group) / fold_str
+    log_dir = config.get_run_log_dir(effective_group) / fold
     log_dir.mkdir(parents=True, exist_ok=True)
 
     # --- W&B ---
@@ -128,14 +127,14 @@ def run_fold(config: RootConfig, fold: int) -> None:
     if offline:
         wandb_kwargs["mode"] = "offline"
     wandb_kwargs["dir"] = str(log_dir)
-    if config.training.cv_folds > 1:
+    if config.training.cv_folds > 1 or config.data.fold is not None:
         # Tag each fold run distinctly within the same group
         wandb_kwargs.setdefault("tags", [])
         wandb_kwargs["tags"] = list(wandb_kwargs["tags"] or []) + [f"fold_{fold}"]
     wandb.init(**wandb_kwargs)
 
     # --- Data ---
-    fold_data = config.data.model_copy(update={"fold": fold_str})
+    fold_data = config.data.model_copy(update={"fold": fold})
     encoder_preprocessing = resolve_encoder_preprocessing_defaults(config.model.encoder).as_kwargs()
     runtime_metadata = _collect_runtime_metadata(
         config,
@@ -190,8 +189,12 @@ def main(config: RootConfig) -> None:
     # Increase W&B service wait time for slow cluster nodes
     os.environ.setdefault("WANDB__SERVICE_WAIT", "300")
 
+    if config.data.fold is not None:
+        run_fold(config, config.data.fold)
+        return
+
     for fold in range(config.training.cv_folds):
-        run_fold(config, fold)
+        run_fold(config, str(fold))
 
 
 if __name__ == "__main__":

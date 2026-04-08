@@ -11,8 +11,10 @@ from glovita.models.encoder.torchvision import TorchvisionEncoder
 from glovita.models.encoder.transformer import TransformerEncoder
 from glovita.models.feature_aggregator import aggregate_features, aggregated_feature_dim
 from glovita.models.heads.classification import ClassificationHead
+from glovita.models.heads.mil.clam import CLAM_MB, CLAM_SB
 from glovita.models.heads.regression import RegressionHead
 from glovita.configs.model import (
+    ClamHeadConfig,
     ClassificationHeadConfig,
     Dinov2EncoderConfig,
     Dinov3EncoderConfig,
@@ -36,6 +38,7 @@ class ComposedModel(nn.Module):
         self.cls_head = head
         self.head = head
         self.feature_aggregation_method = feature_aggregation_method
+        self.latest_aux_loss = None
 
     def _sync_encoder_model(self):
         self.encoder.model = self.model
@@ -44,9 +47,22 @@ class ComposedModel(nn.Module):
         self._sync_encoder_model()
         return self.encoder.forward_features(x)
 
-    def forward(self, x):
+    def forward(self, x, target=None):
         features = self.extract_features(x)
-        pooled = aggregate_features(features, self.feature_aggregation_method)
+        self.latest_aux_loss = None
+
+        if getattr(self.cls_head, "consumes_raw_features", False):
+            logits = self.cls_head(features, label=target)
+            if hasattr(self.cls_head, "get_aux_loss"):
+                self.latest_aux_loss = self.cls_head.get_aux_loss()
+            return logits
+
+        if isinstance(features, dict):
+            raise ValueError(
+                "Bag-style feature inputs require a head that consumes raw bag features, such as `clam`."
+            )
+        tensor_features = features
+        pooled = aggregate_features(tensor_features, self.feature_aggregation_method)
         return self.cls_head(pooled)
 
 
@@ -120,6 +136,28 @@ def build_encoder(config) -> nn.Module:
 def build_head(config, input_dim: int, output_dim: int) -> nn.Module:
     if isinstance(config, ClassificationHeadConfig):
         return ClassificationHead(input_dim=input_dim, num_classes=output_dim, dropout=config.dropout)
+    if isinstance(config, ClamHeadConfig):
+        head_cls = CLAM_SB if config.variant == "sb" else CLAM_MB
+        return head_cls(
+            gate=config.gate,
+            size_arg=config.size_arg,
+            dropout=config.dropout,
+            k_sample=config.k_sample,
+            n_classes=output_dim,
+            subtyping=config.subtyping,
+            embed_dim=input_dim,
+            feature_prep=config.feature_prep,
+            l2_normalize_features=config.l2_normalize_features,
+            layer_norm_eps=config.layer_norm_eps,
+            cosine_head=config.cosine_head,
+            cosine_scale=config.cosine_scale,
+            instance_eval=config.instance_eval,
+            instance_loss_weight=config.instance_loss_weight,
+            attn_drop=config.attn_drop,
+            topk_k=config.topk_k,
+            topk_tau=config.topk_tau,
+            stochastic_topk=config.stochastic_topk,
+        )
     if isinstance(config, RegressionHeadConfig):
         return RegressionHead(input_dim=input_dim, out_dim=config.out_dim, dropout=config.dropout)
     raise ValueError(f"Unsupported head config: {type(config).__name__}")
@@ -127,12 +165,16 @@ def build_head(config, input_dim: int, output_dim: int) -> nn.Module:
 
 def build_model(config: ModelConfig, output_dim: int) -> ComposedModel:
     encoder = build_encoder(config.encoder)
-    pooled_dim = aggregated_feature_dim(
-        embed_dim=encoder.output_dim,
-        method=config.feature_aggregation_method,
-        features_are_tokens=encoder.features_are_tokens,
-    )
-    head = build_head(config.head, pooled_dim, output_dim)
+    head_uses_raw_features = isinstance(config.head, ClamHeadConfig)
+    if head_uses_raw_features:
+        head_input_dim = encoder.output_dim
+    else:
+        head_input_dim = aggregated_feature_dim(
+            embed_dim=encoder.output_dim,
+            method=config.feature_aggregation_method,
+            features_are_tokens=encoder.features_are_tokens,
+        )
+    head = build_head(config.head, head_input_dim, output_dim)
     return ComposedModel(
         encoder=encoder,
         head=head,

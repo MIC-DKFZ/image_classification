@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Callable
 
 import numpy as np
+import torch
 from sklearn.model_selection import StratifiedShuffleSplit
 from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision.datasets import CIFAR10, CIFAR100, ImageNet
@@ -435,6 +436,43 @@ def _extract_targets(dataset) -> np.ndarray:
     )
 
 
+def _unwrap_dataset(dataset):
+    while isinstance(dataset, Subset):
+        dataset = dataset.dataset
+    return dataset
+
+
+def _bag_collate_fn(batch):
+    features, labels = zip(*batch, strict=True)
+    labels = np.asarray([int(label) for label in labels], dtype=np.int64)
+
+    if not features:
+        raise ValueError("Cannot collate an empty batch of MIL bags.")
+
+    if features[0].ndim != 2:
+        raise ValueError(
+            f"MIL bag collation expects each sample to be a 2D [N, D] tensor, got {tuple(features[0].shape)}."
+        )
+
+    max_instances = max(int(feature.shape[0]) for feature in features)
+    feature_dim = int(features[0].shape[1])
+    padded = features[0].new_zeros((len(features), max_instances, feature_dim))
+    mask = torch.zeros((len(features), max_instances), dtype=torch.bool)
+    for idx, bag in enumerate(features):
+        bag_len = int(bag.shape[0])
+        padded[idx, :bag_len] = bag
+        mask[idx, :bag_len] = True
+
+    return {"features": padded, "mask": mask}, torch.from_numpy(labels)
+
+
+def _resolve_collate_fn(dataset):
+    base_dataset = _unwrap_dataset(dataset)
+    if getattr(base_dataset, "is_bag_dataset", False):
+        return _bag_collate_fn
+    return None
+
+
 def _maybe_apply_fraction(dataset, fraction: float | None, stratified: bool):
     if fraction is None or fraction >= 1.0:
         return dataset
@@ -468,21 +506,25 @@ def _build_common_loader_kwargs(dataloading: DataloadingConfig) -> dict:
 
 
 def _build_train_loader(dataloading: DataloadingConfig, dataset) -> DataLoader:
+    collate_fn = _resolve_collate_fn(dataset)
     return DataLoader(
         dataset,
         batch_size=dataloading.batch_size,
         shuffle=dataloading.shuffle_train,
         drop_last=dataloading.drop_last_train,
+        collate_fn=collate_fn,
         **_build_common_loader_kwargs(dataloading),
     )
 
 
 def _build_eval_loader(dataloading: DataloadingConfig, dataset) -> DataLoader:
+    collate_fn = _resolve_collate_fn(dataset)
     return DataLoader(
         dataset,
         batch_size=dataloading.effective_eval_batch_size,
         shuffle=dataloading.shuffle_eval,
         drop_last=dataloading.drop_last_eval,
+        collate_fn=collate_fn,
         **_build_common_loader_kwargs(dataloading),
     )
 

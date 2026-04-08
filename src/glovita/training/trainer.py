@@ -261,15 +261,20 @@ class Trainer:
         for x, y in pbar:
             with self.accelerator.accumulate(model):
                 if self.task.mixup:
+                    if not torch.is_tensor(x):
+                        raise ValueError("Mixup currently only supports tensor inputs, not MIL bag dictionaries.")
                     x_mix, targets_a, targets_b, lam = mixup_data(x, y, alpha=self.task.mixup_alpha)
                     y_hat = model(x_mix)
                     loss = mixup_criterion(self.criterion, y_hat, targets_a, targets_b, lam)
                 else:
-                    y_hat = model(x)
+                    y_hat = model(x, target=y)
                     if self.data.num_classes == 1:
                         y_hat = y_hat.view(-1)
                     target = y.float() if self.data.subtask == "multilabel" else y
                     loss = self.criterion(y_hat, target)
+                    aux_loss = self._get_model_aux_loss(model)
+                    if aux_loss is not None:
+                        loss = loss + aux_loss
 
                 # NaN / Inf detection (replaces NaNLossCallback)
                 if math.isnan(float(loss)) or math.isinf(float(loss)):
@@ -351,11 +356,14 @@ class Trainer:
                 if sanity_steps > 0 and step >= sanity_steps:
                     break
 
-                y_hat = model(x)
+                y_hat = model(x, target=y)
                 if self.data.num_classes == 1:
                     y_hat = y_hat.view(-1)
                 target = y.float() if self.data.subtask == "multilabel" else y
                 loss = self.criterion(y_hat, target)
+                aux_loss = self._get_model_aux_loss(model)
+                if aux_loss is not None:
+                    loss = loss + aux_loss
                 total_loss += loss.detach().float()
 
                 gathered_y_hat, gathered_y = self._gather_for_metrics(y_hat, y)
@@ -401,6 +409,15 @@ class Trainer:
         metrics.update(y_hat, y)
         if conf_mat is not None:
             conf_mat.update(y_hat, y)
+
+    def _get_model_aux_loss(self, model: nn.Module) -> torch.Tensor | None:
+        aux_loss = getattr(model, "latest_aux_loss", None)
+        if aux_loss is not None:
+            return aux_loss
+        wrapped = getattr(model, "module", None)
+        if wrapped is not None:
+            return getattr(wrapped, "latest_aux_loss", None)
+        return None
 
     def _gather_for_metrics(
         self,
