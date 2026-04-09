@@ -35,6 +35,28 @@ class TorchvisionEncoderConfig(BaseModel):
     model_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
 
 
+class TorchvisionVideoEncoderConfig(BaseModel):
+    encoder_type: Literal["torchvision_video"] = "torchvision_video"
+    type: str = "r3d_18"
+    pretrained: bool = True
+    input_channels: int = 3
+    return_intermediates: bool = False
+    intermediate_names: list[str] = Field(default_factory=list)
+    model_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
+
+
+class PytorchvideoEncoderConfig(BaseModel):
+    encoder_type: Literal["pytorchvideo"] = "pytorchvideo"
+    type: str = "x3d_s"
+    pretrained: bool = True
+    input_channels: int = 3
+    pathway_mode: Literal["auto", "single", "slowfast"] = "auto"
+    slowfast_alpha: int = Field(default=4, ge=1)
+    return_intermediates: bool = False
+    intermediate_names: list[str] = Field(default_factory=list)
+    model_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
+
+
 class Dinov2EncoderConfig(BaseModel):
     encoder_type: Literal["dinov2"] = "dinov2"
     type: str = "dinov2_vitb14"
@@ -91,6 +113,8 @@ EncoderConfig = Annotated[
         TimmEncoderConfig,
         TransformerEncoderConfig,
         TorchvisionEncoderConfig,
+        TorchvisionVideoEncoderConfig,
+        PytorchvideoEncoderConfig,
         Dinov2EncoderConfig,
         Dinov3EncoderConfig,
         ResidualEncoderConfig,
@@ -108,7 +132,7 @@ class ClassificationHeadConfig(BaseModel):
 
 class ClamHeadConfig(BaseModel):
     head_type: Literal["clam"] = "clam"
-    variant: Literal["sb", "mb"] = "sb"
+    variant: Literal["sb", "mb"] = "mb"
     gate: bool = True
     size_arg: Literal["tiny", "small", "big"] = "small"
     dropout: float = Field(default=0.0, ge=0.0, lt=1.0)
@@ -124,7 +148,18 @@ class ClamHeadConfig(BaseModel):
     attn_drop: float = Field(default=0.0, ge=0.0, lt=1.0)
     topk_k: int = Field(default=2, ge=1)
     topk_tau: float = Field(default=0.25, gt=0.0)
-    stochastic_topk: bool = True
+    stochastic_topk: bool = False
+    topk_noise_std: float = Field(default=0.1, ge=0.0)
+    topk_consistency_weight: float = Field(default=1.0, ge=0.0)
+
+
+class FramewiseDecoder1DHeadConfig(BaseModel):
+    head_type: Literal["framewise_decoder_1d"] = "framewise_decoder_1d"
+    num_clip_frames: int = Field(default=3, ge=1)
+    stem_key: str = "stem"
+    layer2_key: str = "layer2"
+    layer3_key: str = "layer3"
+    layer4_key: str = "layer4"
 
 
 class RegressionHeadConfig(BaseModel):
@@ -134,7 +169,12 @@ class RegressionHeadConfig(BaseModel):
 
 
 HeadConfig = Annotated[
-    Union[ClassificationHeadConfig, ClamHeadConfig, RegressionHeadConfig],
+    Union[
+        ClassificationHeadConfig,
+        ClamHeadConfig,
+        FramewiseDecoder1DHeadConfig,
+        RegressionHeadConfig,
+    ],
     Field(discriminator="head_type"),
 ]
 

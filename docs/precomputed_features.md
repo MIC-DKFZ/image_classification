@@ -36,7 +36,7 @@ file uses different names.
 The active runtime path is implemented in:
 
 - [precomputed_features.py](../src/glovita/datasets/precomputed_features.py)
-- [precomputed.py](../src/glovita/models/encoder/precomputed.py)
+- [precomputed.py](../src/glovita/models/img_encoder/precomputed.py)
 - [factory.py](../src/glovita/datasets/factory.py)
 
 For bag files, the dataloader pads bags within a batch and passes CLAM a

@@ -2,28 +2,34 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from glovita.models.encoder.dinov2 import Dinov2Encoder
-from glovita.models.encoder.dinov3 import Dinov3Encoder
-from glovita.models.encoder.dynamic import PrimusEncoder, ResidualEncoder
-from glovita.models.encoder.precomputed import PrecomputedEncoder
-from glovita.models.encoder.timm import TimmEncoder
-from glovita.models.encoder.torchvision import TorchvisionEncoder
-from glovita.models.encoder.transformer import TransformerEncoder
+from glovita.models.img_encoder.dinov2 import Dinov2Encoder
+from glovita.models.img_encoder.dinov3 import Dinov3Encoder
+from glovita.models.img_encoder.dynamic import PrimusEncoder, ResidualEncoder
+from glovita.models.img_encoder.precomputed import PrecomputedEncoder
+from glovita.models.img_encoder.timm import TimmEncoder
+from glovita.models.img_encoder.torchvision import TorchvisionEncoder
+from glovita.models.img_encoder.transformer import TransformerEncoder
 from glovita.models.feature_aggregator import aggregate_features, aggregated_feature_dim
 from glovita.models.heads.classification import ClassificationHead
 from glovita.models.heads.mil.clam import CLAM_MB, CLAM_SB
 from glovita.models.heads.regression import RegressionHead
+from glovita.models.heads.video.framewise_decoder_1d import FramewiseDecoder1D
+from glovita.models.video_encoder.pytorchvideo import PytorchvideoEncoder
+from glovita.models.video_encoder.torchvision import TorchvisionVideoEncoder
 from glovita.configs.model import (
     ClamHeadConfig,
     ClassificationHeadConfig,
     Dinov2EncoderConfig,
     Dinov3EncoderConfig,
+    FramewiseDecoder1DHeadConfig,
     ModelConfig,
+    PytorchvideoEncoderConfig,
     PrecomputedEncoderConfig,
     PrimusEncoderConfig,
     RegressionHeadConfig,
     ResidualEncoderConfig,
     TimmEncoderConfig,
+    TorchvisionVideoEncoderConfig,
     TorchvisionEncoderConfig,
     TransformerEncoderConfig,
 )
@@ -58,10 +64,17 @@ class ComposedModel(nn.Module):
             return logits
 
         if isinstance(features, dict):
-            raise ValueError(
-                "Bag-style feature inputs require a head that consumes raw bag features, such as `clam`."
-            )
-        tensor_features = features
+            if "mask" in features:
+                raise ValueError(
+                    "Bag-style feature inputs require a head that consumes raw bag features, such as `clam`."
+                )
+            tensor_features = features.get("features")
+            if tensor_features is None:
+                raise ValueError(
+                    "Structured encoder outputs for pooled heads must include a `features` entry."
+                )
+        else:
+            tensor_features = features
         pooled = aggregate_features(tensor_features, self.feature_aggregation_method)
         return self.cls_head(pooled)
 
@@ -88,6 +101,26 @@ def build_encoder(config) -> nn.Module:
             input_channels=config.input_channels,
             dropout=config.dropout,
             stochastic_depth_prob=config.stochastic_depth_prob,
+            model_kwargs=config.model_kwargs,
+        )
+    if isinstance(config, TorchvisionVideoEncoderConfig):
+        return TorchvisionVideoEncoder(
+            type=config.type,
+            pretrained=config.pretrained,
+            input_channels=config.input_channels,
+            return_intermediates=config.return_intermediates,
+            intermediate_names=config.intermediate_names,
+            model_kwargs=config.model_kwargs,
+        )
+    if isinstance(config, PytorchvideoEncoderConfig):
+        return PytorchvideoEncoder(
+            type=config.type,
+            pretrained=config.pretrained,
+            input_channels=config.input_channels,
+            pathway_mode=config.pathway_mode,
+            slowfast_alpha=config.slowfast_alpha,
+            return_intermediates=config.return_intermediates,
+            intermediate_names=config.intermediate_names,
             model_kwargs=config.model_kwargs,
         )
     if isinstance(config, Dinov2EncoderConfig):
@@ -157,6 +190,17 @@ def build_head(config, input_dim: int, output_dim: int) -> nn.Module:
             topk_k=config.topk_k,
             topk_tau=config.topk_tau,
             stochastic_topk=config.stochastic_topk,
+            topk_noise_std=config.topk_noise_std,
+            topk_consistency_weight=config.topk_consistency_weight,
+        )
+    if isinstance(config, FramewiseDecoder1DHeadConfig):
+        return FramewiseDecoder1D(
+            num_classes=output_dim,
+            num_clip_frames=config.num_clip_frames,
+            stem_key=config.stem_key,
+            layer2_key=config.layer2_key,
+            layer3_key=config.layer3_key,
+            layer4_key=config.layer4_key,
         )
     if isinstance(config, RegressionHeadConfig):
         return RegressionHead(input_dim=input_dim, out_dim=config.out_dim, dropout=config.dropout)
@@ -165,7 +209,7 @@ def build_head(config, input_dim: int, output_dim: int) -> nn.Module:
 
 def build_model(config: ModelConfig, output_dim: int) -> ComposedModel:
     encoder = build_encoder(config.encoder)
-    head_uses_raw_features = isinstance(config.head, ClamHeadConfig)
+    head_uses_raw_features = isinstance(config.head, (ClamHeadConfig, FramewiseDecoder1DHeadConfig))
     if head_uses_raw_features:
         head_input_dim = encoder.output_dim
     else:

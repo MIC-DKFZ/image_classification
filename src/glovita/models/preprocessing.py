@@ -7,9 +7,11 @@ from glovita.configs.model import (
     Dinov2EncoderConfig,
     Dinov3EncoderConfig,
     EncoderConfig,
+    PytorchvideoEncoderConfig,
     PrecomputedEncoderConfig,
     PrimusEncoderConfig,
     TimmEncoderConfig,
+    TorchvisionVideoEncoderConfig,
     TorchvisionEncoderConfig,
     TransformerEncoderConfig,
 )
@@ -168,6 +170,30 @@ def resolve_encoder_preprocessing_defaults(encoder_config: EncoderConfig) -> Pre
             )
         except Exception:
             return PreprocessingDefaults()
+
+    if isinstance(encoder_config, TorchvisionVideoEncoderConfig) and encoder_config.pretrained:
+        try:
+            import torchvision.models.video as tvv
+
+            weights = tvv.get_model_weights(encoder_config.type).DEFAULT
+            transforms = weights.transforms()
+            crop_size = getattr(transforms, "crop_size", None)
+            resize_size = getattr(transforms, "resize_size", None)
+            mean = getattr(transforms, "mean", None)
+            std = getattr(transforms, "std", None)
+            crop_size = crop_size[-1] if isinstance(crop_size, (list, tuple)) else crop_size
+            resize_size = resize_size[-1] if isinstance(resize_size, (list, tuple)) else resize_size
+            return PreprocessingDefaults(
+                image_size=int(crop_size) if crop_size is not None else None,
+                resize_size=int(resize_size) if resize_size is not None else None,
+                mean=_safe_tuple(mean),
+                std=_safe_tuple(std),
+            )
+        except Exception:
+            return PreprocessingDefaults()
+
+    if isinstance(encoder_config, PytorchvideoEncoderConfig):
+        return PreprocessingDefaults()
 
     if isinstance(encoder_config, TransformerEncoderConfig) and encoder_config.pretrained:
         try:

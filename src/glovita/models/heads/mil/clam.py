@@ -232,6 +232,8 @@ class _BaseClam(nn.Module):
         topk_k: int,
         topk_tau: float,
         stochastic_topk: bool,
+        topk_noise_std: float,
+        topk_consistency_weight: float,
     ):
         super().__init__()
         self.size_dict = {
@@ -278,6 +280,8 @@ class _BaseClam(nn.Module):
         self.k_topk = int(topk_k)
         self.attn_tau = float(topk_tau)
         self.stochastic_topk = bool(stochastic_topk)
+        self.topk_noise_std = float(topk_noise_std)
+        self.topk_consistency_weight = float(topk_consistency_weight)
         self.projected_dim = int(size[1])
         self.classifiers = self._build_classifiers(
             hidden_dim=size[1],
@@ -426,6 +430,50 @@ class _BaseClam(nn.Module):
     def get_aux_loss(self) -> torch.Tensor | None:
         return self.last_aux.get("loss")
 
+    def _topk_consistency_loss(
+        self,
+        *,
+        attention_logits: torch.Tensor,
+        projected_features: torch.Tensor,
+        mask: torch.Tensor | None,
+        reference_logits: torch.Tensor,
+    ) -> torch.Tensor:
+        topk_attention, topk_indices = sparse_topk_attention(
+            attention_logits,
+            k=self.k_topk,
+            tau=self.attn_tau,
+            stochastic=False,
+            training=self.training,
+            mask=mask,
+        )
+
+        if projected_features.dim() == 2:
+            perturbed_features = projected_features.clone()
+            noise = torch.randn(
+                (topk_indices.numel(), perturbed_features.shape[-1]),
+                device=perturbed_features.device,
+                dtype=perturbed_features.dtype,
+            ) * self.topk_noise_std
+            flat_indices = topk_indices.reshape(-1)
+            perturbed_features[flat_indices] = perturbed_features[flat_indices] + noise
+        else:
+            perturbed_features = projected_features.clone()
+            batch_size = projected_features.shape[0]
+            for batch_idx in range(batch_size):
+                batch_indices = topk_indices[batch_idx].reshape(-1)
+                noise = torch.randn(
+                    (batch_indices.numel(), perturbed_features.shape[-1]),
+                    device=perturbed_features.device,
+                    dtype=perturbed_features.dtype,
+                ) * self.topk_noise_std
+                perturbed_features[batch_idx, batch_indices] = (
+                    perturbed_features[batch_idx, batch_indices] + noise
+                )
+
+        perturbed_bag_features = torch.matmul(topk_attention, perturbed_features)
+        perturbed_logits = self._bag_logits(perturbed_bag_features)
+        return F.mse_loss(perturbed_logits, reference_logits)
+
     def forward(
         self,
         x: torch.Tensor | dict[str, torch.Tensor],
@@ -439,6 +487,18 @@ class _BaseClam(nn.Module):
 
         logits = self._bag_logits(bag_features)
         self.last_aux = {}
+        total_aux_loss: torch.Tensor | None = None
+
+        if self.stochastic_topk and self.topk_consistency_weight > 0:
+            topk_loss = self._topk_consistency_loss(
+                attention_logits=attention_logits,
+                projected_features=projected_features,
+                mask=mask,
+                reference_logits=logits.detach(),
+            )
+            self.last_aux["topk_consistency_loss"] = topk_loss
+            total_aux_loss = topk_loss * self.topk_consistency_weight
+
         if self.instance_eval_enabled and label is not None:
             if logits.dim() == 1:
                 label = label.view(1)
@@ -474,7 +534,15 @@ class _BaseClam(nn.Module):
                     instance_loss = torch.stack(valid_losses).mean()
             if instance_loss is not None and self.instance_loss_weight > 0:
                 self.last_aux["instance_loss"] = instance_loss
-                self.last_aux["loss"] = instance_loss * self.instance_loss_weight
+                weighted_instance_loss = instance_loss * self.instance_loss_weight
+                total_aux_loss = (
+                    weighted_instance_loss
+                    if total_aux_loss is None
+                    else total_aux_loss + weighted_instance_loss
+                )
+
+        if total_aux_loss is not None:
+            self.last_aux["loss"] = total_aux_loss
 
         return logits
 

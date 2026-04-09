@@ -9,8 +9,6 @@ This repository contains a classification/regression training stack built on:
 - Pydantic
 - Tyro
 
-The current codebase does not use Hydra or Lightning in the active runtime path.
-
 ## Current Architecture
 
 The runtime is organized around a few central entrypoints:
@@ -110,7 +108,8 @@ The user-facing config surface is in [src/glovita/configs](src/glovita/configs):
 
 The current model runtime is composition-based:
 
-- encoders in [src/glovita/models/encoder](src/glovita/models/encoder)
+- image encoders in [src/glovita/models/img_encoder](src/glovita/models/img_encoder)
+- video encoders in [src/glovita/models/video_encoder](src/glovita/models/video_encoder)
 - heads in [src/glovita/models/heads](src/glovita/models/heads)
 - feature aggregation in [src/glovita/models/feature_aggregator.py](src/glovita/models/feature_aggregator.py)
 - PEFT in [src/glovita/models/peft](src/glovita/models/peft)
@@ -119,6 +118,8 @@ Available encoder families include:
 
 - `timm`
 - `torchvision`
+- `torchvision_video`
+- `pytorchvideo`
 - `transformer`
 - `dinov2`
 - `dinov3`
@@ -131,8 +132,14 @@ Available heads include:
 - `classification`
 - `regression`
 - `clam`
+- `framewise_decoder_1d`
 
 The active runtime builds the head output dimension from `config.data.num_classes` for classification tasks rather than duplicating it in the head config.
+
+Special-case docs:
+
+- [docs/mil.md](docs/mil.md): MIL / CLAM and bag-of-features training
+- [docs/video.md](docs/video.md): video encoders and framewise video heads
 
 ## Augmentations
 
@@ -172,7 +179,8 @@ For `precomputed_features`, the runtime supports:
 - variable-size bags stored as concatenated features plus `bag_ptr` or `bag_lengths`
 
 Bag-style precomputed inputs are collated into padded `{features, mask}` batches
-and are intended for MIL heads such as `clam`.
+and are intended for MIL heads such as `clam`. See [docs/mil.md](docs/mil.md)
+for the detailed MIL path.
 
 ## Runtime-Derived Values
 
@@ -193,3 +201,13 @@ Resolved runtime state is logged to each run directory and to W&B config for rep
 ## Documentation
 
 Additional documentation is indexed in [docs/README.md](docs/README.md).
+
+## Acknowledgements
+
+<p align="left">
+  <img src="imgs/Logos/HI_Logo.png" width="150"> &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="imgs/Logos/DKFZ_Logo.png" width="500"> 
+</p>
+
+This Repository is developed and maintained by the Applied Computer Vision Lab (ACVL)
+of [Helmholtz Imaging](https://www.helmholtz-imaging.de/).
