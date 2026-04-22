@@ -213,7 +213,7 @@ def apply_peft(model: nn.Module, config: PeftConfig) -> nn.Module:
 
     elif isinstance(config, GPSConfig):
         from glovita.models.peft.gps import GPS as GPSMixin
-        GPSMixin.__init__(model, gps_percent=config.gps_percent)
+        GPSMixin.__init__(model, gps_topk_per_row=config.gps_topk_per_row)
 
     elif isinstance(config, VisualPromptTuningConfig):
         from glovita.models.peft.visual_prompt_tuning import VisualPromptTuning as VPTMixin

@@ -70,7 +70,7 @@ class AugmentationConfig(BaseModel):
     resize_size: int | None = Field(default=None, ge=1)
     crop_size: int | None = Field(default=None, ge=1)
     cutout_size: int | None = Field(default=None, ge=1)
-    patch_size: tuple[int, int, int] | None = None
+    patch_size: tuple[int, ...] | None = None
     mean: tuple[float, ...] | None = None
     std: tuple[float, ...] | None = None
     # Escape hatches for policy-specific parameters that should override the

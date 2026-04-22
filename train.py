@@ -115,10 +115,13 @@ def _collect_runtime_metadata(
     }
 
 
-def run_fold(config: RootConfig, fold: str) -> None:
+def run_fold(config: RootConfig, fold: str, group: str) -> None:
     """Train a single cross-validation fold (or the single no-CV run)."""
     wandb_kwargs = config.resolve_wandb_kwargs()
-    effective_group = wandb_kwargs["group"]
+    # Override with the stable group resolved once per experiment so that all
+    # fold runs appear in the same W&B group regardless of when they started.
+    wandb_kwargs["group"] = group
+    effective_group = group
     log_dir = config.get_run_log_dir(effective_group) / fold
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -189,12 +192,21 @@ def main(config: RootConfig) -> None:
     # Increase W&B service wait time for slow cluster nodes
     os.environ.setdefault("WANDB__SERVICE_WAIT", "300")
 
+    # Resolve the W&B group once so all fold runs share the same group.
+    # generate_wandb_group() embeds a UUID — calling it per fold would produce
+    # different groups and scatter fold runs across the W&B dashboard.
+    group = config.wandb.group or config.generate_wandb_group()
+
     if config.data.fold is not None:
-        run_fold(config, config.data.fold)
+        run_fold(config, config.data.fold, group=group)
         return
 
     for fold in range(config.training.cv_folds):
-        run_fold(config, str(fold))
+        run_fold(config, str(fold), group=group)
+        # Release model/optimizer memory between folds so large models don't
+        # accumulate across all folds in the same process.
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":

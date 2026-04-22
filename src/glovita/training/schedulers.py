@@ -68,7 +68,6 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
         self.warmstart = warmstart
         self.T_max = T_max - warmstart  # effective cosine period
         self.eta_min = eta_min
-        self._T = 0  # internal cosine counter
 
         try:
             super().__init__(optimizer, last_epoch=last_epoch, verbose=False)
@@ -87,29 +86,29 @@ class CosineAnnealingLR_Warmstart(_LRScheduler):
             factor = (self.last_epoch + 1) / (self.warmstart + 1)
             return [base_lr * factor for base_lr in self.base_lrs]
 
+        # t is the number of steps elapsed since the end of warmup.
+        # Deriving it from last_epoch (rather than a separate mutable counter)
+        # means get_lr() is pure — calling it multiple times per step is safe.
+        t = self.last_epoch - self.warmstart
+
         # First step after warmup: return base_lrs unchanged
-        if self._T == 0:
-            self._T += 1
+        if t == 0:
             return list(self.base_lrs)
 
-        # Cosine annealing
-        if (self._T - 1 - self.T_max) % (2 * self.T_max) == 0:
-            lrs = [
+        # Cosine annealing (with optional warm-restart detection)
+        if (t - 1 - self.T_max) % (2 * self.T_max) == 0:
+            return [
                 group["lr"]
                 + (base_lr - self.eta_min)
                 * (1 - math.cos(math.pi / self.T_max))
                 / 2
                 for base_lr, group in zip(self.base_lrs, self.optimizer.param_groups)
             ]
-            self._T += 1
-            return lrs
 
-        lrs = [
-            (1 + math.cos(math.pi * self._T / self.T_max))
-            / (1 + math.cos(math.pi * (self._T - 1) / self.T_max))
+        return [
+            (1 + math.cos(math.pi * t / self.T_max))
+            / (1 + math.cos(math.pi * (t - 1) / self.T_max))
             * (group["lr"] - self.eta_min)
             + self.eta_min
             for group in self.optimizer.param_groups
         ]
-        self._T += 1
-        return lrs

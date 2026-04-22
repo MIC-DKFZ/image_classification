@@ -28,8 +28,11 @@ _SHARED_TEST_POLICIES_BY_DIM: dict[int, dict[str, TransformBuilder]] = {
     3: defaults_3d.TEST_POLICIES,
 }
 
+# Maps dataset names to their policy module names when the module name differs
+# from the dataset name.  All other datasets (pcam, rxrx1, imagenet, …) use
+# a module named exactly after the dataset, so they need no entry here.
 _DATASET_POLICY_MODULES: dict[str, str] = {
-    "cifar10": "cifar",
+    "cifar10": "cifar",   # cifar10 and cifar100 share a single 'cifar' module
     "cifar100": "cifar",
 }
 

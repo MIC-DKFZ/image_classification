@@ -156,17 +156,21 @@ def main(config: ExtractConfig) -> None:
 
     for split in _iter_requested_splits(config):
         loader = loaders[split]
+        loader_iter = iter(loader)
         try:
-            first_batch = next(iter(loader))
+            first_batch = next(loader_iter)
         except StopIteration:
             print(f"Skipping empty split: {split}")
             continue
 
-        x0, _ = first_batch
+        # Probe feature shape from the first batch, then chain it back so it is
+        # written to the HDF5 file exactly once (not twice).
+        x0, y0 = first_batch
         imgsize = _feature_imgsize(x0)
-        sample_features = model.extract_features(x0.to(device))
-        sample_agg = aggregate_features(sample_features, config.method).detach().cpu()
-        feature_dim = int(sample_agg.shape[-1])
+        first_features = aggregate_features(
+            model.extract_features(x0.to(device)), config.method
+        ).detach().cpu()
+        feature_dim = int(first_features.shape[-1])
         dataset_len = len(loader.dataset)
 
         out_file = config.output_dir / _resolve_output_filename(
@@ -188,8 +192,16 @@ def main(config: ExtractConfig) -> None:
             )
             dset_labels = f.create_dataset("labels", shape=(dataset_len,), dtype="int64")
 
-            index = 0
-            for x, y in tqdm(loader, desc=f"{split.upper()} Batches"):
+            # Write the already-computed first batch.
+            first_labels = y0.detach().cpu().numpy()
+            first_features_np = first_features.numpy()
+            first_batch_size = len(first_labels)
+            dset_features[:first_batch_size] = first_features_np
+            dset_labels[:first_batch_size] = first_labels
+            index = first_batch_size
+
+            # Continue with the remaining batches via the same iterator.
+            for x, y in tqdm(loader_iter, desc=f"{split.upper()} Batches"):
                 x = x.to(device)
                 features = aggregate_features(model.extract_features(x), config.method).detach().cpu().numpy()
                 labels = y.detach().cpu().numpy()

@@ -57,25 +57,25 @@ def _collect_checkpoints(exp_dir: Path, fold: Optional[str]) -> List[Path]:
     return sorted(candidates)
 
 
+def _load_run_config(ckpt_path: Path):
+    run_dir = ckpt_path.parent.parent
+    config_file = run_dir / "config.json"
+    if not config_file.exists():
+        raise FileNotFoundError(f"config.json not found at {config_file}")
+    from glovita.configs.root import RootConfig
+    return RootConfig.model_validate_json(config_file.read_text())
+
+
 def _load_model(ckpt_path: Path) -> torch.nn.Module:
     """Re-create the model from the saved config.json and load checkpoint weights."""
-    run_dir = ckpt_path.parent.parent  # checkpoints/ -> run dir
-    config_file = run_dir / "config.json"
-
-    if not config_file.exists():
-        raise FileNotFoundError(
-            f"config.json not found at {config_file}. "
-            "Make sure the checkpoint was created by the new train.py."
-        )
-
     from glovita.configs.root import RootConfig
+    from glovita.models.factory import build_model
     from glovita.models.peft.registry import apply_peft
 
-    config = RootConfig.model_validate_json(config_file.read_text())
-
-    from train import _build_model
-    model = _build_model(config)
-    model = apply_peft(model, config.peft)
+    run_config = _load_run_config(ckpt_path)
+    output_dim = getattr(run_config.data, "num_classes", 1)
+    model = build_model(run_config.model, output_dim=output_dim)
+    model = apply_peft(model, run_config.peft)
 
     state = torch.load(ckpt_path, map_location="cpu")
     model.load_state_dict(state["model"])
@@ -83,18 +83,10 @@ def _load_model(ckpt_path: Path) -> torch.nn.Module:
     return model
 
 
-def _load_run_config(ckpt_path: Path):
-    run_dir = ckpt_path.parent.parent
-    config_file = run_dir / "config.json"
-    if not config_file.exists():
-        raise FileNotFoundError(f"config.json not found at {config_file}")
-    from glovita.configs.root import RootConfig
-
-    return RootConfig.model_validate_json(config_file.read_text())
-
-
 @torch.no_grad()
 def run_inference(config: InferConfig) -> None:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     ckpt_paths = _collect_checkpoints(config.exp_dir, config.fold)
     print(f"Found {len(ckpt_paths)} checkpoint(s).")
 
@@ -108,16 +100,21 @@ def run_inference(config: InferConfig) -> None:
         encoder_preprocessing=encoder_preprocessing,
     )
 
+    task = reference_run_config.data.task
+    subtask = reference_run_config.data.subtask
+    num_classes = reference_run_config.data.num_classes
+
     all_logits: List[torch.Tensor] = []
     all_labels: Optional[torch.Tensor] = None
 
     for ckpt_path in ckpt_paths:
         print(f"  Loading {ckpt_path}")
         model = _load_model(ckpt_path)
+        model.to(device)
 
         batch_logits, batch_labels = [], []
         for x, y in test_loader:
-            batch_logits.append(model(x))
+            batch_logits.append(model(x.to(device)).cpu())
             batch_labels.append(y)
 
         all_logits.append(torch.cat(batch_logits))
@@ -126,22 +123,37 @@ def run_inference(config: InferConfig) -> None:
 
     assert all_labels is not None
 
-    # Ensemble: sum logits, then argmax
+    # Ensemble: sum logits across checkpoints
     summed = torch.sum(torch.stack(all_logits), dim=0)
-    preds = torch.argmax(summed, dim=1)
+
+    # Produce predictions appropriate for the task
+    if task == "Regression":
+        preds = summed.squeeze(-1)
+    elif subtask == "multilabel":
+        preds = (summed.sigmoid() > 0.5).long()
+    else:
+        preds = torch.argmax(summed, dim=1)
 
     # Compute requested metrics
-    from torchmetrics import MetricCollection, Accuracy, F1Score
+    from torchmetrics import MetricCollection, Accuracy, F1Score, MeanAbsoluteError, MeanSquaredError
 
     metrics_dict = {}
-    if "acc" in config.metrics:
-        metrics_dict["Accuracy"] = Accuracy(
-            task="multiclass", num_classes=config.data.num_classes
-        )
-    if "f1" in config.metrics:
-        metrics_dict["F1"] = F1Score(
-            task="multiclass", num_classes=config.data.num_classes, average="macro"
-        )
+    if task == "Regression":
+        if "mse" in config.metrics:
+            metrics_dict["MSE"] = MeanSquaredError()
+        if "mae" in config.metrics:
+            metrics_dict["MAE"] = MeanAbsoluteError()
+    else:
+        metric_task = subtask  # "multiclass" | "multilabel"
+        if "acc" in config.metrics:
+            metrics_dict["Accuracy"] = Accuracy(
+                task=metric_task, num_classes=num_classes, num_labels=num_classes
+            )
+        if "f1" in config.metrics:
+            metrics_dict["F1"] = F1Score(
+                task=metric_task, num_classes=num_classes, num_labels=num_classes,
+                average="macro",
+            )
 
     collection = MetricCollection(metrics_dict)
     results = collection(preds, all_labels)

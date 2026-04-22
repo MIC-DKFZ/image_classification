@@ -1,4 +1,4 @@
-from peft import get_peft_model, LoraConfig
+from peft import get_peft_model, LoraConfig as PeftLoraConfig
 
 
 MODEL_TO_ARCH_MAPPING = {
@@ -71,7 +71,7 @@ class LoRA:
         module_mapping = MODULE_MAPPING[target_arch]
         lora_target_modules = [module_mapping[module] for module in lora_target_modules]
 
-        lora_config = LoraConfig(
+        lora_config = PeftLoraConfig(
             r=lora_rank,
             lora_alpha=lora_alpha,
             lora_dropout=lora_dropout,

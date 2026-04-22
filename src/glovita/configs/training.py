@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -17,9 +16,11 @@ class TrainingConfig(BaseModel):
     seed: Optional[int] = None
     # torch.compile the model before training
     compile: bool = False
-    # Root directory for logs and checkpoints
-    log_dir: Path = Path("./logs")
     enable_checkpointing: bool = True
+    # Logged validation metric key used to decide whether to update `best.pt`.
+    # Examples: "Accuracy", "F1", "Balanced_Accuracy", "MSE", "MAE".
+    # If unset, the first logged validation metric is used.
+    best_checkpoint_metric: str | None = None
     # Throttle progress bar output for LSF/SLURM environments
     cluster_progress_bar: bool = False
     # Cross-validation: 1 = no CV, k>1 = k-fold CV

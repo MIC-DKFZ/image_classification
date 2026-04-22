@@ -220,6 +220,10 @@ def _build_cifar10_datasets(
             **eval_dataset_kwargs,
         )
 
+    # CIFAR-10 has no official test split separate from val (the torchvision
+    # "test" flag is the fixed 10k held-out set, which serves as both val and
+    # test here).  Callers that need a true test set should use a dataset with
+    # an explicit splits.json.
     return train_dataset, val_dataset, val_dataset
 
 
@@ -274,6 +278,7 @@ def _build_cifar100_datasets(
             **eval_dataset_kwargs,
         )
 
+    # Same as CIFAR-10: val set doubles as the test split.
     return train_dataset, val_dataset, val_dataset
 
 
@@ -310,6 +315,7 @@ def _build_imagenet_datasets(
         config.data_root_dir,
         **eval_dataset_kwargs,
     )
+    # ImageNet's official validation set is used as both val and test.
     return train_dataset, val_dataset, val_dataset
 
 
@@ -484,7 +490,8 @@ def _maybe_apply_fraction(dataset, fraction: float | None, stratified: bool):
         indices = train_idx
     else:
         count = int(len(dataset) * fraction)
-        indices = np.random.choice(len(dataset), count, replace=False)
+        rng = np.random.default_rng(seed=42)
+        indices = rng.choice(len(dataset), count, replace=False)
 
     return Subset(dataset, indices)
 

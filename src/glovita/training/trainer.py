@@ -176,6 +176,11 @@ class Trainer:
         self.train_preds: list = []
         self.train_labels: list = []
 
+        # Best-checkpoint tracking: choose a logged validation metric key
+        # explicitly when provided, otherwise fall back to the first logged one.
+        self._best_metric_key = training_config.best_checkpoint_metric
+        self._best_val_metric: float | None = None
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -223,15 +228,21 @@ class Trainer:
 
         # Optional sanity val
         if self.cfg.num_sanity_val_steps > 0:
-            self._val_epoch(model, val_loader, epoch=-1, sanity_steps=self.cfg.num_sanity_val_steps)
+            self._val_epoch(
+                model,
+                optimizer,
+                val_loader,
+                epoch=-1,
+                sanity_steps=self.cfg.num_sanity_val_steps,
+            )
 
         for epoch in range(self.cfg.epochs):
             self._train_epoch(model, optimizer, train_loader, epoch)
-            self._val_epoch(model, val_loader, epoch)
+            self._val_epoch(model, optimizer, val_loader, epoch)
             if scheduler is not None:
                 scheduler.step()
             if self.cfg.enable_checkpointing and self.accelerator.is_main_process:
-                self._save_checkpoint(model, optimizer, epoch)
+                self._save_checkpoint(model, optimizer, epoch, is_best=False)
 
         return self.accelerator.unwrap_model(model)
 
@@ -336,6 +347,7 @@ class Trainer:
     def _val_epoch(
         self,
         model: nn.Module,
+        optimizer: torch.optim.Optimizer,
         loader,
         epoch: int,
         sanity_steps: int = 0,
@@ -392,7 +404,8 @@ class Trainer:
 
         if self.accelerator.is_main_process:
             log_dict = {"val_loss": avg_loss, "epoch": epoch}
-            log_dict.update(self._compute_and_reset(self.val_metrics))
+            metric_values = self._compute_and_reset(self.val_metrics)
+            log_dict.update(metric_values)
             if self.val_conf_mat is not None:
                 self.val_conf_mat.log_to_wandb("val", step=epoch)
                 self.val_conf_mat.reset()
@@ -400,6 +413,27 @@ class Trainer:
                 self._log_scatter("Val", self.val_labels, self.val_preds)
                 self.val_preds, self.val_labels = [], []
             wandb.log(log_dict)
+
+            # Save best checkpoint when the selected validation metric improves.
+            if self.cfg.enable_checkpointing and metric_values:
+                metric_key = self._best_metric_key or next(iter(metric_values))
+                if metric_key not in metric_values:
+                    available = ", ".join(metric_values.keys())
+                    raise KeyError(
+                        f"training.best_checkpoint_metric={metric_key!r} was not found in "
+                        f"the logged validation metrics. Available metrics: {available}"
+                    )
+                primary_val = metric_values[metric_key]
+                higher_is_better = metric_key.casefold() not in {"mse", "mae"}
+                if isinstance(primary_val, float):
+                    is_best = (
+                        self._best_val_metric is None
+                        or (higher_is_better and primary_val > self._best_val_metric)
+                        or (not higher_is_better and primary_val < self._best_val_metric)
+                    )
+                    if is_best:
+                        self._best_val_metric = primary_val
+                        self._save_checkpoint(model, optimizer, epoch, is_best=True)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -502,7 +536,13 @@ class Trainer:
         target = targets.float() if self.data.subtask == "multilabel" else targets
         return self.criterion(outputs, target)
 
-    def _save_checkpoint(self, model: nn.Module, optimizer: torch.optim.Optimizer, epoch: int):
+    def _save_checkpoint(
+        self,
+        model: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        epoch: int,
+        is_best: bool = False,
+    ):
         ckpt_dir = self.log_dir / "checkpoints"
         ckpt_dir.mkdir(parents=True, exist_ok=True)
         state = {
@@ -513,6 +553,8 @@ class Trainer:
         torch.save(state, ckpt_dir / f"epoch_{epoch:04d}.pt")
         # Always keep a 'last.pt' pointer
         torch.save(state, ckpt_dir / "last.pt")
+        if is_best:
+            torch.save(state, ckpt_dir / "best.pt")
 
 
 # ---------------------------------------------------------------------------

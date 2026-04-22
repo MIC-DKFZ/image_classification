@@ -15,20 +15,19 @@ _logger = logging.getLogger("train")
 
 
 @dataclass
-class GPSConfig:
-    # NOTE: this is NOT a percent; it's top-k per "row/cell-group" like your original code
+class _GPSRuntime:
+    """Internal runtime configuration for GPS, kept separate from the Pydantic config."""
     topk_per_row: int = 1
-    calib_batches: int = 1  # number of batches to probe gradients on
+    calib_batches: int = 1
     keep_trainable_name_substrings: Tuple[str, ...] = ("head", "classifier", "cls_head")
-    # always freeze these (name contains)
     always_freeze_name_substrings: Tuple[str, ...] = ("norm", "pos_embed", "cls_token")
 
 
 class GPS:
     """Lightweight mixin that stores GPS configuration on a plain ``nn.Module``."""
 
-    def __init__(self, gps_percent: int = 1, gps_calib_batches: int = 1, *args, **kwargs):
-        self.gps_cfg = GPSConfig(topk_per_row=gps_percent, calib_batches=gps_calib_batches)
+    def __init__(self, gps_topk_per_row: int = 1, gps_calib_batches: int = 1, *args, **kwargs):
+        self.gps_cfg = _GPSRuntime(topk_per_row=gps_topk_per_row, calib_batches=gps_calib_batches)
         self._gps_done = False
         self._gps_masks: Dict[str, torch.Tensor] = {}
         self._gps_hook_handles = []

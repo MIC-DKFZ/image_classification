@@ -99,6 +99,11 @@ def _get_layerwise_lr_params(
         )
     n_blocks = len(model.blocks)
 
+    # Key matching is first-match: a parameter name is compared against keys in
+    # insertion order and the first hit wins.  Block keys ("blocks.0.", …) must
+    # therefore come BEFORE the generic "norm" key so that a parameter like
+    # "blocks.5.norm1.weight" is assigned to its block depth (i+2) rather than
+    # the final-norm depth (n_blocks+2).  Do NOT reorder these insertions.
     key2depth: OrderedDict[str, int] = OrderedDict()
     key2depth["patch_embed"] = 1
     for i in range(n_blocks):

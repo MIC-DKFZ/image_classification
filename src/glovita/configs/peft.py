@@ -215,9 +215,13 @@ class FacTConfig(BaseModel):
 
 
 class GPSConfig(BaseModel):
-    """GPS: Gradient-based Parameter Selection."""
+    """GPS: Gradient-based Parameter Selection.
+
+    Selects the top-k elements per row (of each weight matrix) to train based
+    on gradient magnitude computed over a small calibration batch.
+    """
     method: Literal["gps"] = "gps"
-    gps_percent: float = Field(default=1.0, gt=0.0, le=100.0)
+    gps_topk_per_row: int = Field(default=1, ge=1)
 
 
 class VisualPromptTuningConfig(BaseModel):

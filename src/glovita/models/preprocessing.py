@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 import re
+
+_logger = logging.getLogger(__name__)
 
 from glovita.configs.model import (
     Dinov2EncoderConfig,
@@ -23,7 +26,7 @@ class PreprocessingDefaults:
     resize_size: int | None = None
     mean: tuple[float, ...] | None = None
     std: tuple[float, ...] | None = None
-    patch_size: tuple[int, int, int] | None = None
+    patch_size: tuple[int, ...] | None = None
 
     def as_kwargs(self) -> dict:
         return {
@@ -140,7 +143,12 @@ def resolve_encoder_preprocessing_defaults(encoder_config: EncoderConfig) -> Pre
                 std=_safe_tuple(data_cfg.get("std")),
                 patch_size=patch_size,
             )
-        except Exception:
+        except Exception as exc:
+            _logger.warning(
+                "Could not resolve timm preprocessing defaults for %r: %s. "
+                "Augmentation will use no encoder-derived defaults.",
+                encoder_config.type, exc,
+            )
             return PreprocessingDefaults()
 
     if isinstance(encoder_config, TorchvisionEncoderConfig) and encoder_config.pretrained:
@@ -168,7 +176,12 @@ def resolve_encoder_preprocessing_defaults(encoder_config: EncoderConfig) -> Pre
                 std=_safe_tuple(std),
                 patch_size=patch_size,
             )
-        except Exception:
+        except Exception as exc:
+            _logger.warning(
+                "Could not resolve torchvision preprocessing defaults for %r: %s. "
+                "Augmentation will use no encoder-derived defaults.",
+                encoder_config.type, exc,
+            )
             return PreprocessingDefaults()
 
     if isinstance(encoder_config, TorchvisionVideoEncoderConfig) and encoder_config.pretrained:
@@ -189,7 +202,12 @@ def resolve_encoder_preprocessing_defaults(encoder_config: EncoderConfig) -> Pre
                 mean=_safe_tuple(mean),
                 std=_safe_tuple(std),
             )
-        except Exception:
+        except Exception as exc:
+            _logger.warning(
+                "Could not resolve torchvision-video preprocessing defaults for %r: %s. "
+                "Augmentation will use no encoder-derived defaults.",
+                encoder_config.type, exc,
+            )
             return PreprocessingDefaults()
 
     if isinstance(encoder_config, PytorchvideoEncoderConfig):
@@ -197,7 +215,7 @@ def resolve_encoder_preprocessing_defaults(encoder_config: EncoderConfig) -> Pre
 
     if isinstance(encoder_config, TransformerEncoderConfig) and encoder_config.pretrained:
         try:
-            from transformers import AutoImageProcessor
+            from transformers import AutoImageProcessor, AutoModel
 
             processor = AutoImageProcessor.from_pretrained(encoder_config.type)
             size = getattr(processor, "size", None)
@@ -211,8 +229,8 @@ def resolve_encoder_preprocessing_defaults(encoder_config: EncoderConfig) -> Pre
                 resize_size = size
             patch_size = _infer_transformers_patch_size_from_processor(processor)
             if patch_size is None:
-                model = AutoModel.from_pretrained(encoder_config.type) if encoder_config.pretrained else None
-                patch_size = _infer_transformers_patch_size(model) if model is not None else None
+                model = AutoModel.from_pretrained(encoder_config.type)
+                patch_size = _infer_transformers_patch_size(model)
             return PreprocessingDefaults(
                 image_size=int(image_size) if image_size is not None else None,
                 resize_size=int(resize_size) if resize_size is not None else None,
@@ -220,7 +238,12 @@ def resolve_encoder_preprocessing_defaults(encoder_config: EncoderConfig) -> Pre
                 std=_safe_tuple(getattr(processor, "image_std", None)),
                 patch_size=patch_size,
             )
-        except Exception:
+        except Exception as exc:
+            _logger.warning(
+                "Could not resolve transformer preprocessing defaults for %r: %s. "
+                "Augmentation will use no encoder-derived defaults.",
+                encoder_config.type, exc,
+            )
             return PreprocessingDefaults()
 
     if isinstance(encoder_config, Dinov2EncoderConfig):
