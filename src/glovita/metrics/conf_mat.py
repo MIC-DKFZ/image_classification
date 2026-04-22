@@ -3,10 +3,11 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import wandb
 from matplotlib.figure import Figure
 from torchmetrics import Metric
 from torchmetrics.utilities.data import _bincount
+
+from glovita.logging.base import ExperimentLogger
 
 
 class ConfusionMatrix(Metric):
@@ -87,7 +88,7 @@ class ConfusionMatrix(Metric):
         plt.close(figure)
         return figure
 
-    def log_to_wandb(self, split: str, step: int | None = None) -> None:
+    def log_to_logger(self, split: str, logger: ExperimentLogger, step: int | None = None) -> None:
         confmat = self.mat.detach().cpu().numpy()
         figure = self._mat_to_figure(confmat, "Confusion Matrix")
 
@@ -100,10 +101,7 @@ class ConfusionMatrix(Metric):
             norm_colorbar=True,
         )
 
-        wandb.log(
-            {
-                f"{split}_ConfusionMatrix_absolute": wandb.Image(figure),
-                f"{split}_ConfusionMatrix_normalized": wandb.Image(figure_norm),
-            },
-            step=step,
-        )
+        logger.log_figure(f"{split}_ConfusionMatrix_absolute", figure, step=step)
+        logger.log_figure(f"{split}_ConfusionMatrix_normalized", figure_norm, step=step)
+        plt.close(figure)
+        plt.close(figure_norm)

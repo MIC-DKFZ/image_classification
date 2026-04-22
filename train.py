@@ -38,17 +38,17 @@ from pathlib import Path
 from importlib.metadata import PackageNotFoundError, version
 
 import torch
-import wandb
 
 from glovita.configs.cli import parse_root_cli
 from glovita.configs.root import RootConfig
-from glovita.training.trainer import Trainer
-from glovita.training.optimizers import build_optimizer
-from glovita.training.schedulers import build_scheduler
 from glovita.datasets.factory import build_dataloaders, resolve_augmentation_config
+from glovita.logging import build_logger
 from glovita.models.factory import build_model
 from glovita.models.peft.registry import apply_peft
 from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
+from glovita.training.optimizers import build_optimizer
+from glovita.training.schedulers import build_scheduler
+from glovita.training.trainer import Trainer
 
 
 def _build_model(config: RootConfig) -> torch.nn.Module:
@@ -77,7 +77,7 @@ def _collect_runtime_metadata(
     config: RootConfig,
     fold_data,
     encoder_preprocessing: dict,
-    effective_wandb: dict,
+    effective_logger: dict,
 ) -> dict:
     return {
         "argv": sys.argv,
@@ -91,6 +91,7 @@ def _collect_runtime_metadata(
             "transformers": _package_version("transformers"),
             "accelerate": _package_version("accelerate"),
             "wandb": _package_version("wandb"),
+            "mlflow": _package_version("mlflow"),
             "tyro": _package_version("tyro"),
             "pydantic": _package_version("pydantic"),
         },
@@ -109,32 +110,42 @@ def _collect_runtime_metadata(
             "optimizer": _serialize(config.optimizer.model_dump()),
             "training": _serialize(config.training.model_dump()),
             "task": _serialize(config.task.model_dump()),
-            "wandb": _serialize(effective_wandb),
+            "logger": _serialize(effective_logger),
             "add_log": _serialize(config.add_log),
         },
     }
 
 
+def _resolve_effective_logger_config(config: RootConfig, group: str) -> dict:
+    logger_cfg = config.logger.model_dump(exclude_none=True)
+    backend = logger_cfg.get("backend")
+    if backend == "wandb":
+        logger_cfg.setdefault("project", getattr(config.logger, "project", None) or config.default_logger_experiment_name)
+        logger_cfg.setdefault("group", getattr(config.logger, "group", None) or group)
+    elif backend == "mlflow":
+        logger_cfg.setdefault("tracking_uri", getattr(config.logger, "tracking_uri", None) or config.default_mlflow_tracking_uri)
+        logger_cfg.setdefault(
+            "experiment_name",
+            getattr(config.logger, "experiment_name", None) or config.default_logger_experiment_name,
+        )
+        logger_cfg.setdefault("group", getattr(config.logger, "group", None) or group)
+    return logger_cfg
+
+
 def run_fold(config: RootConfig, fold: str, group: str) -> None:
     """Train a single cross-validation fold (or the single no-CV run)."""
-    wandb_kwargs = config.resolve_wandb_kwargs()
-    # Override with the stable group resolved once per experiment so that all
-    # fold runs appear in the same W&B group regardless of when they started.
-    wandb_kwargs["group"] = group
     effective_group = group
     log_dir = config.get_run_log_dir(effective_group) / fold
     log_dir.mkdir(parents=True, exist_ok=True)
-
-    # --- W&B ---
-    offline = wandb_kwargs.pop("offline", False)
-    if offline:
-        wandb_kwargs["mode"] = "offline"
-    wandb_kwargs["dir"] = str(log_dir)
-    if config.training.cv_folds > 1 or config.data.fold is not None:
-        # Tag each fold run distinctly within the same group
-        wandb_kwargs.setdefault("tags", [])
-        wandb_kwargs["tags"] = list(wandb_kwargs["tags"] or []) + [f"fold_{fold}"]
-    wandb.init(**wandb_kwargs)
+    extra_tags = [f"fold_{fold}"] if (config.training.cv_folds > 1 or config.data.fold is not None) else []
+    logger = build_logger(
+        config.logger,
+        log_dir=log_dir,
+        default_experiment_name=config.default_logger_experiment_name,
+        default_tracking_uri=config.default_mlflow_tracking_uri,
+        group=effective_group,
+        extra_tags=extra_tags,
+    )
 
     # --- Data ---
     fold_data = config.data.model_copy(update={"fold": fold})
@@ -143,14 +154,7 @@ def run_fold(config: RootConfig, fold: str, group: str) -> None:
         config,
         fold_data,
         encoder_preprocessing,
-        effective_wandb=wandb_kwargs,
-    )
-
-    # Log full user config plus resolved runtime settings
-    wandb.config.update(runtime_metadata["resolved"])
-    wandb.config.update(
-        {"runtime": _serialize({k: v for k, v in runtime_metadata.items() if k != "resolved"})},
-        allow_val_change=True,
+        effective_logger=_resolve_effective_logger_config(config, effective_group),
     )
 
     train_loader, val_loader, _ = build_dataloaders(
@@ -174,12 +178,15 @@ def run_fold(config: RootConfig, fold: str, group: str) -> None:
     resolved_config_path.write_text(json.dumps(runtime_metadata["resolved"], indent=2))
     runtime_path = log_dir / "runtime_info.json"
     runtime_path.write_text(json.dumps(runtime_metadata, indent=2))
+    logger.log_config(runtime_metadata["resolved"])
+    logger.log_config({"runtime": _serialize({k: v for k, v in runtime_metadata.items() if k != "resolved"})})
 
     # --- Train ---
-    trainer = Trainer(config.training, config.task, config.data, log_dir)
-    trainer.fit(model, optimizer, scheduler, train_loader, val_loader)
-
-    wandb.finish()
+    try:
+        trainer = Trainer(config.training, config.task, fold_data, log_dir, logger)
+        trainer.fit(model, optimizer, scheduler, train_loader, val_loader)
+    finally:
+        logger.finish()
 
 
 def main(config: RootConfig) -> None:
@@ -189,13 +196,13 @@ def main(config: RootConfig) -> None:
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
 
-    # Increase W&B service wait time for slow cluster nodes
-    os.environ.setdefault("WANDB__SERVICE_WAIT", "300")
+    if getattr(config.logger, "backend", None) == "wandb":
+        # Increase W&B service wait time for slow cluster nodes.
+        os.environ.setdefault("WANDB__SERVICE_WAIT", "300")
 
-    # Resolve the W&B group once so all fold runs share the same group.
-    # generate_wandb_group() embeds a UUID — calling it per fold would produce
-    # different groups and scatter fold runs across the W&B dashboard.
-    group = config.wandb.group or config.generate_wandb_group()
+    # Resolve the run group once so all fold runs share the same grouping key.
+    explicit_group = getattr(config.logger, "group", None)
+    group = explicit_group or config.generate_run_group()
 
     if config.data.fold is not None:
         run_fold(config, config.data.fold, group=group)

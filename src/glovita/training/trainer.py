@@ -4,7 +4,7 @@ Design principles:
   - Explicit over magic: every step of the training loop is visible here.
   - All distributed / mixed-precision / gradient-accumulation concerns are
     handled by Accelerate; the rest of the code is plain PyTorch.
-  - W&B is called directly (not through a logger abstraction).
+  - Experiment logging goes through a small backend-neutral abstraction.
   - NaN detection replaces the old NaNLossCallback.
 """
 from __future__ import annotations
@@ -14,9 +14,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-import wandb
 from accelerate import Accelerator
 from tqdm import tqdm
 from torchmetrics import MetricCollection
@@ -40,6 +40,7 @@ from glovita.models.peft.gps import maybe_apply_gps
 from glovita.configs.data import DataConfig
 from glovita.configs.task import TaskConfig
 from glovita.configs.training import TrainingConfig
+from glovita.logging.base import ExperimentLogger
 
 
 # ---------------------------------------------------------------------------
@@ -133,11 +134,13 @@ class Trainer:
         task_config: TaskConfig,
         data_config: DataConfig,
         log_dir: Path,
+        logger: ExperimentLogger,
     ):
         self.cfg = training_config
         self.task = task_config
         self.data = data_config
         self.log_dir = log_dir
+        self.logger = logger
 
         self.accelerator = Accelerator(
             mixed_precision=training_config.precision if training_config.precision != "no" else "no",
@@ -288,7 +291,8 @@ class Trainer:
                         loss = loss + aux_loss
 
                 # NaN / Inf detection (replaces NaNLossCallback)
-                if math.isnan(float(loss)) or math.isinf(float(loss)):
+                loss_scalar = float(loss.detach())
+                if math.isnan(loss_scalar) or math.isinf(loss_scalar):
                     nan_count += 1
                     if nan_count >= self.NAN_PATIENCE:
                         raise RuntimeError(
@@ -331,18 +335,18 @@ class Trainer:
             if mode == "epochwise":
                 log_dict.update(self._compute_and_reset(self.train_metrics))
                 if self.train_conf_mat is not None:
-                    self.train_conf_mat.log_to_wandb("train", step=epoch)
+                    self.train_conf_mat.log_to_logger("train", self.logger, step=epoch)
                     self.train_conf_mat.reset()
                 if self.data.task == "Regression" and self.train_preds:
-                    self._log_scatter("Train", self.train_labels, self.train_preds)
+                    self._log_scatter("Train", self.train_labels, self.train_preds, step=epoch)
                     self.train_preds, self.train_labels = [], []
             else:
                 # stepwise: metrics already computed per-step; log epoch summary
                 log_dict.update(self._compute_and_reset(self.train_metrics))
                 if self.train_conf_mat is not None:
-                    self.train_conf_mat.log_to_wandb("train", step=epoch)
+                    self.train_conf_mat.log_to_logger("train", self.logger, step=epoch)
                     self.train_conf_mat.reset()
-            wandb.log(log_dict)
+            self.logger.log_metrics(log_dict, step=epoch)
 
     def _val_epoch(
         self,
@@ -407,12 +411,12 @@ class Trainer:
             metric_values = self._compute_and_reset(self.val_metrics)
             log_dict.update(metric_values)
             if self.val_conf_mat is not None:
-                self.val_conf_mat.log_to_wandb("val", step=epoch)
+                self.val_conf_mat.log_to_logger("val", self.logger, step=epoch)
                 self.val_conf_mat.reset()
             if self.data.task == "Regression" and self.val_preds:
-                self._log_scatter("Val", self.val_labels, self.val_preds)
+                self._log_scatter("Val", self.val_labels, self.val_preds, step=epoch)
                 self.val_preds, self.val_labels = [], []
-            wandb.log(log_dict)
+            self.logger.log_metrics(log_dict, step=epoch)
 
             # Save best checkpoint when the selected validation metric improves.
             if self.cfg.enable_checkpointing and metric_values:
@@ -523,12 +527,15 @@ class Trainer:
             count += 1
         return postfix
 
-    def _log_scatter(self, split: str, labels: list, preds: list):
-        data = [[x, y] for x, y in zip(labels, preds)]
-        table = wandb.Table(data=data, columns=["Ground Truth", "Prediction"])
-        wandb.log(
-            {f"{split} Scatterplot": wandb.plot.scatter(table, "Ground Truth", "Prediction")}
-        )
+    def _log_scatter(self, split: str, labels: list, preds: list, step: int | None = None):
+        figure = plt.figure(figsize=(6, 6))
+        ax = figure.add_subplot(111)
+        ax.scatter(labels, preds, alpha=0.5, s=12)
+        ax.set_title(f"{split} Scatterplot")
+        ax.set_xlabel("Ground Truth")
+        ax.set_ylabel("Prediction")
+        self.logger.log_figure(f"{split}_Scatterplot", figure, step=step)
+        plt.close(figure)
 
     def _loss_for_calibration(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         if self.data.num_classes == 1:

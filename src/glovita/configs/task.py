@@ -17,7 +17,7 @@ class TaskConfig(BaseModel):
     metrics: List[str] = ["acc", "f1"]
     # "stepwise": compute per batch, aggregate; "epochwise": accumulate then compute once
     metric_computation_mode: Literal["stepwise", "epochwise"] = "epochwise"
-    # Whether to log confusion matrices / scatter plots to W&B
+    # Whether to log confusion matrices / scatter plots to the active experiment logger
     result_plot: Optional[Literal["val", "all"]] = None
     # Label smoothing for cross-entropy (0 = disabled)
     label_smoothing: float = Field(default=0.0, ge=0.0, lt=1.0)

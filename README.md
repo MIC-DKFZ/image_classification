@@ -5,7 +5,7 @@ This repository contains a classification/regression training stack built on:
 - PyTorch
 - TorchMetrics
 - Accelerate
-- Weights & Biases
+- Weights & Biases or MLflow
 - Pydantic
 - Tyro
 
@@ -30,10 +30,23 @@ Important runtime conventions:
 
 ## Installation
 
-Install the project requirements in an environment that already has a compatible PyTorch build for your machine:
+Install the project in an environment that already has a compatible PyTorch build
+for your machine, then add the logger backend you want:
 
 ```bash
 pip install -e .
+```
+
+For Weights & Biases:
+
+```bash
+pip install -e .[wandb]
+```
+
+For MLflow:
+
+```bash
+pip install -e .[mlflow]
 ```
 
 
@@ -66,6 +79,23 @@ python train.py \
   --dataloading.batch_size 128
 ```
 
+The default logger backend is `wandb`. To use MLflow instead:
+
+```bash
+python train.py \
+  --data.dataset cifar10 \
+  --data.data_root_dir ./data \
+  --model.encoder.encoder_type timm \
+  --model.encoder.type resnet50.a1_in1k \
+  --model.head.head_type classification \
+  --peft.method full_finetuning \
+  logger:mlflow-logger-config
+```
+
+If `--logger.tracking_uri` is unset, MLflow defaults to a local file-backed
+store under `./experiments/mlflow`. Set `--logger.tracking_uri` only when you
+want a specific local path or a remote MLflow server.
+
 For help:
 
 ```bash
@@ -87,7 +117,7 @@ python train.py \
   --add_log.notes.run_group ablation_a
 ```
 
-These values are saved in the run config and logged to W&B, but they do not affect runtime behavior.
+These values are saved in the run config and logged to the active logger backend, but they do not affect runtime behavior.
 
 ## Config Layout
 
@@ -102,7 +132,7 @@ The user-facing config surface is in [src/glovita/configs](src/glovita/configs):
 - [optimizer.py](src/glovita/configs/optimizer.py): optimizer and scheduler settings
 - [training.py](src/glovita/configs/training.py): trainer loop settings
 - [task.py](src/glovita/configs/task.py): metrics and task behavior
-- [wandb_cfg.py](src/glovita/configs/wandb_cfg.py): W&B settings
+- [logging.py](src/glovita/configs/logging.py): logger backend settings
 
 ## Models
 
@@ -190,13 +220,13 @@ Several values are intentionally derived at runtime instead of being duplicated 
 - encoder preprocessing defaults (`image_size`, `resize_size`, `mean`, `std`, `patch_size`)
 - effective augmentation configuration after encoder-default + user-override merging
 - effective eval batch size and worker settings in dataloading
-- default W&B project/group names when the user does not set them
+- default logger experiment/group names when the user does not set them
 - cross-validation behavior:
   - `training.cv_folds > 1` runs folds sequentially as `0..N-1`
   - `data.fold` forces a single fold run
   - dataset-specific fold-key interpretation is handled by the dataset implementation
 
-Resolved runtime state is logged to each run directory and to W&B config for reproducibility.
+Resolved runtime state is logged to each run directory and to the selected logger backend for reproducibility.
 
 ## Documentation
 
