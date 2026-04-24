@@ -1,22 +1,42 @@
-# Documentation
+# Documentation Index
 
-This directory contains supplemental documentation for the current tyro +
-pydantic + accelerate runtime.
+This directory contains the more detailed documentation that sits underneath the
+top-level [README.md](../README.md).
 
-Primary entrypoints:
+Start with the top-level README if you are new to the project. It explains:
 
-- [README.md](../README.md): current top-level usage and architecture
-- [src/glovita/configs](../src/glovita/configs): user-facing config schema
-- [src/glovita/datasets/factory.py](../src/glovita/datasets/factory.py): dataset and dataloader assembly
-- [src/glovita/augmentation/policies/registry.py](../src/glovita/augmentation/policies/registry.py): augmentation resolution
+- the config tree
+- the CLI style
+- run directory layout
+- logger selection
+- the extension path for datasets and models
 
-Useful docs in this folder:
+Then use the topic-specific docs below.
 
-- [augmentation/policies.md](augmentation/policies.md): augmentation layout and policy selection
-- [datasets/DATASET_STRUCTURE.md](datasets/DATASET_STRUCTURE.md): dataset file layout expectations
-- [mil.md](mil.md): MIL / CLAM / bag-of-features path
-- [video.md](video.md): video encoder + framewise decoder structure
-- [precomputed_features.md](precomputed_features.md): precomputed-feature loading and extraction
-- [testing/TESTING.md](testing/TESTING.md): testing guide
+## Core Docs
 
-Docs that still mention the old Hydra/Lightning stack should be treated as historical unless they explicitly describe the current `train.py` / `infer.py` runtime.
+- [../README.md](../README.md): main project overview, CLI, config model, extension points
+- [datasets/DATASET_STRUCTURE.md](datasets/DATASET_STRUCTURE.md): current split-file expectations and dataset layout rules
+- [augmentation/policies.md](augmentation/policies.md): augmentation policy structure, available shared policies, and extension path
+- [precomputed_features.md](precomputed_features.md): HDF5 feature training and extraction
+- [mil.md](mil.md): MIL and CLAM over precomputed bags
+- [video.md](video.md): video encoders, intermediates, and framewise heads
+- [testing/TEST_RUN_README.md](testing/TEST_RUN_README.md): simple smoke-test examples
+- [../tests/README.md](../tests/README.md): test suite structure and how to run it
+
+## How To Use This Documentation
+
+If you want to:
+
+- run a normal experiment:
+  - start with [../README.md](../README.md)
+- understand dataset structure or add a dataset:
+  - read [datasets/DATASET_STRUCTURE.md](datasets/DATASET_STRUCTURE.md)
+- change augmentation defaults or add new policies:
+  - read [augmentation/policies.md](augmentation/policies.md)
+- train from extracted features:
+  - read [precomputed_features.md](precomputed_features.md)
+- use CLAM / bag-of-features MIL:
+  - read [mil.md](mil.md)
+- use video encoders or framewise heads:
+  - read [video.md](video.md)

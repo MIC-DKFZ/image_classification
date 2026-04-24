@@ -1,47 +1,95 @@
 # Multiple Instance Learning
 
-This document describes the current MIL path in GloViTa.
+This document explains the current MIL path in GloViTa.
 
 ## Current Scope
 
-MIL is currently supported through:
+MIL is currently supported for:
 
-- dataset config: `precomputed_features`
-- encoder config: `precomputed`
-- head config: `clam`
+- bags of precomputed features
+- the `precomputed_features` dataset config
+- the `precomputed` encoder
+- the `clam` head
 
-This means the active MIL path expects bags of precomputed features rather than
-raw images or raw videos.
+That means the active MIL workflow is feature-based, not raw-image-bag or
+raw-video-bag MIL.
 
-## Supported Bag Formats
+## Runtime Path
 
-The HDF5 loader in [precomputed_features.py](../src/glovita/datasets/precomputed_features.py)
-supports:
+The MIL path is built from:
 
-- fixed-size bags:
-  - `features`: shape `(B, N, D)`
-  - `labels`: shape `(B,)`
-- variable-size bags:
-  - `features`: shape `(M, D)`
-  - `labels`: shape `(B,)`
-  - plus either `bag_ptr` or `bag_lengths`
+- [precomputed_features.py](../src/glovita/datasets/precomputed_features.py)
+- [precomputed.py](../src/glovita/models/img_encoder/precomputed.py)
+- [clam.py](../src/glovita/models/heads/mil/clam.py)
+- [factory.py](../src/glovita/models/factory.py)
+- [factory.py](../src/glovita/datasets/factory.py)
 
-At dataloader time, bags are collated into:
+Important design point:
+
+- CLAM consumes raw bag features directly
+- it does not use the standard pooled-token feature aggregation path
+
+This is why the model factory distinguishes between:
+
+- normal pooled heads
+- raw-feature-consuming heads
+
+## Supported HDF5 Bag Formats
+
+The HDF5 loader supports three layouts.
+
+### Instance Features
+
+```text
+features: (N, D)
+labels:   (N,)
+```
+
+This is not bag MIL. It is just standard feature-based classification or regression.
+
+### Fixed-Size Bags
+
+```text
+features: (B, N, D)
+labels:   (B,)
+```
+
+### Variable-Size Bags
+
+```text
+features:    (M, D)
+labels:      (B,)
+bag_ptr:     (B + 1,)
+```
+
+or
+
+```text
+features:    (M, D)
+labels:      (B,)
+bag_lengths: (B,)
+```
+
+## Collation Behavior
+
+At dataloader time, MIL bags are collated into:
 
 - `features`: padded tensor `(B, N_max, D)`
 - `mask`: boolean tensor `(B, N_max)`
 
-## CLAM Head
+This padded structure is what the CLAM head receives.
 
-The active CLAM implementation lives in [clam.py](../src/glovita/models/heads/mil/clam.py).
+## CLAM Head Configuration
 
-Supported variants:
+The user-facing config class is:
 
-- `variant=sb`
-- `variant=mb`
+- [ClamHeadConfig](../src/glovita/configs/model.py)
 
-Important config knobs:
+Important options:
 
+- `variant`
+  - `sb`
+  - `mb`
 - `gate`
 - `size_arg`
 - `dropout`
@@ -50,6 +98,7 @@ Important config knobs:
 - `feature_prep`
 - `l2_normalize_features`
 - `cosine_head`
+- `cosine_scale`
 - `instance_eval`
 - `instance_loss_weight`
 - `attn_drop`
@@ -59,22 +108,23 @@ Important config knobs:
 - `topk_noise_std`
 - `topk_consistency_weight`
 
-## Current Training Semantics
+## Current CLAM Semantics
 
-The normal CLAM bag prediction is computed from dense attention over all
-instances.
+The main bag prediction is computed from dense attention over the whole bag.
 
-Optional auxiliary losses:
+Optional auxiliary behavior:
 
-- instance-level CLAM loss:
+- instance-level CLAM auxiliary loss:
   - enabled by `instance_eval=True`
-- top-k perturbation consistency loss:
+- top-k perturbation consistency penalty:
   - enabled by `stochastic_topk=True`
 
-The top-k branch does not replace the main prediction. It adds an auxiliary
-penalty on top of the normal bag-level loss.
+Important detail:
 
-## Example
+- the top-k branch is auxiliary
+- it does not replace the main bag prediction
+
+## Example Training Command
 
 ```bash
 python train.py \
@@ -89,12 +139,27 @@ python train.py \
   --model.head.variant mb \
   --model.head.instance_eval \
   --model.head.stochastic_topk \
-  --peft.method full_finetuning
+  --peft.method full_finetuning \
+  --dataloading.batch_size 8
 ```
 
-## Limitations
+## Practical Notes
 
-- the active MIL path is based on precomputed features, not raw image/video bags
-- there is no separate MIL-specific dataset abstraction yet
-- inference / evaluation tooling is still mostly written with standard
-  classification in mind
+- `data.num_classes` must be set explicitly
+- `model.encoder.feature_dim` must match the feature tensor dimension
+- augmentations are not used for `precomputed_features`
+- `model.feature_aggregation_method` is ignored by `clam`
+- `full_finetuning` is the right PEFT config for this path unless you are
+  reconstructing a checkpoint with a different PEFT method
+
+## Current Limitations
+
+- active MIL support is feature-based, not raw-bag image/video MIL
+- inference and evaluation tooling is primarily oriented around standard
+  classification use cases
+- there is no separate generic MIL dataset abstraction yet
+
+## Related Docs
+
+- [precomputed_features.md](precomputed_features.md): HDF5 file formats and feature extraction
+- [../README.md](../README.md): overall config and CLI model

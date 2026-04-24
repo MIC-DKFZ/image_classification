@@ -1,53 +1,85 @@
 # Precomputed Features
 
-The current runtime supports training from precomputed HDF5 feature files using:
+This document explains how GloViTa handles training from precomputed HDF5
+feature files and how [extract_features.py](../extract_features.py) produces
+those files.
+
+## Supported Runtime Path
+
+Training from precomputed features uses:
 
 - dataset config: `precomputed_features`
 - encoder config: `precomputed`
-- either the standard classification head in [classification.py](../src/glovita/models/heads/classification.py)
-- or the MIL `clam` head in [clam.py](../src/glovita/models/heads/mil/clam.py)
+- a standard head such as `classification`
+- or the MIL `clam` head for bag data
 
-This replaces the old dedicated linear-model path. The `precomputed` encoder is
-an identity backbone, so the rest of the model stack still works normally.
+The `precomputed` encoder is effectively an identity backbone. This lets the
+rest of the normal model stack keep working:
 
-## Supported File Formats
+- model config
+- head selection
+- PEFT reconstruction
+- trainer logic
 
-Each HDF5 file must contain `features` and `labels`. The loader supports three
-layouts:
+## Supported HDF5 Layouts
 
-- instance features:
-  - `features`: shape `(N, D)`
-  - `labels`: shape `(N,)`
-- fixed-size bags:
-  - `features`: shape `(B, N, D)`
-  - `labels`: shape `(B,)`
-- variable-size bags:
-  - `features`: shape `(M, D)`
-  - `labels`: shape `(B,)`
-  - plus either:
-    - `bag_ptr`: shape `(B + 1,)`
-    - or `bag_lengths`: shape `(B,)`
+Each HDF5 file must contain:
 
-The default dataset keys can be overridden via `--data.dataset_kwargs.*` if your
-file uses different names.
+- `features`
+- `labels`
 
-## Current Loading Path
+The current loader supports three shapes.
 
-The active runtime path is implemented in:
+### 1. Instance Features
 
-- [precomputed_features.py](../src/glovita/datasets/precomputed_features.py)
-- [precomputed.py](../src/glovita/models/img_encoder/precomputed.py)
-- [factory.py](../src/glovita/datasets/factory.py)
+```text
+features: (N, D)
+labels:   (N,)
+```
 
-For bag files, the dataloader pads bags within a batch and passes CLAM a
-dictionary with:
+### 2. Fixed-Size Bags
 
-- `features`: padded tensor of shape `(B, N_max, D)`
-- `mask`: boolean tensor of shape `(B, N_max)`
+```text
+features: (B, N, D)
+labels:   (B,)
+```
+
+### 3. Variable-Size Bags
+
+```text
+features:    (M, D)
+labels:      (B,)
+bag_ptr:     (B + 1,)
+```
+
+or
+
+```text
+features:    (M, D)
+labels:      (B,)
+bag_lengths: (B,)
+```
+
+## Loader Behavior
+
+The active loader lives in:
+
+- [../src/glovita/datasets/precomputed_features.py](../src/glovita/datasets/precomputed_features.py)
+
+The dataset factory integrates it through:
+
+- [../src/glovita/datasets/factory.py](../src/glovita/datasets/factory.py)
+
+For bag-style data, the dataloader pads bags within a batch and returns:
+
+- `features`: padded tensor `(B, N_max, D)`
+- `mask`: boolean tensor `(B, N_max)`
+
+This is intended for bag-aware heads such as `clam`.
 
 ## Training Examples
 
-Standard classification on precomputed instance features:
+### Standard Classification On Feature Files
 
 ```bash
 python train.py \
@@ -63,7 +95,7 @@ python train.py \
   --dataloading.batch_size 512
 ```
 
-MIL with bag features and CLAM:
+### MIL With CLAM On Bag Files
 
 ```bash
 python train.py \
@@ -81,35 +113,32 @@ python train.py \
   --dataloading.batch_size 8
 ```
 
-If you have a separate test file:
+If a separate test file exists:
 
 ```bash
 --data.test_features_file /path/to/test_features.h5
 ```
 
-## Notes
+## Important Notes
 
-- `data.data_root_dir` is still required by the shared data schema, but it is
-  not used for feature loading beyond normal config consistency.
-- `data.num_classes` must be set explicitly.
-- `model.encoder.feature_dim` must be set explicitly and must match the last
-  dimension of the stored feature tensor.
-- Augmentations are not used for `precomputed_features`.
-- `clam` consumes raw bag features directly, so
-  `model.feature_aggregation_method` is ignored for that head.
-- Bag-style precomputed inputs are intended for MIL heads. Standard pooled heads
-  will raise if they receive padded bag batches.
+- `data.data_root_dir` is part of the shared data schema but is not used
+  for feature loading in the same way as image datasets
+- `data.num_classes` must be set explicitly
+- `model.encoder.feature_dim` must match the stored feature dimension
+- augmentations are not used for `precomputed_features`
+- `clam` consumes raw bag features directly, so `model.feature_aggregation_method`
+  is ignored for that head
 
 ## Feature Extraction
 
-[extract_features.py](../extract_features.py) writes the same `features` /
-`labels` HDF5 format and supports two modes:
+[extract_features.py](../extract_features.py) writes the same HDF5 format.
 
-- explicit config mode: provide `data` + `model` and optionally `peft`
-- checkpoint mode: provide `--checkpoint_path` and the script reconstructs the
-  saved run automatically
+It supports:
 
-Example extraction command:
+- explicit config mode
+- checkpoint reconstruction mode
+
+### Explicit Config Mode
 
 ```bash
 python extract_features.py \
@@ -124,7 +153,7 @@ python extract_features.py \
   --dataloading.batch_size 128
 ```
 
-Extraction from a checkpoint saved by this repo:
+### Checkpoint Reconstruction Mode
 
 ```bash
 python extract_features.py \
@@ -133,17 +162,60 @@ python extract_features.py \
   --output_filename "{checkpoint}_{dataset}_{split}_{method}.h5"
 ```
 
+In checkpoint mode, the script:
+
+1. finds `config.json` next to the checkpoint run directory
+2. reconstructs the saved model and PEFT configuration
+3. loads checkpoint weights
+4. extracts features from the selected split(s)
+
+## Extraction Options
+
+Important extraction fields:
+
+- `method`
+  - `cls_token`
+  - `avg`
+  - `sum`
+  - `mean_all`
+  - `joint`
+- `split`
+  - `train`
+  - `val`
+  - `test`
+  - or all when unset
+- `precision`
+- `compression`
+- `output_dir`
+- `output_filename`
+- `use_eval_transform_for_train`
+
 Notes:
 
-- `--method joint` reproduces the concatenated CLS-token + average patch-token representation.
-- `peft` defaults to `full_finetuning`, so plain backbone extraction does not
-  require an explicit PEFT flag.
-- if `--checkpoint_path` is provided, the script loads `config.json` from the
-  checkpoint run directory and reconstructs the saved model/PEFT setup before
-  loading the checkpoint weights.
-- by default the extraction script applies the test/eval transform to the train
-  split as well, so extracted train features are deterministic.
-- if `--output_filename` is unset, the script uses the default template:
-  `agg_{method}_{model}_{dataset}_{split}_size{imgsize}_float{precision}.h5`
-- `--output_filename` accepts a Python format string with placeholders:
-  `method`, `model`, `dataset`, `split`, `imgsize`, `precision`, `checkpoint`.
+- `joint` corresponds to concatenated CLS-token + average patch-token features
+- `peft` defaults to `full_finetuning`
+- by default, extraction uses evaluation transforms for the train split as well,
+  so train feature extraction is deterministic
+
+## Output Filename Template
+
+If `--output_filename` is unset, the script uses:
+
+```text
+agg_{method}_{model}_{dataset}_{split}_size{imgsize}_float{precision}.h5
+```
+
+Supported placeholders:
+
+- `method`
+- `model`
+- `dataset`
+- `split`
+- `imgsize`
+- `precision`
+- `checkpoint`
+
+## Related Docs
+
+- [mil.md](mil.md): MIL/CLAM path for bag features
+- [../README.md](../README.md): main config and CLI model

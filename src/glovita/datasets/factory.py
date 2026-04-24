@@ -28,6 +28,7 @@ from torchvision.datasets import CIFAR10, CIFAR100, ImageNet
 
 from glovita.augmentation.policies.registry import build_transforms, resolve_policy_names
 from glovita.datasets.cifar import Cifar10Albumentation, Cifar100Albumentation
+from glovita.datasets.generic_image_dataset import GenericImageDataset
 from glovita.datasets.precomputed_features import PrecomputedFeaturesDataset
 from glovita.datasets.utils import seed_worker
 from glovita.configs.data import DataConfig
@@ -341,10 +342,82 @@ def _build_precomputed_feature_datasets(
     return train_dataset, val_dataset, test_dataset
 
 
+def _build_generic_image_datasets(
+    config: DataConfig, encoder_preprocessing: dict | None = None
+) -> tuple[Dataset, Dataset, Dataset]:
+    train_transform, test_transform = build_transforms(
+        config.dataset,
+        train_policy=config.augmentation.train_policy,
+        test_policy=config.augmentation.test_policy,
+        train_overrides=_resolve_train_augmentation_kwargs(config),
+        test_overrides=_resolve_test_augmentation_kwargs(config),
+        **_resolve_augmentation_kwargs(config, encoder_preprocessing),
+    )
+
+    common_kwargs = dict(config.dataset_kwargs)
+    common_kwargs.update(
+        {
+            "images_dir": config.images_dir,
+            "split_source": config.split_source,
+            "label_source": config.label_source,
+            "split_file": config.split_file,
+            "labels_file": config.labels_file,
+            "path_column": config.path_column,
+            "label_column": config.label_column,
+            "train_split_name": config.train_split_name,
+            "val_split_name": config.val_split_name,
+            "test_split_name": config.test_split_name,
+            "allowed_exts": config.allowed_exts,
+            "class_names": config.class_names,
+            "task": config.task,
+            "strict": config.strict,
+        }
+    )
+
+    train_dataset = GenericImageDataset(
+        config.data_root_dir,
+        split="train",
+        transform=train_transform,
+        **common_kwargs,
+    )
+    val_dataset = GenericImageDataset(
+        config.data_root_dir,
+        split="val",
+        transform=test_transform,
+        **common_kwargs,
+    )
+
+    if config.split_source == "subdirs":
+        test_dir = Path(config.data_root_dir) / config.images_dir / config.test_split_name
+        if test_dir.exists():
+            test_dataset = GenericImageDataset(
+                config.data_root_dir,
+                split="test",
+                transform=test_transform,
+                **common_kwargs,
+            )
+        else:
+            test_dataset = val_dataset
+    else:
+        split_names = _load_split_names(Path(config.data_root_dir), split_file=config.split_file)
+        if config.test_split_name in split_names:
+            test_dataset = GenericImageDataset(
+                config.data_root_dir,
+                split="test",
+                transform=test_transform,
+                **common_kwargs,
+            )
+        else:
+            test_dataset = val_dataset
+
+    return train_dataset, val_dataset, test_dataset
+
+
 _DATASET_REGISTRY: dict[str, DatasetSpec] = {
     "cifar10": DatasetSpec(build_datasets=_build_cifar10_datasets),
     "cifar100": DatasetSpec(build_datasets=_build_cifar100_datasets),
     "imagenet": DatasetSpec(build_datasets=_build_imagenet_datasets),
+    "generic_image_dataset": DatasetSpec(build_datasets=_build_generic_image_datasets),
     "precomputed_features": DatasetSpec(build_datasets=_build_precomputed_feature_datasets),
     "pcam": DatasetSpec(
         build_datasets=lambda cfg, enc=None: _build_generic_split_datasets(

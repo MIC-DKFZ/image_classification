@@ -1,294 +1,299 @@
-# Dataset Structure Documentation
+# Dataset Structure And Split Conventions
 
-## Overview
+This document describes the dataset structure expected by the current GloViTa
+runtime.
 
-All 10 datasets have been reorganized with clean folder names and consistent structure. All datasets are located in: `$DATA_ROOT/SynergyUnitDatasets/`
+## Design Principle
 
-## Dataset Reorganization Summary
+Datasets in the active runtime are plain PyTorch `Dataset` classes.
 
-| Original Path | New Path | Changes Made |
-|--------------|----------|--------------|
-| `AID` | `AID` | ✓ No changes (already clean) |
-| `ZooScanNet/ZooScanNet` | `ZooScanNet` | ✓ Flattened nested structure<br>✓ Renamed `imgs/` → `images/` |
-| `2025_ChestXray14` | `ChestXray14` | ✓ Removed year prefix |
-| `neu-surface-defect-database/NEU-DET` | `NEUDET` | ✓ Flattened nested structure |
-| `rxrx1_v1.0` | `RxRx1` | ✓ Removed version suffix |
-| `pytorch-challange-flower-dataset` | `Flowers102` | ✓ Clean name<br>✓ Renamed `dataset/` → `images/` |
-| `resisc45_images` | `RESISC45` | ✓ Removed suffix |
-| `pcamv1-20260120T124959Z-3-001` | `PCam` | ✓ Clean name |
-| `diabetic-retinopathy-detection` | `DiabeticRetinopathy` | ✓ Clean name |
-| `fgvc-aircraft/.../data` | `FGVCAircraft` | ✓ Flattened deeply nested structure |
+They are assembled centrally in:
 
-## Dataset Split Statistics
+- [../../src/glovita/datasets/factory.py](../../src/glovita/datasets/factory.py)
 
-Quick reference table for all dataset splits:
+The goal is:
 
-| # | Dataset | Classes | Total Images | Train | Val | Test | Split Type |
-|---|---------|---------|--------------|-------|-----|------|------------|
-| 1 | AID | 30 | 10,000 | 6,000 | 2,000 | 2,000 | Random 60/20/20 |
-| 2 | ZooScanNet | 116 | 797,061 | 478,236 | 159,412 | 159,413 | Random 60/20/20 (filtered) |
-| 3 | ChestXray14 | 15 | 112,120 | 68,749 | 22,125 | 21,246 | Patient-level 60/20/20 |
-| 4 | NEUDET | 6 | 1,800 | 1,440 | 180 | 180 | Official train + split valid |
-| 5 | RxRx1 | 1,139 | 115,656 | 60,918 | 20,306 | 34,432 | Official train/test + split |
-| 6 | Flowers102 | 102 | 7,370 | 6,552 | 490 | 328 | Official train + split valid |
-| 7 | RESISC45 | 45 | 31,500 | 18,900 | 6,300 | 6,300 | Official train/val/test |
-| 8 | PCam | 2 | 262,144 | 157,286 | 52,429 | 52,429 | Random 60/20/20 |
-| 9 | DiabeticRetinopathy | 5 | 35,126 | 21,074 | 7,026 | 7,026 | Random 60/20/20 |
-| 10 | FGVCAircraft | 100 | 10,000 | 6,000 | 2,000 | 2,000 | Random 60/20/20 |
+- no duplicated train/val/test orchestration per dataset
+- a small number of dataset construction patterns that the factory can reuse
 
-**Notes:**
-- **RESISC45**: Official splits MUST be preserved for benchmark comparability
-- **Flowers102**: Non-stratified split (classes have 1-2 samples in valid set)
-- **NEUDET**: Respects official train/validation boundary
-- **ChestXray14**: Patient-level splitting prevents data leakage
-- **ZooScanNet**: Adaptive size filtering applied (24px-64px based on class size)
+## The Three Main Dataset Styles
 
-## Final Dataset Structures
+### 1. Built-In Torchvision Datasets
 
-### 1. AID (Aerial Image Dataset)
-```
-AID/
+These do not rely on `splits.json`:
+
+- CIFAR-10
+- CIFAR-100
+- ImageNet
+
+They are built through dedicated branches in the dataset factory.
+
+### 2. Generic Image Dataset
+
+The runtime now also provides a reusable generic image dataset:
+
+- `dataset="generic_image_dataset"`
+
+This is intended for common image-dataset layouts where users should not need to
+write a custom dataset class.
+
+Supported split sources:
+
+- `splits_json`
+- `subdirs`
+
+Supported label sources:
+
+- `folder`
+- `json`
+- `csv`
+
+Supported target types:
+
+- scalar multiclass classification
+- scalar regression
+
+It does not currently implement generic multilabel parsing.
+
+This path is implemented in:
+
+- [../../src/glovita/datasets/generic_image_dataset.py](../../src/glovita/datasets/generic_image_dataset.py)
+
+### 3. Split-Aware Repo Datasets
+
+Most repo datasets follow a split-aware pattern:
+
+- a plain `Dataset` class in `src/glovita/datasets/<name>.py`
+- a `splits.json`
+- usually a `labels.json`
+
+These are built via `_build_generic_split_datasets(...)` in the dataset factory.
+
+## Generic Image Dataset Layouts
+
+### A. split file + external labels
+
+Example:
+
+```text
+dataset_root/
 ├── images/
-│   ├── Airport/
-│   ├── Beach/
-│   └── ... (30 classes)
+│   ├── cat/
+│   │   └── cat_001.jpg
+│   └── dog/
+│       └── dog_001.jpg
 ├── splits.json
-├── labels.json
-└── class_map.json
+└── labels.json
 ```
-- **Classes**: 30
-- **Total images**: 10,000
-- **Split**: 6,000 train / 2,000 val / 2,000 test
 
-### 2. ZooScanNet
-```
-ZooScanNet/
-├── images/              [RENAMED from imgs/]
-│   ├── Copepoda/
-│   ├── Medusae/
-│   └── ... (116 classes after filtering)
-├── splits.json
-├── labels.json
-├── class_map.json
-└── filtering_stats.json
-```
-- **Classes**: 116 (filtered from 120, adaptive size filtering applied)
-- **Total images**: 797,061
-- **Split**: 478,236 train / 159,412 val / 159,413 test
-- **Special**: Adaptive minimum image size filtering (24px-64px based on class population)
+Example `splits.json`:
 
-### 3. ChestXray14
-```
-ChestXray14/
-├── images/
-├── splits.json
-├── labels.json
-└── class_map.json
-```
-- **Classes**: 15 (disease labels)
-- **Total images**: 112,120
-- **Split**: 68,749 train / 22,125 val / 21,246 test
-- **Special**: Patient-level stratified splitting (no patient overlap between splits)
-
-### 4. NEUDET (Steel Defect Detection)
-```
-NEUDET/
-├── train/
-│   └── images/
-│       ├── crazing/
-│       ├── inclusion/
-│       └── ... (6 classes)
-├── validation/
-│   └── images/
-├── splits.json
-├── labels.json
-└── class_map.json
-```
-- **Classes**: 6 (defect types)
-- **Total images**: 1,800
-- **Split**: 1,440 train / 180 val / 180 test
-- **Note**: Uses official train folder, splits official validation into val+test (50/50)
-
-### 5. RxRx1 (Cell Microscopy)
-```
-RxRx1/
-├── images/
-│   ├── HEPG2-01/
-│   ├── HEPG2-02/
-│   └── ... (51 cell plates)
-├── splits.json
-├── labels.json
-└── class_map.json
-```
-- **Classes**: 1,139 (siRNA treatments)
-- **Total images**: 115,656
-- **Split**: 60,918 train / 20,306 val / 34,432 test
-
-### 6. Flowers102
-```
-Flowers102/
-├── images/              [RENAMED from dataset/]
-│   ├── train/
-│   ├── valid/
-│   └── test/           (unlabeled - not used)
-├── splits.json
-├── labels.json
-└── class_map.json
-```
-- **Classes**: 102 (flower species)
-- **Total images**: 7,370 (6,552 train + 818 valid, 819 test unlabeled)
-- **Split**: 6,552 train / 490 val / 328 test
-- **Note**: Uses official train folder, splits official valid into val (60%) + test (40%) with non-stratified split
-
-### 7. RESISC45 (Remote Sensing)
-```
-RESISC45/
-├── train/
-├── validation/
-├── test/
-├── splits.json
-├── labels.json
-└── class_map.json
-```
-- **Classes**: 45 (scene categories)
-- **Total images**: 31,500
-- **Split**: 18,900 train / 6,300 val / 6,300 test
-- **Note**: Maintains original train/validation/test folder structure
-
-### 8. PCam (Histopathology)
-```
-PCam/
-├── images/
-│   ├── train/
-│   ├── val/
-│   └── test/
-├── splits.json
-├── labels.json
-└── class_map.json
-```
-- **Classes**: 2 (tumor present/absent)
-- **Total images**: 262,144 (96×96 patches)
-- **Split**: 157,286 train / 52,429 val / 52,429 test
-- **Note**: Extracted from H5 files to PNG images
-
-### 9. DiabeticRetinopathy
-```
-DiabeticRetinopathy/
-├── train/
-│   ├── 10_left.jpeg
-│   ├── 10_right.jpeg
-│   └── ...
-├── splits.json
-├── labels.json
-├── class_map.json
-└── trainLabels.csv
-```
-- **Classes**: 5 (severity levels 0-4)
-- **Total images**: 35,126
-- **Split**: 21,074 train / 7,026 val / 7,026 test
-
-### 10. FGVCAircraft
-```
-FGVCAircraft/
-├── images/
-│   ├── 0034309.jpg
-│   ├── 0034958.jpg
-│   └── ... (10,000 images)
-├── splits.json
-├── labels.json
-└── class_map.json
-```
-- **Classes**: 100 (aircraft variants)
-- **Total images**: 10,000
-- **Split**: 6,000 train / 2,000 val / 2,000 test
-
-## File Format Standards
-
-### splits.json
-Current standard format across the existing datasets:
 ```json
 {
-  "train": ["image_id1", "image_id2", ...],
-  "val": ["image_id3", "image_id4", ...],
-  "test": ["image_id5", "image_id6", ...]
+  "train": ["cat/cat_001.jpg"],
+  "val": ["dog/dog_001.jpg"]
 }
 ```
 
-Future fold-aware datasets may instead use numeric string keys such as:
-```json
-{
-  "0": ["image_id1", "image_id2", ...],
-  "1": ["image_id3", "image_id4", ...]
-}
-```
-The exact meaning of the keys is defined by the dataset class that consumes the file.
+Example `labels.json`:
 
-### labels.json
-Standard format across all datasets:
 ```json
 {
-  "image_path1": 0,
-  "image_path2": 1,
-  ...
-}
-```
-- Keys: String image paths or sample IDs, depending on the dataset class
-- Values: Integer class labels (0-indexed)
-
-### class_map.json
-Standard format (where applicable):
-```json
-{
-  "class_name1": 0,
-  "class_name2": 1,
-  ...
+  "cat/cat_001.jpg": 0,
+  "dog/dog_001.jpg": 1
 }
 ```
 
-## Dataset .py File Updates
+### B. split subdirectories + folder labels
 
-All dataset classes have been updated to use the new clean folder names:
+```text
+dataset_root/
+└── images/
+    ├── train/
+    │   ├── cat/
+    │   └── dog/
+    ├── val/
+    │   ├── cat/
+    │   └── dog/
+    └── test/
+        ├── cat/
+        └── dog/
+```
 
-| Dataset File | Updated Path | Additional Changes |
-|-------------|--------------|-------------------|
-| `aid.py` | `$DATA_ROOT/AID` | None |
-| `zooscannet.py` | `$DATA_ROOT/ZooScanNet` | `images_dir="imgs"` → `images_dir="images"` |
-| `chestxray14.py` | `$DATA_ROOT/ChestXray14` | None |
-| `neudet.py` | `$DATA_ROOT/NEUDET` | None |
-| `rxrx1.py` | `$DATA_ROOT/RxRx1` | None |
-| `flowers102.py` | `$DATA_ROOT/Flowers102` | Removed `dataset_dir` parameter, uses `root/img_id` directly |
-| `resisc45.py` | `$DATA_ROOT/RESISC45` | None |
-| `pcam.py` | `$DATA_ROOT/PCam` | None |
-| `diabetic_retina.py` | `$DATA_ROOT/DiabeticRetinopathy` | None |
-| `fgvc_aircraft.py` | `$DATA_ROOT/FGVCAircraft` | None |
+In this case:
 
-## Usage
+- `split_source=subdirs`
+- `label_source=folder`
 
-Set the `$DATA_ROOT` environment variable to point to your SynergyUnitDatasets folder:
+No `splits.json` or `labels.json` is required.
+
+## Expected Split File Contract
+
+For the current datasets, the standard split file looks like:
+
+```json
+{
+  "train": ["sample_a", "sample_b"],
+  "val": ["sample_c"],
+  "test": ["sample_d"]
+}
+```
+
+Important points:
+
+- the exact sample IDs are dataset-specific
+- some datasets use image-relative paths
+- some datasets use sample IDs that the dataset class resolves internally
+
+If `test` is missing:
+
+- the dataset factory reuses the validation dataset as the test dataset
+
+That is what currently happens for some datasets with only train/val style
+splits.
+
+## Fold-Aware Datasets
+
+The framework already supports passing a fold identifier through:
+
+- `data.fold`
+
+For fold-aware datasets, `splits.json` may also contain numeric string
+keys, for example:
+
+```json
+{
+  "0": ["sample_a", "sample_b"],
+  "1": ["sample_c", "sample_d"]
+}
+```
+
+Important design point:
+
+- the framework passes the fold value through
+- the dataset implementation defines what that fold means
+- the framework does not impose a universal fold interpretation
+
+This is deliberate. Different datasets may need:
+
+- precomputed folds
+- patient-level folds
+- site-level folds
+- custom train/val definitions per fold
+
+## labels.json / labels.csv
+
+Most custom datasets also use a `labels.json` file, typically of the form:
+
+```json
+{
+  "sample_a": 0,
+  "sample_b": 1
+}
+```
+
+Again, the exact key convention is dataset-specific. The dataset class owns the
+mapping logic.
+
+The generic image dataset also supports a CSV labels file. The relevant config
+fields are:
+
+- `path_column`
+- `label_column`
+
+## Recommended Dataset Directory Layout
+
+The runtime does not enforce one single universal directory tree, but the
+following pattern is recommended for split-aware custom datasets:
+
+```text
+<dataset_root>/
+├── images/                # or any dataset-specific raw-data directory
+├── splits.json
+├── labels.json
+└── class_map.json         # optional helper file
+```
+
+The important part is not the exact folder name. The important part is that the
+dataset class and split file agree on how to resolve sample IDs.
+
+## How The Dataset Factory Uses The Split Files
+
+The generic path in [factory.py](../../src/glovita/datasets/factory.py) does the following:
+
+1. resolve train/test transforms
+2. instantiate the dataset class with:
+   - `split="train"`
+   - `split="val"`
+   - optionally `split="test"`
+3. pass `split_file="splits.json"` by default
+4. check whether a `test` split actually exists
+5. build dataloaders
+
+So the dataset class contract is simple:
+
+- accept `split`
+- accept `transform`
+- usually accept `split_file`
+- interpret the split keys for that dataset
+
+## Adding A New Dataset
+
+For a new dataset, decide first whether the generic path is enough.
+
+### Reuse The Generic Image Dataset When:
+
+- samples are ordinary image files
+- labels are scalar targets
+- splits come from a split file or split subdirectories
+- labels come from folder names, JSON, or CSV
+
+### Write A Custom Dataset Class When:
+
+- the dataset has custom metadata resolution
+- you need grouped or patient-level logic
+- you decode videos or volumes
+- one sample contains multiple files
+- targets are more complex than one scalar per sample
+
+For a new custom split-aware dataset:
+
+1. Add a config class in [../../src/glovita/configs/data.py](../../src/glovita/configs/data.py)
+2. Add a dataset class in `src/glovita/datasets/<name>.py`
+3. Add a factory entry in [../../src/glovita/datasets/factory.py](../../src/glovita/datasets/factory.py)
+4. Add augmentation defaults and, if needed, policy implementations
+
+If your dataset follows the standard split-aware pattern, try to reuse:
+
+- `_build_generic_split_datasets(...)`
+
+rather than writing a new custom builder.
+
+## Dataset-Specific Constructor Args
+
+If a dataset needs special constructor arguments that are not part of the shared
+data schema, use:
+
+- `data.dataset_kwargs`
+
+Example:
 
 ```bash
-export DATA_ROOT=/path/to/your/SynergyUnitDatasets
+python train.py \
+  --data.dataset your_dataset \
+  --data.data_root_dir /data/YourDataset \
+  --data.dataset_kwargs.some_flag true
 ```
 
-Or in Python:
-```python
-import os
-DATA_ROOT = os.environ.get("DATA_ROOT", "./data")
+This is the same escape-hatch design used elsewhere in the project:
 
-# Build dataloaders through the registry factory
-from glovita.configs.data import AIDConfig
-from glovita.datasets.factory import build_dataloaders
+- keep common parameters explicit
+- use typed `*_kwargs` only for the rare family-specific extras
 
-cfg = AIDConfig(data_root_dir=f"{DATA_ROOT}/AID", batch_size=32, num_workers=4)
-train_loader, val_loader, test_loader = build_dataloaders(cfg)
-```
+## Notes On Existing Docs
 
-## Notes
+For runtime behavior, the source of truth is:
 
-- Most datasets use 60/20/20 train/val/test splits with stratified sampling
-- **RESISC45**: Uses official train/validation/test splits (18,900/6,300/6,300)
-- **Flowers102**: Uses official train, splits official valid into val+test with non-stratified split (6,552/490/328)
-- **NEUDET**: Uses official train, splits official validation into val+test (1,440/180/180)
-- **ChestXray14**: Patient-level stratified splitting to prevent data leakage (68,749/22,125/21,246)
-- **ZooScanNet**: Adaptive image size filtering applied (478,236/159,412/159,413)
-- **RxRx1**: Uses existing train/test split, creates val from train (60,918/20,306/34,432)
+- [../../src/glovita/configs/data.py](../../src/glovita/configs/data.py)
+- [../../src/glovita/datasets/factory.py](../../src/glovita/datasets/factory.py)
+- the dataset class itself

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import BaseModel, Field, JsonValue, model_validator
 
 from glovita.configs.augmentation import AugmentationConfig
 
@@ -212,6 +212,43 @@ class DiabeticRetinaConfig(BaseDataConfig):
     )
 
 
+class GenericImageDatasetConfig(BaseDataConfig):
+    dataset: Literal["generic_image_dataset"] = "generic_image_dataset"
+    num_classes: int
+    task: Literal["Classification", "Regression"] = "Classification"
+    subtask: Literal["multiclass", "regression"] = "multiclass"
+    images_dir: str = "images"
+    split_source: Literal["splits_json", "subdirs"] = "splits_json"
+    label_source: Literal["folder", "json", "csv"] = "json"
+    split_file: str = "splits.json"
+    labels_file: str = "labels.json"
+    path_column: str = "path"
+    label_column: str = "label"
+    train_split_name: str = "train"
+    val_split_name: str = "val"
+    test_split_name: str = "test"
+    allowed_exts: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff")
+    class_names: list[str] | None = None
+    strict: bool = True
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="default_2d_2",
+            test_policy="shared_default_2d",
+        )
+    )
+
+    @model_validator(mode="after")
+    def _validate_task_settings(self):
+        if self.task == "Regression":
+            if self.subtask != "regression":
+                raise ValueError("generic_image_dataset uses subtask='regression' for Regression tasks.")
+            if self.num_classes != 1:
+                raise ValueError("generic_image_dataset expects num_classes=1 for scalar regression targets.")
+        elif self.subtask != "multiclass":
+            raise ValueError("generic_image_dataset currently supports only subtask='multiclass' for Classification.")
+        return self
+
+
 class PrecomputedFeaturesConfig(BaseDataConfig):
     dataset: Literal["precomputed_features"] = "precomputed_features"
     num_classes: int
@@ -241,6 +278,7 @@ DataConfig = Annotated[
         Flowers102Config,
         FGVCAircraftConfig,
         DiabeticRetinaConfig,
+        GenericImageDatasetConfig,
         PrecomputedFeaturesConfig,
     ],
     Field(discriminator="dataset"),

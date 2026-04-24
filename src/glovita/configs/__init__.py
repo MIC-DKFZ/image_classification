@@ -25,7 +25,7 @@ from glovita.configs.model import (
 )
 from glovita.configs.peft import PeftConfig
 from glovita.configs.data import DataConfig
-from glovita.configs.data import PrecomputedFeaturesConfig
+from glovita.configs.data import GenericImageDatasetConfig, PrecomputedFeaturesConfig
 
 __all__ = [
     "RootConfig",
@@ -56,5 +56,6 @@ __all__ = [
     "PrimusEncoderConfig",
     "PeftConfig",
     "DataConfig",
+    "GenericImageDatasetConfig",
     "PrecomputedFeaturesConfig",
 ]
