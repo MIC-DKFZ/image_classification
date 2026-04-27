@@ -1,26 +1,21 @@
 #!/usr/bin/env python3
 """
-Plot a UMAP for a single (model, dataset) combination.
+Plot a UMAP for a single (model, dataset) combination from precomputed HDF5 features.
 
-Resolves the HDF5 filename from the model/data config objects (matching the
-naming convention used by extract_features.py), loads embeddings, fits UMAP,
-and saves a scatter plot PNG.
+Looks for a file matching:
+    <embeddings_dir>/agg_*_<model>_<dataset>_<split>_*.h5
 
-If no matching HDF5 is found, run extract_features.py first to produce it.
+Run extract_features.py first to produce the embeddings if they don't exist.
 
 Usage:
     python plot_umap.py \
-        --model.encoder.encoder_type timm \
-        --model.encoder.type vit_base_patch16_224 \
-        --data.dataset aid \
-        --data.data_root_dir /data/aid \
+        --model vit_base_patch16_224 \
+        --dataset aid \
         --embeddings_dir precomputed_features
 
     python plot_umap.py \
-        --model.encoder.encoder_type dinov2 \
-        --model.encoder.type dinov2_vitb14 \
-        --data.dataset flowers102 \
-        --data.data_root_dir /data/flowers102 \
+        --model dinov2_vitb14 \
+        --dataset flowers102 \
         --split test \
         --embeddings_dir precomputed_features
 """
@@ -29,7 +24,7 @@ from __future__ import annotations
 
 import glob as _glob
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import h5py
 import matplotlib.pyplot as plt
@@ -37,9 +32,6 @@ import numpy as np
 from pydantic import BaseModel
 
 from glovita.configs.cli import parse_cli
-from glovita.configs.data import DataConfig
-from glovita.configs.model import ModelConfig
-from extract_features import _serialize_model_name
 
 try:
     import umap as umap_module
@@ -52,8 +44,8 @@ MAX_PER_CLASS = 200
 
 
 class PlotUmapConfig(BaseModel):
-    model: Optional[ModelConfig] = None
-    data: Optional[DataConfig] = None
+    model: str
+    dataset: str
     embeddings_dir: Path = Path("precomputed_features")
     output_dir: Path = Path("umap_plots/single")
     split: Literal["train", "val", "test"] = "val"
@@ -65,16 +57,8 @@ class PlotUmapConfig(BaseModel):
     min_dist: float = 0.1
 
 
-def _model_token(config: PlotUmapConfig) -> str:
-    return _serialize_model_name(config.model)
-
-
-def _dataset_token(config: PlotUmapConfig) -> str:
-    return config.data.dataset
-
-
-def find_h5(embeddings_dir: Path, model_tok: str, dataset_tok: str, split: str) -> Path | None:
-    pattern = str(embeddings_dir / f"agg_*_{model_tok}_{dataset_tok}_{split}_*.h5")
+def find_h5(embeddings_dir: Path, model: str, dataset: str, split: str) -> Path | None:
+    pattern = str(embeddings_dir / f"agg_*_{model}_{dataset}_{split}_*.h5")
     hits = _glob.glob(pattern)
     return Path(hits[0]) if hits else None
 
@@ -134,20 +118,14 @@ def plot_umap(xy: np.ndarray, labels: np.ndarray, title: str, output_path: Path,
 
 
 def main(config: PlotUmapConfig) -> None:
-    if config.model is None or config.data is None:
-        raise ValueError("Both --model and --data config blocks must be provided.")
+    print(f"Model  : {config.model}")
+    print(f"Dataset: {config.dataset}")
 
-    model_tok = _model_token(config)
-    dataset_tok = _dataset_token(config)
-
-    print(f"Model token  : {model_tok}")
-    print(f"Dataset token: {dataset_tok}")
-
-    h5 = find_h5(config.embeddings_dir, model_tok, dataset_tok, config.split)
+    h5 = find_h5(config.embeddings_dir, config.model, config.dataset, config.split)
     if h5 is None:
         raise FileNotFoundError(
             f"No HDF5 found in {config.embeddings_dir} matching "
-            f"model='{model_tok}', dataset='{dataset_tok}', split='{config.split}'.\n"
+            f"model='{config.model}', dataset='{config.dataset}', split='{config.split}'.\n"
             "Run extract_features.py first to produce the embeddings."
         )
 
@@ -162,13 +140,11 @@ def main(config: PlotUmapConfig) -> None:
     print("Fitting UMAP...")
     xy = fit_umap(features, config.n_neighbors, config.min_dist, config.seed)
 
-    encoder = config.model.encoder
-    model_label = getattr(encoder, "type", model_tok)
     title = (
-        f"{model_label} / {dataset_tok}  ({config.split})\n"
+        f"{config.model} / {config.dataset}  ({config.split})\n"
         f"n={len(labels):,}  classes={n_cls}"
     )
-    out = config.output_dir / f"{model_tok}_{dataset_tok}_{config.split}.png"
+    out = config.output_dir / f"{config.model}_{config.dataset}_{config.split}.png"
     plot_umap(xy, labels, title, out, config.dpi)
 
 
