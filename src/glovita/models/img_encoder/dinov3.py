@@ -7,12 +7,13 @@ import torch.nn as nn
 
 
 class Dinov3Encoder(nn.Module):
-    def __init__(self, type: str, weight_dir: Path):
+    def __init__(self, type: str, pretrained: bool = True, weight_dir: Path | None = None):
         super().__init__()
         model_name = "_".join(type.split("_")[:2])
-        self.model = torch.hub.load("facebookresearch/dinov3", model_name, pretrained=False)
-        state_dict = torch.load(str(Path(weight_dir) / f"{type}.pth"), map_location="cpu")
-        self.model.load_state_dict(state_dict, strict=True)
+        self.model = torch.hub.load("facebookresearch/dinov3", model_name, pretrained=pretrained)
+        if weight_dir is not None:
+            state_dict = torch.load(Path(weight_dir) / f"{type}.pth", map_location="cpu")
+            self.model.load_state_dict(state_dict, strict=True)
         self.output_dim = int(self.model.embed_dim)
         self.features_are_tokens = True
 

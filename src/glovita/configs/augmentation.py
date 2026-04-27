@@ -64,16 +64,16 @@ class AugmentationConfig(BaseModel):
     - explicit values set here always win over encoder-derived defaults.
     """
 
-    train_policy: TrainPolicyName | None = None
-    test_policy: TestPolicyName | None = None
-    image_size: int | None = Field(default=None, ge=1)
-    resize_size: int | None = Field(default=None, ge=1)
-    crop_size: int | None = Field(default=None, ge=1)
-    cutout_size: int | None = Field(default=None, ge=1)
-    patch_size: tuple[int, ...] | None = None
-    mean: tuple[float, ...] | None = None
-    std: tuple[float, ...] | None = None
+    train_policy: TrainPolicyName | None = Field(default=None, description="Train-time augmentation policy name.")
+    test_policy: TestPolicyName | None = Field(default=None, description="Validation/test-time augmentation policy name.")
+    image_size: int | None = Field(default=None, ge=1, description="Target crop or image size used by the policy.")
+    resize_size: int | None = Field(default=None, ge=1, description="Pre-crop resize size used by deterministic eval transforms.")
+    crop_size: int | None = Field(default=None, ge=1, description="Explicit crop size for policies that separate resize and crop.")
+    cutout_size: int | None = Field(default=None, ge=1, description="Cutout mask size for policies that support cutout.")
+    patch_size: tuple[int, ...] | None = Field(default=None, description="Patch size metadata derived from the encoder or set manually.")
+    mean: tuple[float, ...] | None = Field(default=None, description="Normalization mean. Leave unset to use dataset or encoder defaults.")
+    std: tuple[float, ...] | None = Field(default=None, description="Normalization std. Leave unset to use dataset or encoder defaults.")
     # Escape hatches for policy-specific parameters that should override the
     # shared defaults separately for train and eval builders.
-    train_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
-    test_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
+    train_kwargs: dict[str, JsonValue] = Field(default_factory=dict, description="Policy-specific train overrides that are not part of the shared schema.")
+    test_kwargs: dict[str, JsonValue] = Field(default_factory=dict, description="Policy-specific eval overrides that are not part of the shared schema.")

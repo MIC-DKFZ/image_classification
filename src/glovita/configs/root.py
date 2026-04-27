@@ -11,7 +11,7 @@ from glovita.configs.dataloading import DataloadingConfig
 from glovita.configs.logging import LoggerConfig, WandbLoggerConfig
 from glovita.configs.model import ModelConfig
 from glovita.configs.optimizer import OptimizerConfig
-from glovita.configs.peft import PeftConfig
+from glovita.configs.peft import FullFinetuningConfig, PeftConfig
 from glovita.configs.task import TaskConfig
 from glovita.configs.training import TrainingConfig
 
@@ -31,22 +31,22 @@ class RootConfig(BaseModel):
     """
 
     # Required: must be provided via CLI or config file
-    data: DataConfig
-    model: ModelConfig
-    peft: PeftConfig
+    data: DataConfig = Field(description="Dataset selection and dataset-specific defaults.")
+    model: ModelConfig = Field(description="Encoder, head, and feature aggregation settings.")
+    peft: PeftConfig = Field(default_factory=FullFinetuningConfig, description="Parameter-efficient fine-tuning method configuration. Defaults to full_finetuning.")
 
     # Optional blocks with sensible defaults
-    task: TaskConfig = Field(default_factory=TaskConfig)
-    training: TrainingConfig = Field(default_factory=TrainingConfig)
-    dataloading: DataloadingConfig = Field(default_factory=DataloadingConfig)
-    optimizer: OptimizerConfig = Field(default_factory=OptimizerConfig)
-    logger: LoggerConfig = Field(default_factory=WandbLoggerConfig)
+    task: TaskConfig = Field(default_factory=TaskConfig, description="Metric computation and task-level training options.")
+    training: TrainingConfig = Field(default_factory=TrainingConfig, description="Training-loop and hardware settings.")
+    dataloading: DataloadingConfig = Field(default_factory=DataloadingConfig, description="PyTorch DataLoader settings.")
+    optimizer: OptimizerConfig = Field(default_factory=OptimizerConfig, description="Optimizer and scheduler settings.")
+    logger: LoggerConfig = Field(default_factory=WandbLoggerConfig, description="Experiment logger backend configuration.")
     # Arbitrary logging-only metadata injected from CLI via --add_log.* flags.
     # This is saved and logged but never used to control runtime behavior.
-    add_log: dict[str, JsonValue] = Field(default_factory=dict)
+    add_log: dict[str, JsonValue] = Field(default_factory=dict, description="Logging-only metadata injected from the CLI via --add_log.* flags.")
 
     # Root directory for experiment outputs (checkpoints, logs)
-    exp_dir: Path = Path("./experiments")
+    exp_dir: Path = Field(default=Path("./experiments"), description="Root directory for experiment outputs such as checkpoints and config snapshots.")
 
     @model_validator(mode="before")
     @classmethod

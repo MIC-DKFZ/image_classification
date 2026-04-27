@@ -274,7 +274,6 @@ glovita_train \
   --model.encoder.type resnet50.a1_in1k \
   --model.encoder.no_pretrained \
   --model.head.head_type classification \
-  --peft.method full_finetuning \
   --training.epochs 2 \
   --dataloading.batch_size 128
 ```
@@ -302,7 +301,6 @@ glovita_train \
   --model.encoder.encoder_type timm \
   --model.encoder.type resnet50.a1_in1k \
   --model.head.head_type classification \
-  --peft.method full_finetuning \
   logger:mlflow-logger-config
 ```
 
@@ -499,8 +497,7 @@ glovita_train \
   --data.label_source folder \
   --model.encoder.encoder_type timm \
   --model.encoder.type resnet50.a1_in1k \
-  --model.head.head_type classification \
-  --peft.method full_finetuning
+  --model.head.head_type classification
 ```
 
 This generic path is deliberately limited to common image cases. You should

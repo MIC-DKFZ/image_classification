@@ -139,7 +139,6 @@ glovita_train \
   --model.head.variant mb \
   --model.head.instance_eval \
   --model.head.stochastic_topk \
-  --peft.method full_finetuning \
   --dataloading.batch_size 8
 ```
 

@@ -27,8 +27,7 @@ glovita_train \
   --dataloading.batch_size 8 \
   data:cifar10-config --data.data_root_dir ./data \
   model.encoder:timm-encoder-config --model.encoder.type resnet18 --model.encoder.no_pretrained \
-  model.head:classification-head-config \
-  peft:full-finetuning-config
+  model.head:classification-head-config
 ```
 
 ## What A Smoke Test Should Validate
@@ -53,7 +52,6 @@ glovita_train \
   data:cifar10-config --data.data_root_dir ./data \
   model.encoder:timm-encoder-config --model.encoder.type resnet18 --model.encoder.no_pretrained \
   model.head:classification-head-config \
-  peft:full-finetuning-config \
   logger:mlflow-logger-config
 ```
 
@@ -69,7 +67,6 @@ glovita_train \
   --model.encoder.type resnet18 \
   --model.encoder.no_pretrained \
   --model.head.head_type classification \
-  --peft.method full_finetuning \
   logger:no-logger-config
 ```
 

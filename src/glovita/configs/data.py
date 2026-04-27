@@ -11,19 +11,19 @@ from glovita.configs.augmentation import AugmentationConfig
 class BaseDataConfig(BaseModel):
     """Shared data-loading parameters for all datasets."""
 
-    data_root_dir: Path
+    data_root_dir: Path = Field(description="Dataset root directory.")
     # Subsample training data to this fraction (None = use full dataset).
-    data_fraction: Optional[float] = Field(default=None, gt=0.0, le=1.0)
+    data_fraction: Optional[float] = Field(default=None, gt=0.0, le=1.0, description="Optional fraction of the training set to keep.")
     # Cross-validation fold identifier (e.g. "0", "1"). None = use default split.
-    fold: Optional[str] = None
+    fold: Optional[str] = Field(default=None, description="Optional fold identifier. Dataset implementations decide how to interpret it.")
     # Stratify the data-fraction subsample by class label when subsampling.
-    stratified: bool = True
+    stratified: bool = Field(default=True, description="Stratify the data_fraction subsample by label when possible.")
     # User-facing augmentation defaults and overrides. Dataset-specific defaults
     # are defined on the concrete dataset config classes below.
-    augmentation: AugmentationConfig = Field(default_factory=AugmentationConfig)
+    augmentation: AugmentationConfig = Field(default_factory=AugmentationConfig, description="Augmentation defaults and explicit overrides for this dataset.")
     # Escape hatch for dataset-constructor-specific arguments that are not
     # worth promoting into the shared schema yet.
-    dataset_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
+    dataset_kwargs: dict[str, JsonValue] = Field(default_factory=dict, description="Dataset-constructor-specific kwargs not covered by the shared schema.")
 
 
 # ---------------------------------------------------------------------------
@@ -213,23 +213,25 @@ class DiabeticRetinaConfig(BaseDataConfig):
 
 
 class GenericImageDatasetConfig(BaseDataConfig):
+    """Reusable image-folder / split-file dataset for standard scalar-label image tasks."""
+
     dataset: Literal["generic_image_dataset"] = "generic_image_dataset"
-    num_classes: int
-    task: Literal["Classification", "Regression"] = "Classification"
-    subtask: Literal["multiclass", "regression"] = "multiclass"
-    images_dir: str = "images"
-    split_source: Literal["splits_json", "subdirs"] = "splits_json"
-    label_source: Literal["folder", "json", "csv"] = "json"
-    split_file: str = "splits.json"
-    labels_file: str = "labels.json"
-    path_column: str = "path"
-    label_column: str = "label"
-    train_split_name: str = "train"
-    val_split_name: str = "val"
-    test_split_name: str = "test"
-    allowed_exts: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff")
-    class_names: list[str] | None = None
-    strict: bool = True
+    num_classes: int = Field(description="Number of classes for classification, or 1 for scalar regression.")
+    task: Literal["Classification", "Regression"] = Field(default="Classification", description="Whether the generic dataset is used for classification or regression.")
+    subtask: Literal["multiclass", "regression"] = Field(default="multiclass", description="Multiclass classification or scalar regression mode.")
+    images_dir: str = Field(default="images", description="Directory under data_root_dir that contains the image files.")
+    split_source: Literal["splits_json", "subdirs"] = Field(default="splits_json", description="Whether splits are defined by a JSON file or by train/val/test subdirectories.")
+    label_source: Literal["folder", "json", "csv"] = Field(default="json", description="Where labels come from: class folders, a JSON mapping, or a CSV table.")
+    split_file: str = Field(default="splits.json", description="Split-file name relative to data_root_dir when split_source='splits_json'.")
+    labels_file: str = Field(default="labels.json", description="Label-file name relative to data_root_dir when using JSON or CSV labels.")
+    path_column: str = Field(default="path", description="CSV column containing image-relative paths when label_source='csv'.")
+    label_column: str = Field(default="label", description="CSV column containing labels when label_source='csv'.")
+    train_split_name: str = Field(default="train", description="Split name used for the training set.")
+    val_split_name: str = Field(default="val", description="Split name used for the validation set.")
+    test_split_name: str = Field(default="test", description="Split name used for the test set.")
+    allowed_exts: tuple[str, ...] = Field(default=(".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"), description="File extensions considered valid image files.")
+    class_names: list[str] | None = Field(default=None, description="Optional explicit class-name ordering for folder-based classification.")
+    strict: bool = Field(default=True, description="Fail on missing files or malformed metadata instead of silently skipping bad entries.")
     augmentation: AugmentationConfig = Field(
         default_factory=lambda: AugmentationConfig(
             train_policy="default_2d_2",
@@ -250,13 +252,15 @@ class GenericImageDatasetConfig(BaseDataConfig):
 
 
 class PrecomputedFeaturesConfig(BaseDataConfig):
+    """Dataset config for training directly from extracted HDF5 feature files."""
+
     dataset: Literal["precomputed_features"] = "precomputed_features"
-    num_classes: int
-    task: Literal["Classification"] = "Classification"
-    subtask: Literal["multiclass"] = "multiclass"
-    train_features_file: Path
-    val_features_file: Path
-    test_features_file: Path | None = None
+    num_classes: int = Field(description="Number of target classes represented by the feature files.")
+    task: Literal["Classification"] = Field(default="Classification", description="Precomputed-feature training currently uses classification semantics.")
+    subtask: Literal["multiclass"] = Field(default="multiclass", description="Subtask type for precomputed-feature training.")
+    train_features_file: Path = Field(description="HDF5 file containing training features and labels.")
+    val_features_file: Path = Field(description="HDF5 file containing validation features and labels.")
+    test_features_file: Path | None = Field(default=None, description="Optional HDF5 file containing test features and labels.")
 
 
 # ---------------------------------------------------------------------------

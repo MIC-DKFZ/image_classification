@@ -5,7 +5,7 @@ from pathlib import Path
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from glovita.configs.cli import parse_cli
 
@@ -20,15 +20,17 @@ MAX_PER_CLASS = 200
 
 
 class PlotUmapConfig(BaseModel):
-    h5_path: Path
-    title: str | None = None
-    output_path: Path | None = None
-    max_samples: int = MAX_SAMPLES
-    max_per_class: int = MAX_PER_CLASS
-    seed: int = 42
-    dpi: int = 200
-    n_neighbors: int = 15
-    min_dist: float = 0.1
+    """UMAP plot configuration for an extracted feature file."""
+
+    h5_path: Path = Field(description="HDF5 feature file produced by glovita_extract_features.")
+    title: str | None = Field(default=None, description="Optional plot title. Defaults to the HDF5 file stem.")
+    output_path: Path | None = Field(default=None, description="Optional output image path. Defaults to umap_plots/single/<h5_stem>.png.")
+    max_samples: int = Field(default=MAX_SAMPLES, ge=1, description="Maximum total number of samples to plot after subsampling.")
+    max_per_class: int = Field(default=MAX_PER_CLASS, ge=1, description="Maximum number of samples kept per class before the global max_samples cap is applied.")
+    seed: int = Field(default=42, description="Random seed used for subsampling and UMAP initialization.")
+    dpi: int = Field(default=200, ge=1, description="Output image resolution in dots per inch.")
+    n_neighbors: int = Field(default=15, ge=2, description="UMAP n_neighbors parameter controlling local neighborhood size.")
+    min_dist: float = Field(default=0.1, ge=0.0, description="UMAP min_dist parameter controlling cluster compactness.")
 
 
 def load_and_subsample(h5_path: Path, max_samples: int, max_per_class: int, seed: int):

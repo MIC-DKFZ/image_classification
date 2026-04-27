@@ -90,7 +90,6 @@ glovita_train \
   --model.encoder.encoder_type precomputed \
   --model.encoder.feature_dim 1536 \
   --model.head.head_type classification \
-  --peft.method full_finetuning \
   --dataloading.batch_size 512
 ```
 
@@ -108,7 +107,6 @@ glovita_train \
   --model.head.head_type clam \
   --model.head.variant sb \
   --model.head.instance_eval \
-  --peft.method full_finetuning \
   --dataloading.batch_size 8
 ```
 
@@ -148,7 +146,6 @@ glovita_extract_features \
   --model.encoder.encoder_type timm \
   --model.encoder.type vit_base_patch16_224 \
   --model.head.head_type classification \
-  --peft.method full_finetuning \
   --dataloading.batch_size 128
 ```
 

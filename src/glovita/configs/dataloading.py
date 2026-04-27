@@ -13,18 +13,18 @@ class DataloadingConfig(BaseModel):
     - `effective_prefetch_factor`: disabled automatically for `num_workers=0`
     """
 
-    batch_size: int = Field(default=32, ge=1)
-    eval_batch_size: int | None = Field(default=None, ge=1)
-    num_workers: int = Field(default=12, ge=0)
-    pin_memory: bool = True
-    persistent_workers: bool = True
-    prefetch_factor: int | None = Field(default=2, ge=1)
-    timeout: float = Field(default=0.0, ge=0.0)
-    drop_last_train: bool = False
-    drop_last_eval: bool = False
-    shuffle_train: bool = True
-    shuffle_eval: bool = False
-    use_worker_init_fn: bool = True
+    batch_size: int = Field(default=32, ge=1, description="Training batch size.")
+    eval_batch_size: int | None = Field(default=None, ge=1, description="Validation/test batch size. Falls back to batch_size when unset.")
+    num_workers: int = Field(default=12, ge=0, description="Number of DataLoader worker processes.")
+    pin_memory: bool = Field(default=True, description="Enable pinned host memory for faster GPU transfers.")
+    persistent_workers: bool = Field(default=True, description="Keep workers alive across epochs when num_workers > 0.")
+    prefetch_factor: int | None = Field(default=2, ge=1, description="Number of prefetched batches per worker. Ignored when num_workers=0.")
+    timeout: float = Field(default=0.0, ge=0.0, description="DataLoader worker timeout in seconds.")
+    drop_last_train: bool = Field(default=False, description="Drop the last incomplete training batch.")
+    drop_last_eval: bool = Field(default=False, description="Drop the last incomplete validation/test batch.")
+    shuffle_train: bool = Field(default=True, description="Shuffle the training dataset each epoch.")
+    shuffle_eval: bool = Field(default=False, description="Shuffle validation/test data. Usually left disabled.")
+    use_worker_init_fn: bool = Field(default=True, description="Use the repo worker seeding function for reproducible workers.")
 
     @property
     def effective_eval_batch_size(self) -> int:

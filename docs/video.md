@@ -129,8 +129,7 @@ glovita_train \
   --data.data_root_dir /data/videos \
   --model.encoder.encoder_type torchvision_video \
   --model.encoder.type r3d_18 \
-  --model.head.head_type classification \
-  --peft.method full_finetuning
+  --model.head.head_type classification
 ```
 
 ### Framewise Decoder Wiring

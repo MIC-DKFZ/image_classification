@@ -126,10 +126,13 @@ def build_encoder(config) -> nn.Module:
     if isinstance(config, Dinov2EncoderConfig):
         return Dinov2Encoder(
             type=config.type,
+            pretrained=config.pretrained,
+            weight_dir=config.weight_dir,
         )
     if isinstance(config, Dinov3EncoderConfig):
         return Dinov3Encoder(
             type=config.type,
+            pretrained=config.pretrained,
             weight_dir=config.weight_dir,
         )
     if isinstance(config, ResidualEncoderConfig):
