@@ -6,31 +6,23 @@ Resolves the HDF5 filename from the model/data config objects (matching the
 naming convention used by extract_features.py), loads embeddings, fits UMAP,
 and saves a scatter plot PNG.
 
-If --compute_embeddings is set and no HDF5 is found, feature extraction is run
-automatically via extract_features.main() before plotting.
+If no matching HDF5 is found, run extract_features.py first to produce it.
 
 Usage:
     python plot_umap.py \
         --model.encoder.encoder_type timm \
         --model.encoder.type vit_base_patch16_224 \
         --data.dataset aid \
-        --data.data_root_dir /data/aid
+        --data.data_root_dir /data/aid \
+        --embeddings_dir precomputed_features
 
     python plot_umap.py \
         --model.encoder.encoder_type dinov2 \
         --model.encoder.type dinov2_vitb14 \
         --data.dataset flowers102 \
         --data.data_root_dir /data/flowers102 \
-        --split test
-
-    python plot_umap.py \
-        --model.encoder.encoder_type timm \
-        --model.encoder.type vit_base_patch16_224 \
-        --data.dataset pcam \
-        --data.data_root_dir /data/pcam \
-        --embeddings_dir embeddings/frozen/precomputed_features \
-        --output_dir umap_plots/single \
-        --compute_embeddings
+        --split test \
+        --embeddings_dir precomputed_features
 """
 
 from __future__ import annotations
@@ -47,8 +39,7 @@ from pydantic import BaseModel
 from glovita.configs.cli import parse_cli
 from glovita.configs.data import DataConfig
 from glovita.configs.model import ModelConfig
-from extract_features import ExtractConfig, _serialize_model_name
-from extract_features import main as extract_features_main
+from extract_features import _serialize_model_name
 
 try:
     import umap as umap_module
@@ -63,7 +54,6 @@ MAX_PER_CLASS = 200
 class PlotUmapConfig(BaseModel):
     model: Optional[ModelConfig] = None
     data: Optional[DataConfig] = None
-    checkpoint_path: Optional[Path] = None
     embeddings_dir: Path = Path("precomputed_features")
     output_dir: Path = Path("umap_plots/single")
     split: Literal["train", "val", "test"] = "val"
@@ -71,7 +61,6 @@ class PlotUmapConfig(BaseModel):
     max_per_class: int = MAX_PER_CLASS
     seed: int = 42
     dpi: int = 200
-    compute_embeddings: bool = False
     n_neighbors: int = 15
     min_dist: float = 0.1
 
@@ -88,17 +77,6 @@ def find_h5(embeddings_dir: Path, model_tok: str, dataset_tok: str, split: str) 
     pattern = str(embeddings_dir / f"agg_*_{model_tok}_{dataset_tok}_{split}_*.h5")
     hits = _glob.glob(pattern)
     return Path(hits[0]) if hits else None
-
-
-def run_extraction(config: PlotUmapConfig) -> None:
-    extract_config = ExtractConfig(
-        model=config.model,
-        data=config.data,
-        checkpoint_path=config.checkpoint_path,
-        split=config.split,
-        output_dir=config.embeddings_dir,
-    )
-    extract_features_main(extract_config)
 
 
 def load_and_subsample(h5_path: Path, max_samples: int, max_per_class: int, seed: int):
@@ -166,22 +144,12 @@ def main(config: PlotUmapConfig) -> None:
     print(f"Dataset token: {dataset_tok}")
 
     h5 = find_h5(config.embeddings_dir, model_tok, dataset_tok, config.split)
-
     if h5 is None:
-        if not config.compute_embeddings:
-            raise FileNotFoundError(
-                f"No HDF5 found in {config.embeddings_dir} matching "
-                f"model='{model_tok}', dataset='{dataset_tok}', split='{config.split}'.\n"
-                "Re-run with --compute_embeddings to extract them automatically."
-            )
-        print("Embeddings not found — running extraction...")
-        run_extraction(config)
-        h5 = find_h5(config.embeddings_dir, model_tok, dataset_tok, config.split)
-        if h5 is None:
-            raise FileNotFoundError(
-                "Extraction completed but HDF5 still not found. "
-                f"Check {config.embeddings_dir} and the extraction output above."
-            )
+        raise FileNotFoundError(
+            f"No HDF5 found in {config.embeddings_dir} matching "
+            f"model='{model_tok}', dataset='{dataset_tok}', split='{config.split}'.\n"
+            "Run extract_features.py first to produce the embeddings."
+        )
 
     print(f"Found H5: {h5}")
     print("Loading embeddings...")
