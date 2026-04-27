@@ -216,4 +216,7 @@ class ModelConfig(BaseModel):
 
     encoder: EncoderConfig = Field(default_factory=TimmEncoderConfig, description="Encoder family and encoder-specific parameters.")
     head: HeadConfig = Field(default_factory=ClassificationHeadConfig, description="Prediction head configuration.")
-    feature_aggregation_method: AggregationMethod = Field(default="cls_token", description="How token-like encoder features are pooled before the head.")
+    feature_aggregation_method: AggregationMethod = Field(
+        default="cls_token",
+        description="How token-like encoder features are pooled before the head: cls_token = CLS token only, avg = mean of patch tokens only, sum = sum of patch tokens, mean_all = mean over all tokens including CLS, joint = concatenate CLS token with mean patch token.",
+    )

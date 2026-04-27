@@ -27,18 +27,63 @@ DEFAULT_OUTPUT_FILENAME_TEMPLATE = (
 
 
 class ExtractConfig(BaseModel):
-    checkpoint_path: Path | None = None
-    data: DataConfig | None = None
-    model: ModelConfig | None = None
-    peft: PeftConfig = Field(default_factory=FullFinetuningConfig)
-    dataloading: DataloadingConfig = Field(default_factory=DataloadingConfig)
-    method: Literal["cls_token", "avg", "sum", "mean_all", "joint"] = "joint"
-    split: Optional[Literal["train", "val", "test"]] = None
-    precision: Literal[16, 32] = 16
-    compression: int = Field(default=4, ge=0, le=9)
-    output_dir: Path = Path("./precomputed_features")
-    output_filename: str | None = None
-    use_eval_transform_for_train: bool = True
+    """Feature extraction configuration.
+
+    Two modes are supported:
+    - explicit mode: provide `data` and `model`
+    - checkpoint mode: provide `checkpoint_path` and reconstruct the saved run
+    """
+
+    checkpoint_path: Path | None = Field(
+        default=None,
+        description="Optional checkpoint from a previous GloViTa run. If set, model/config are reconstructed from the saved run directory.",
+    )
+    data: DataConfig | None = Field(
+        default=None,
+        description="Dataset configuration for explicit extraction mode. Not required when checkpoint_path is used.",
+    )
+    model: ModelConfig | None = Field(
+        default=None,
+        description="Model configuration for explicit extraction mode. Not required when checkpoint_path is used.",
+    )
+    peft: PeftConfig = Field(
+        default_factory=FullFinetuningConfig,
+        description="PEFT configuration used when building the model. Defaults to full_finetuning.",
+    )
+    dataloading: DataloadingConfig = Field(
+        default_factory=DataloadingConfig,
+        description="Dataloader settings used during feature extraction.",
+    )
+    method: Literal["cls_token", "avg", "sum", "mean_all", "joint"] = Field(
+        default="joint",
+        description="Feature aggregation method: cls_token = CLS token only, avg = mean of patch tokens only, sum = sum of patch tokens, mean_all = mean over all tokens including CLS, joint = concatenate CLS token with mean patch token.",
+    )
+    split: Optional[Literal["train", "val", "test"]] = Field(
+        default=None,
+        description="Which split to extract. If unset, train, val, and test are processed in sequence.",
+    )
+    precision: Literal[16, 32] = Field(
+        default=16,
+        description="Output feature storage precision in the HDF5 file.",
+    )
+    compression: int = Field(
+        default=4,
+        ge=0,
+        le=9,
+        description="HDF5 compression level. 0 disables compression.",
+    )
+    output_dir: Path = Field(
+        default=Path("./precomputed_features"),
+        description="Directory where extracted HDF5 feature files are written.",
+    )
+    output_filename: str | None = Field(
+        default=None,
+        description="Optional output filename template. Available placeholders: {method}, {model}, {dataset}, {split}, {imgsize}, {precision}, {checkpoint}.",
+    )
+    use_eval_transform_for_train: bool = Field(
+        default=True,
+        description="Use the evaluation transform for the train split as well, so train feature extraction is deterministic.",
+    )
 
 
 def _serialize_model_name(config: ModelConfig) -> str:
@@ -219,4 +264,3 @@ def main(config: ExtractConfig | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

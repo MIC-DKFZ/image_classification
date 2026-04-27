@@ -14,12 +14,31 @@ from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
 
 
 class InferConfig(BaseModel):
-    exp_dir: Path = Path("./experiments")
-    data: DataConfig
-    dataloading: DataloadingConfig = Field(default_factory=DataloadingConfig)
-    metrics: List[str] = Field(default_factory=lambda: ["acc", "f1"])
-    fold: Optional[str] = None
-    pred_output: Optional[Path] = None
+    """Checkpoint-based inference and evaluation configuration."""
+
+    exp_dir: Path = Field(
+        default=Path("./experiments"),
+        description="Run directory containing checkpoints/ or fold subdirectories with checkpoints/.",
+    )
+    data: DataConfig = Field(
+        description="Dataset configuration used to build the evaluation dataloader.",
+    )
+    dataloading: DataloadingConfig = Field(
+        default_factory=DataloadingConfig,
+        description="Dataloader settings for inference.",
+    )
+    metrics: List[str] = Field(
+        default_factory=lambda: ["acc", "f1"],
+        description="Metric names to compute on the test set. Common values: acc, f1, mse, mae.",
+    )
+    fold: Optional[str] = Field(
+        default=None,
+        description="Specific fold to evaluate. If unset, infer scans all fold subdirectories and ensembles their last.pt checkpoints when available.",
+    )
+    pred_output: Optional[Path] = Field(
+        default=None,
+        description="Optional path to save predictions and labels as a torch file.",
+    )
 
 
 def _collect_checkpoints(exp_dir: Path, fold: Optional[str]) -> List[Path]:
@@ -151,4 +170,3 @@ def main(config: InferConfig | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-
