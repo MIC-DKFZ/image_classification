@@ -1,30 +1,20 @@
 #!/usr/bin/env python3
 """
-Plot a UMAP for a single (model, dataset) combination from precomputed HDF5 features.
-
-Looks for a file matching:
-    <embeddings_dir>/agg_*_<model>_<dataset>_<split>_*.h5
-
-Run extract_features.py first to produce the embeddings if they don't exist.
+Plot a UMAP from a precomputed HDF5 feature file produced by extract_features.py.
 
 Usage:
     python plot_umap.py \
-        --model vit_base_patch16_224 \
-        --dataset aid \
-        --embeddings_dir precomputed_features
+        --h5_path precomputed_features/agg_joint_vit_base_patch16_224_aid_val_size224_float16.h5
 
     python plot_umap.py \
-        --model dinov2_vitb14 \
-        --dataset flowers102 \
-        --split test \
-        --embeddings_dir precomputed_features
+        --h5_path precomputed_features/features.h5 \
+        --title "ViT-B / AID (val)" \
+        --output_path umap_plots/aid_val.png
 """
 
 from __future__ import annotations
 
-import glob as _glob
 from pathlib import Path
-from typing import Literal
 
 import h5py
 import matplotlib.pyplot as plt
@@ -35,8 +25,8 @@ from glovita.configs.cli import parse_cli
 
 try:
     import umap as umap_module
-except ImportError:
-    raise ImportError("Install umap-learn: pip install umap-learn")
+except ImportError as exc:
+    raise ImportError("Install umap-learn: pip install umap-learn") from exc
 
 
 MAX_SAMPLES = 5000
@@ -44,11 +34,9 @@ MAX_PER_CLASS = 200
 
 
 class PlotUmapConfig(BaseModel):
-    model: str
-    dataset: str
-    embeddings_dir: Path = Path("precomputed_features")
-    output_dir: Path = Path("umap_plots/single")
-    split: Literal["train", "val", "test"] = "val"
+    h5_path: Path
+    title: str | None = None
+    output_path: Path | None = None
     max_samples: int = MAX_SAMPLES
     max_per_class: int = MAX_PER_CLASS
     seed: int = 42
@@ -57,16 +45,27 @@ class PlotUmapConfig(BaseModel):
     min_dist: float = 0.1
 
 
-def find_h5(embeddings_dir: Path, model: str, dataset: str, split: str) -> Path | None:
-    pattern = str(embeddings_dir / f"agg_*_{model}_{dataset}_{split}_*.h5")
-    hits = _glob.glob(pattern)
-    return Path(hits[0]) if hits else None
-
-
 def load_and_subsample(h5_path: Path, max_samples: int, max_per_class: int, seed: int):
     with h5py.File(h5_path, "r") as f:
+        if "features" not in f or "labels" not in f:
+            raise KeyError(f"{h5_path} must contain 'features' and 'labels' datasets.")
         features = f["features"][:].astype(np.float32)
         labels = f["labels"][:]
+
+    if features.ndim != 2:
+        raise ValueError(
+            f"{h5_path} contains features with shape {features.shape}. "
+            "plot_umap.py expects instance-level features with shape (N, D)."
+        )
+    if labels.ndim != 1:
+        raise ValueError(
+            f"{h5_path} contains labels with shape {labels.shape}. "
+            "plot_umap.py expects labels with shape (N,)."
+        )
+    if len(features) != len(labels):
+        raise ValueError(
+            f"{h5_path} contains {len(features)} features but {len(labels)} labels."
+        )
 
     if len(labels) <= max_samples:
         return features, labels
@@ -84,7 +83,10 @@ def load_and_subsample(h5_path: Path, max_samples: int, max_per_class: int, seed
 
 def fit_umap(features: np.ndarray, n_neighbors: int, min_dist: float, seed: int) -> np.ndarray:
     reducer = umap_module.UMAP(
-        n_neighbors=n_neighbors, min_dist=min_dist, n_components=2, random_state=seed
+        n_neighbors=n_neighbors,
+        min_dist=min_dist,
+        n_components=2,
+        random_state=seed,
     )
     return reducer.fit_transform(features)
 
@@ -98,11 +100,15 @@ def plot_umap(xy: np.ndarray, labels: np.ndarray, title: str, output_path: Path,
     n_cls = len(np.unique(labels))
     fig, ax = plt.subplots(figsize=(7, 6))
     ax.scatter(
-        xy[:, 0], xy[:, 1],
+        xy[:, 0],
+        xy[:, 1],
         c=labels,
         cmap=colormap_for(n_cls),
-        vmin=0, vmax=max(n_cls - 1, 1),
-        s=6, alpha=0.6, linewidths=0,
+        vmin=0,
+        vmax=max(n_cls - 1, 1),
+        s=6,
+        alpha=0.6,
+        linewidths=0,
         rasterized=True,
     )
     ax.set_title(title, fontsize=12)
@@ -117,22 +123,25 @@ def plot_umap(xy: np.ndarray, labels: np.ndarray, title: str, output_path: Path,
     print(f"Saved {output_path}")
 
 
+def _resolve_output_path(config: PlotUmapConfig) -> Path:
+    if config.output_path is not None:
+        return config.output_path
+    return Path("umap_plots/single") / f"{config.h5_path.stem}.png"
+
+
+def _resolve_title(config: PlotUmapConfig, num_samples: int, num_classes: int) -> str:
+    prefix = config.title or config.h5_path.stem
+    return f"{prefix}\nn={num_samples:,}  classes={num_classes}"
+
+
 def main(config: PlotUmapConfig) -> None:
-    print(f"Model  : {config.model}")
-    print(f"Dataset: {config.dataset}")
+    if not config.h5_path.exists():
+        raise FileNotFoundError(f"HDF5 file not found: {config.h5_path}")
 
-    h5 = find_h5(config.embeddings_dir, config.model, config.dataset, config.split)
-    if h5 is None:
-        raise FileNotFoundError(
-            f"No HDF5 found in {config.embeddings_dir} matching "
-            f"model='{config.model}', dataset='{config.dataset}', split='{config.split}'.\n"
-            "Run extract_features.py first to produce the embeddings."
-        )
-
-    print(f"Found H5: {h5}")
+    print(f"H5 file: {config.h5_path}")
     print("Loading embeddings...")
     features, labels = load_and_subsample(
-        h5, config.max_samples, config.max_per_class, config.seed
+        config.h5_path, config.max_samples, config.max_per_class, config.seed
     )
     n_cls = len(np.unique(labels))
     print(f"  {len(labels):,} samples, {n_cls} classes")
@@ -140,11 +149,8 @@ def main(config: PlotUmapConfig) -> None:
     print("Fitting UMAP...")
     xy = fit_umap(features, config.n_neighbors, config.min_dist, config.seed)
 
-    title = (
-        f"{config.model} / {config.dataset}  ({config.split})\n"
-        f"n={len(labels):,}  classes={n_cls}"
-    )
-    out = config.output_dir / f"{config.model}_{config.dataset}_{config.split}.png"
+    title = _resolve_title(config, len(labels), n_cls)
+    out = _resolve_output_path(config)
     plot_umap(xy, labels, title, out, config.dpi)
 
 
