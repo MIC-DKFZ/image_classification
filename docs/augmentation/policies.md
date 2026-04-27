@@ -135,7 +135,7 @@ That merge happens in:
 ### Override Only The Train Policy
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset chestxray14 \
   --data.data_root_dir /data/ChestXray14 \
   --data.augmentation.train_policy default_2d_4
@@ -144,7 +144,7 @@ python train.py \
 ### Override Both Policies And Sizes
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset imagenet \
   --data.data_root_dir /data/ILSVRC \
   --data.augmentation.train_policy randaugment_224 \
@@ -156,7 +156,7 @@ python train.py \
 ### Pass Policy-Specific Escape-Hatch Values
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset cifar10 \
   --data.data_root_dir ./data \
   --data.augmentation.train_kwargs.cutout_size 12

@@ -29,6 +29,7 @@ dependencies = [
   "madgrad>=1.2",
   "h5py>=3.8.0",
   "matplotlib>=3.6.2",
+  "umap-learn>=0.5.6",
   "blosc2>=2.7.0",
   "scikit-learn>=1.0.0",
   "rich>=12.6.0",
@@ -40,6 +41,12 @@ dependencies = [
 [project.optional-dependencies]
 wandb = ["wandb>=0.15.8"]
 mlflow = ["mlflow>=2.14.0"]
+
+[project.scripts]
+glovita_train = "glovita.cli.train:main"
+glovita_infer = "glovita.cli.infer:main"
+glovita_extract_features = "glovita.cli.extract_features:main"
+glovita_plot_umap = "glovita.cli.plot_umap:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

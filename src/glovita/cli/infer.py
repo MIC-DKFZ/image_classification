@@ -1,21 +1,3 @@
-#!/usr/bin/env python
-"""Inference / evaluation entry point.
-
-Loads one or more checkpoints from a training run, runs inference on the test
-set, and optionally ensembles logits (sum-before-softmax).
-
-Usage
------
-Single fold:
-
-    python infer.py \
-        --exp_dir ./experiments/imagenet/my_run/0 \
-        --data.dataset imagenet --data.data_root_dir /data/ILSVRC
-
-Ensemble over all fold checkpoints (scans sub-directories automatically):
-
-    python infer.py --exp_dir ./experiments/imagenet/my_run
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -25,23 +7,18 @@ import torch
 from pydantic import BaseModel, Field
 
 from glovita.configs.cli import parse_cli
-from glovita.datasets.factory import build_dataloaders
 from glovita.configs.data import DataConfig
 from glovita.configs.dataloading import DataloadingConfig
+from glovita.datasets.factory import build_dataloaders
 from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
 
 
 class InferConfig(BaseModel):
-    """Inference configuration."""
-
-    # Directory that contains checkpoints/ or fold sub-directories
     exp_dir: Path = Path("./experiments")
     data: DataConfig
     dataloading: DataloadingConfig = Field(default_factory=DataloadingConfig)
     metrics: List[str] = Field(default_factory=lambda: ["acc", "f1"])
-    # Evaluate a specific fold only (None = scan all folds)
     fold: Optional[str] = None
-    # Write predictions + labels to this file
     pred_output: Optional[Path] = None
 
 
@@ -63,12 +40,11 @@ def _load_run_config(ckpt_path: Path):
     if not config_file.exists():
         raise FileNotFoundError(f"config.json not found at {config_file}")
     from glovita.configs.root import RootConfig
+
     return RootConfig.model_validate_json(config_file.read_text())
 
 
 def _load_model(ckpt_path: Path) -> torch.nn.Module:
-    """Re-create the model from the saved config.json and load checkpoint weights."""
-    from glovita.configs.root import RootConfig
     from glovita.models.factory import build_model
     from glovita.models.peft.registry import apply_peft
 
@@ -123,10 +99,8 @@ def run_inference(config: InferConfig) -> None:
 
     assert all_labels is not None
 
-    # Ensemble: sum logits across checkpoints
     summed = torch.sum(torch.stack(all_logits), dim=0)
 
-    # Produce predictions appropriate for the task
     if task == "Regression":
         preds = summed.squeeze(-1)
     elif subtask == "multilabel":
@@ -134,8 +108,7 @@ def run_inference(config: InferConfig) -> None:
     else:
         preds = torch.argmax(summed, dim=1)
 
-    # Compute requested metrics
-    from torchmetrics import MetricCollection, Accuracy, F1Score, MeanAbsoluteError, MeanSquaredError
+    from torchmetrics import Accuracy, F1Score, MeanAbsoluteError, MeanSquaredError, MetricCollection
 
     metrics_dict = {}
     if task == "Regression":
@@ -144,14 +117,16 @@ def run_inference(config: InferConfig) -> None:
         if "mae" in config.metrics:
             metrics_dict["MAE"] = MeanAbsoluteError()
     else:
-        metric_task = subtask  # "multiclass" | "multilabel"
+        metric_task = subtask
         if "acc" in config.metrics:
             metrics_dict["Accuracy"] = Accuracy(
                 task=metric_task, num_classes=num_classes, num_labels=num_classes
             )
         if "f1" in config.metrics:
             metrics_dict["F1"] = F1Score(
-                task=metric_task, num_classes=num_classes, num_labels=num_classes,
+                task=metric_task,
+                num_classes=num_classes,
+                num_labels=num_classes,
                 average="macro",
             )
 
@@ -168,5 +143,12 @@ def run_inference(config: InferConfig) -> None:
         print(f"Predictions saved to {config.pred_output}")
 
 
+def main(config: InferConfig | None = None) -> None:
+    if config is None:
+        config = parse_cli(InferConfig)
+    run_inference(config)
+
+
 if __name__ == "__main__":
-    run_inference(parse_cli(InferConfig))
+    main()
+

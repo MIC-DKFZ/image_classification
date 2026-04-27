@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,16 +9,16 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 
 from glovita.configs.cli import parse_cli
-from glovita.configs.root import RootConfig
-from glovita.datasets.factory import build_dataloaders
-from glovita.models.factory import build_model
-from glovita.models.feature_aggregator import AGGREGATION_METHODS, aggregate_features
-from glovita.models.peft.registry import apply_peft
-from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
 from glovita.configs.data import DataConfig
 from glovita.configs.dataloading import DataloadingConfig
 from glovita.configs.model import ModelConfig
 from glovita.configs.peft import FullFinetuningConfig, PeftConfig
+from glovita.configs.root import RootConfig
+from glovita.datasets.factory import build_dataloaders
+from glovita.models.factory import build_model
+from glovita.models.feature_aggregator import aggregate_features
+from glovita.models.peft.registry import apply_peft
+from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
 
 
 DEFAULT_OUTPUT_FILENAME_TEMPLATE = (
@@ -130,7 +129,7 @@ def _resolve_output_filename(
 
 
 @torch.no_grad()
-def main(config: ExtractConfig) -> None:
+def run_extraction(config: ExtractConfig) -> None:
     data_config, model_config, peft_config = _resolve_runtime_config(config)
     extraction_data_config = _make_extraction_data_config(config, data_config)
     encoder_preprocessing = resolve_encoder_preprocessing_defaults(model_config.encoder).as_kwargs()
@@ -163,8 +162,6 @@ def main(config: ExtractConfig) -> None:
             print(f"Skipping empty split: {split}")
             continue
 
-        # Probe feature shape from the first batch, then chain it back so it is
-        # written to the HDF5 file exactly once (not twice).
         x0, y0 = first_batch
         imgsize = _feature_imgsize(x0)
         first_features = aggregate_features(
@@ -192,7 +189,6 @@ def main(config: ExtractConfig) -> None:
             )
             dset_labels = f.create_dataset("labels", shape=(dataset_len,), dtype="int64")
 
-            # Write the already-computed first batch.
             first_labels = y0.detach().cpu().numpy()
             first_features_np = first_features.numpy()
             first_batch_size = len(first_labels)
@@ -200,10 +196,14 @@ def main(config: ExtractConfig) -> None:
             dset_labels[:first_batch_size] = first_labels
             index = first_batch_size
 
-            # Continue with the remaining batches via the same iterator.
             for x, y in tqdm(loader_iter, desc=f"{split.upper()} Batches"):
                 x = x.to(device)
-                features = aggregate_features(model.extract_features(x), config.method).detach().cpu().numpy()
+                features = (
+                    aggregate_features(model.extract_features(x), config.method)
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
                 labels = y.detach().cpu().numpy()
                 batch_size = len(labels)
                 dset_features[index : index + batch_size] = features
@@ -211,5 +211,12 @@ def main(config: ExtractConfig) -> None:
                 index += batch_size
 
 
+def main(config: ExtractConfig | None = None) -> None:
+    if config is None:
+        config = parse_cli(ExtractConfig)
+    run_extraction(config)
+
+
 if __name__ == "__main__":
-    main(parse_cli(ExtractConfig))
+    main()
+

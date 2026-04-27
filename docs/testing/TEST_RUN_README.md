@@ -11,9 +11,9 @@ with:
 
 Use:
 
-- [../../train.py](../../train.py) for training
-- [../../infer.py](../../infer.py) for checkpoint-based evaluation
-- [../../extract_features.py](../../extract_features.py) for feature extraction
+- `glovita_train` for training
+- `glovita_infer` for checkpoint-based evaluation
+- `glovita_extract_features` for feature extraction
 
 The CLI is generated from the typed config schema in:
 
@@ -22,7 +22,7 @@ The CLI is generated from the typed config schema in:
 ## Minimal Smoke Test
 
 ```bash
-python train.py \
+glovita_train \
   --training.epochs 1 \
   --dataloading.batch_size 8 \
   data:cifar10-config --data.data_root_dir ./data \
@@ -47,7 +47,7 @@ For a fast runtime check, verify that:
 ### Check MLflow Path
 
 ```bash
-python train.py \
+glovita_train \
   --training.epochs 1 \
   --dataloading.batch_size 8 \
   data:cifar10-config --data.data_root_dir ./data \
@@ -60,7 +60,7 @@ python train.py \
 ### Disable External Logging Entirely
 
 ```bash
-python train.py \
+glovita_train \
   --training.epochs 1 \
   --dataloading.batch_size 8 \
   --data.dataset cifar10 \

@@ -1,17 +1,3 @@
-#!/usr/bin/env python3
-"""
-Plot a UMAP from a precomputed HDF5 feature file produced by extract_features.py.
-
-Usage:
-    python plot_umap.py \
-        --h5_path precomputed_features/agg_joint_vit_base_patch16_224_aid_val_size224_float16.h5
-
-    python plot_umap.py \
-        --h5_path precomputed_features/features.h5 \
-        --title "ViT-B / AID (val)" \
-        --output_path umap_plots/aid_val.png
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -55,12 +41,12 @@ def load_and_subsample(h5_path: Path, max_samples: int, max_per_class: int, seed
     if features.ndim != 2:
         raise ValueError(
             f"{h5_path} contains features with shape {features.shape}. "
-            "plot_umap.py expects instance-level features with shape (N, D)."
+            "glovita_plot_umap expects instance-level features with shape (N, D)."
         )
     if labels.ndim != 1:
         raise ValueError(
             f"{h5_path} contains labels with shape {labels.shape}. "
-            "plot_umap.py expects labels with shape (N,)."
+            "glovita_plot_umap expects labels with shape (N,)."
         )
     if len(features) != len(labels):
         raise ValueError(
@@ -134,7 +120,7 @@ def _resolve_title(config: PlotUmapConfig, num_samples: int, num_classes: int) -
     return f"{prefix}\nn={num_samples:,}  classes={num_classes}"
 
 
-def main(config: PlotUmapConfig) -> None:
+def run_plot(config: PlotUmapConfig) -> None:
     if not config.h5_path.exists():
         raise FileNotFoundError(f"HDF5 file not found: {config.h5_path}")
 
@@ -154,5 +140,11 @@ def main(config: PlotUmapConfig) -> None:
     plot_umap(xy, labels, title, out, config.dpi)
 
 
+def main(config: PlotUmapConfig | None = None) -> None:
+    if config is None:
+        config = parse_cli(PlotUmapConfig)
+    run_plot(config)
+
+
 if __name__ == "__main__":
-    main(parse_cli(PlotUmapConfig))
+    main()

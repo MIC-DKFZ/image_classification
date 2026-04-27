@@ -127,7 +127,7 @@ Important detail:
 ## Example Training Command
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset precomputed_features \
   --data.data_root_dir . \
   --data.num_classes 2 \

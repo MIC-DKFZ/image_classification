@@ -48,9 +48,10 @@ common case, so users do not always need to write their own dataset classes.
 
 The files new users will touch most often are:
 
-- [train.py](train.py): training entrypoint
-- [infer.py](infer.py): checkpoint-based evaluation entrypoint
-- [extract_features.py](extract_features.py): feature extraction entrypoint
+- `glovita_train`: installed training command
+- `glovita_infer`: installed checkpoint-based evaluation command
+- `glovita_extract_features`: installed feature extraction command
+- `glovita_plot_umap`: installed embedding-plotting command
 - [src/glovita/configs](src/glovita/configs): all typed user-facing config blocks
 - [src/glovita/datasets/factory.py](src/glovita/datasets/factory.py): dataset and dataloader assembly
 - [src/glovita/models/factory.py](src/glovita/models/factory.py): encoder/head model assembly
@@ -95,6 +96,22 @@ Notes:
 - base installation does not require `wandb`
 - base installation does not require `mlflow`
 - the selected logger backend is imported lazily at runtime
+- `pip install -e .` installs these commands:
+  - `glovita_train`
+  - `glovita_infer`
+  - `glovita_extract_features`
+  - `glovita_plot_umap`
+
+## Installed Commands
+
+After installation, use:
+
+```bash
+glovita_train
+glovita_infer
+glovita_extract_features
+glovita_plot_umap
+```
 
 ## Training: The Two CLI Styles
 
@@ -112,7 +129,7 @@ The runtime uses underscore-style flags consistently.
 This is the most readable style once you understand the config tree:
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset cifar10 \
   --data.data_root_dir ./data \
   --model.encoder.encoder_type timm \
@@ -134,7 +151,7 @@ Use this style when:
 Discriminated-union config blocks can also be selected as subcommands:
 
 ```bash
-python train.py \
+glovita_train \
   --dataloading.batch_size 128 \
   data:cifar10-config --data.data_root_dir ./data \
   model.encoder:timm-encoder-config --model.encoder.type resnet50.a1_in1k --model.encoder.no_pretrained \
@@ -204,7 +221,7 @@ For many booleans, tyro generates a negative leaf flag. Example:
 --model.encoder.no_pretrained
 ```
 
-Use `python train.py --help` to see the exact generated form for a field.
+Use `glovita_train --help` to see the exact generated form for a field.
 
 ### Nested Override Paths
 
@@ -218,10 +235,10 @@ Most values are overridden by their dotted config path:
 
 ### Logging-Only Metadata
 
-`train.py` supports a special logging-only escape hatch:
+`glovita_train` supports a special logging-only escape hatch:
 
 ```bash
-python train.py \
+glovita_train \
   ... \
   --add_log.comment "scratch baseline" \
   --add_log.dataset_alias CIFAR10_small \
@@ -239,9 +256,10 @@ These values:
 Use:
 
 ```bash
-python train.py --help
-python infer.py --help
-python extract_features.py --help
+glovita_train --help
+glovita_infer --help
+glovita_extract_features --help
+glovita_plot_umap --help
 ```
 
 ## A Practical Training Walkthrough
@@ -249,7 +267,7 @@ python extract_features.py --help
 ### Minimal CIFAR-10 Example
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset cifar10 \
   --data.data_root_dir ./data \
   --model.encoder.encoder_type timm \
@@ -266,7 +284,7 @@ python train.py \
 Dataset configs define defaults, but you can override them directly:
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset chestxray14 \
   --data.data_root_dir /data/ChestXray14 \
   --data.augmentation.train_policy default_2d_4 \
@@ -278,7 +296,7 @@ python train.py \
 The default logger backend is `wandb`. To use MLflow:
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset cifar10 \
   --data.data_root_dir ./data \
   --model.encoder.encoder_type timm \
@@ -294,7 +312,7 @@ under `./experiments/mlflow`.
 ### Select The Best-Checkpoint Metric Explicitly
 
 ```bash
-python train.py \
+glovita_train \
   ... \
   --training.best_checkpoint_metric F1
 ```
@@ -392,8 +410,8 @@ Notes:
 
 This layout is used by:
 
-- [infer.py](infer.py)
-- [extract_features.py](extract_features.py)
+- `glovita_infer`
+- `glovita_extract_features`
 
 when reconstructing models from checkpoints.
 
@@ -473,7 +491,7 @@ dataset_root/
 Example:
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset generic_image_dataset \
   --data.data_root_dir /data/MyDataset \
   --data.num_classes 2 \

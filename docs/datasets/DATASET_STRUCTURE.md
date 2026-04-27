@@ -279,7 +279,7 @@ data schema, use:
 Example:
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset your_dataset \
   --data.data_root_dir /data/YourDataset \
   --data.dataset_kwargs.some_flag true

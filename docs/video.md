@@ -124,7 +124,7 @@ These keys tell the decoder which intermediate feature maps to consume.
 ### Clip-Level Video Classification
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset your_video_dataset \
   --data.data_root_dir /data/videos \
   --model.encoder.encoder_type torchvision_video \
@@ -136,7 +136,7 @@ python train.py \
 ### Framewise Decoder Wiring
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset your_video_dataset \
   --data.data_root_dir /data/videos \
   --model.encoder.encoder_type torchvision_video \

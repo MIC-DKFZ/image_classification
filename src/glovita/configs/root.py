@@ -20,11 +20,11 @@ class RootConfig(BaseModel):
     """Top-level experiment configuration.
 
     CLI usage (tyro):
-        python train.py --data.dataset imagenet --data.data_root_dir /data/ILSVRC \
-                        --model.encoder.encoder_type timm --model.encoder.type vit_base_patch16_224 \
-                        --model.head.head_type classification \
-                        --peft.method lora --peft.lora_rank 16 \
-                        --training.epochs 20 --optimizer.lr 2e-5
+        glovita_train --data.dataset imagenet --data.data_root_dir /data/ILSVRC \
+                      --model.encoder.encoder_type timm --model.encoder.type vit_base_patch16_224 \
+                      --model.head.head_type classification \
+                      --peft.method lora --peft.lora_rank 16 \
+                      --training.epochs 20 --optimizer.lr 2e-5
 
     For subcommand-style selection of data / model / peft, tyro will automatically
     generate subcommands from the discriminated-union fields.

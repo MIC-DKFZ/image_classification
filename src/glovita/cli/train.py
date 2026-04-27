@@ -1,41 +1,11 @@
-#!/usr/bin/env python
-"""Training entry point.
-
-Usage examples
---------------
-Basic run (tyro generates the full CLI from RootConfig):
-
-    python train.py \
-        --data.dataset imagenet --data.data_root_dir /data/ILSVRC \
-        --model.encoder.encoder_type timm --model.encoder.type vit_base_patch16_224 \
-        --model.head.head_type classification \
-        --peft.method lora --peft.lora_rank 16 \
-        --training.epochs 20 --optimizer.lr 2e-5
-
-Select subcommands (tyro's shorthand for discriminated unions):
-
-    python train.py \
-        data:imagenet-config --data.data_root_dir /data/ILSVRC \
-        --model.encoder.encoder_type timm --model.encoder.type vit_base_patch16_224 \
-        --model.head.head_type classification \
-        peft:lora-config --peft.lora_rank 16
-
-Multi-GPU with Accelerate (launch via accelerate CLI):
-
-    accelerate launch --num_processes 4 train.py ...
-
-Cross-validation (5 folds):
-
-    python train.py ... --training.cv_folds 5
-"""
 from __future__ import annotations
 
 import json
 import os
 import platform
 import sys
-from pathlib import Path
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 
 import torch
 
@@ -52,7 +22,6 @@ from glovita.training.trainer import Trainer
 
 
 def _build_model(config: RootConfig) -> torch.nn.Module:
-    """Instantiate the composed encoder + head model from config."""
     return build_model(config.model, output_dim=getattr(config.data, "num_classes", 1))
 
 
@@ -120,10 +89,16 @@ def _resolve_effective_logger_config(config: RootConfig, group: str) -> dict:
     logger_cfg = config.logger.model_dump(exclude_none=True)
     backend = logger_cfg.get("backend")
     if backend == "wandb":
-        logger_cfg.setdefault("project", getattr(config.logger, "project", None) or config.default_logger_experiment_name)
+        logger_cfg.setdefault(
+            "project",
+            getattr(config.logger, "project", None) or config.default_logger_experiment_name,
+        )
         logger_cfg.setdefault("group", getattr(config.logger, "group", None) or group)
     elif backend == "mlflow":
-        logger_cfg.setdefault("tracking_uri", getattr(config.logger, "tracking_uri", None) or config.default_mlflow_tracking_uri)
+        logger_cfg.setdefault(
+            "tracking_uri",
+            getattr(config.logger, "tracking_uri", None) or config.default_mlflow_tracking_uri,
+        )
         logger_cfg.setdefault(
             "experiment_name",
             getattr(config.logger, "experiment_name", None) or config.default_logger_experiment_name,
@@ -133,7 +108,6 @@ def _resolve_effective_logger_config(config: RootConfig, group: str) -> dict:
 
 
 def run_fold(config: RootConfig, fold: str, group: str) -> None:
-    """Train a single cross-validation fold (or the single no-CV run)."""
     effective_group = group
     log_dir = config.get_run_log_dir(effective_group) / fold
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -147,7 +121,6 @@ def run_fold(config: RootConfig, fold: str, group: str) -> None:
         extra_tags=extra_tags,
     )
 
-    # --- Data ---
     fold_data = config.data.model_copy(update={"fold": fold})
     encoder_preprocessing = resolve_encoder_preprocessing_defaults(config.model.encoder).as_kwargs()
     runtime_metadata = _collect_runtime_metadata(
@@ -163,15 +136,12 @@ def run_fold(config: RootConfig, fold: str, group: str) -> None:
         encoder_preprocessing=encoder_preprocessing,
     )
 
-    # --- Model + PEFT ---
     model = _build_model(config)
     model = apply_peft(model, config.peft)
 
-    # --- Optimizer + Scheduler ---
     optimizer = build_optimizer(model, config.optimizer)
     scheduler = build_scheduler(optimizer, config.optimizer, config.training.epochs)
 
-    # Save config snapshot for inference / reproducibility
     config_path = log_dir / "config.json"
     config_path.write_text(config.model_dump_json(indent=2))
     resolved_config_path = log_dir / "resolved_config.json"
@@ -181,7 +151,6 @@ def run_fold(config: RootConfig, fold: str, group: str) -> None:
     logger.log_config(runtime_metadata["resolved"])
     logger.log_config({"runtime": _serialize({k: v for k, v in runtime_metadata.items() if k != "resolved"})})
 
-    # --- Train ---
     try:
         trainer = Trainer(config.training, config.task, fold_data, log_dir, logger)
         trainer.fit(model, optimizer, scheduler, train_loader, val_loader)
@@ -189,18 +158,18 @@ def run_fold(config: RootConfig, fold: str, group: str) -> None:
         logger.finish()
 
 
-def main(config: RootConfig) -> None:
-    # Reproducibility
+def main(config: RootConfig | None = None) -> None:
+    if config is None:
+        config = parse_root_cli(RootConfig)
+
     if config.training.seed is not None:
         torch.manual_seed(config.training.seed)
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
 
     if getattr(config.logger, "backend", None) == "wandb":
-        # Increase W&B service wait time for slow cluster nodes.
         os.environ.setdefault("WANDB__SERVICE_WAIT", "300")
 
-    # Resolve the run group once so all fold runs share the same grouping key.
     explicit_group = getattr(config.logger, "group", None)
     group = explicit_group or config.generate_run_group()
 
@@ -210,11 +179,10 @@ def main(config: RootConfig) -> None:
 
     for fold in range(config.training.cv_folds):
         run_fold(config, str(fold), group=group)
-        # Release model/optimizer memory between folds so large models don't
-        # accumulate across all folds in the same process.
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
-    main(parse_root_cli(RootConfig))
+    main()
+

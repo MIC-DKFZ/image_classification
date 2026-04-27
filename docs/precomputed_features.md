@@ -1,8 +1,7 @@
 # Precomputed Features
 
 This document explains how GloViTa handles training from precomputed HDF5
-feature files and how [extract_features.py](../extract_features.py) produces
-those files.
+feature files and how `glovita_extract_features` produces those files.
 
 ## Supported Runtime Path
 
@@ -82,7 +81,7 @@ This is intended for bag-aware heads such as `clam`.
 ### Standard Classification On Feature Files
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset precomputed_features \
   --data.data_root_dir . \
   --data.num_classes 1000 \
@@ -98,7 +97,7 @@ python train.py \
 ### MIL With CLAM On Bag Files
 
 ```bash
-python train.py \
+glovita_train \
   --data.dataset precomputed_features \
   --data.data_root_dir . \
   --data.num_classes 2 \
@@ -131,7 +130,7 @@ If a separate test file exists:
 
 ## Feature Extraction
 
-[extract_features.py](../extract_features.py) writes the same HDF5 format.
+`glovita_extract_features` writes the same HDF5 format.
 
 It supports:
 
@@ -141,7 +140,7 @@ It supports:
 ### Explicit Config Mode
 
 ```bash
-python extract_features.py \
+glovita_extract_features \
   --method joint \
   --output_dir ./precomputed_features \
   --data.dataset cifar10 \
@@ -156,7 +155,7 @@ python extract_features.py \
 ### Checkpoint Reconstruction Mode
 
 ```bash
-python extract_features.py \
+glovita_extract_features \
   --checkpoint_path ./experiments/cifar10/my_run/0/checkpoints/last.pt \
   --output_dir ./precomputed_features \
   --output_filename "{checkpoint}_{dataset}_{split}_{method}.h5"
