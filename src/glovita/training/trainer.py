@@ -9,6 +9,7 @@ Design principles:
 """
 from __future__ import annotations
 
+import json
 import math
 import sys
 from pathlib import Path
@@ -141,6 +142,11 @@ class Trainer:
         self.data = data_config
         self.log_dir = log_dir
         self.logger = logger
+        self.metrics_path = log_dir / "metrics.json"
+        self._metrics_history: dict[str, list[dict[str, float | int]]] = {
+            "train": [],
+            "val": [],
+        }
 
         self.accelerator = Accelerator(
             mixed_precision=training_config.precision if training_config.precision != "no" else "no",
@@ -347,6 +353,7 @@ class Trainer:
                     self.train_conf_mat.log_to_logger("train", self.logger, step=epoch)
                     self.train_conf_mat.reset()
             self.logger.log_metrics(log_dict, step=epoch)
+            self._append_local_metrics("train", log_dict)
 
     def _val_epoch(
         self,
@@ -417,6 +424,7 @@ class Trainer:
                 self._log_scatter("Val", self.val_labels, self.val_preds, step=epoch)
                 self.val_preds, self.val_labels = [], []
             self.logger.log_metrics(log_dict, step=epoch)
+            self._append_local_metrics("val", log_dict)
 
             # Save best checkpoint when the selected validation metric improves.
             if self.cfg.enable_checkpointing and metric_values:
@@ -447,6 +455,18 @@ class Trainer:
         metrics.update(y_hat, y)
         if conf_mat is not None:
             conf_mat.update(y_hat, y)
+
+    def _append_local_metrics(self, split: str, metrics: dict[str, float | int]) -> None:
+        payload: dict[str, float | int] = {}
+        for key, value in metrics.items():
+            if isinstance(value, bool):
+                payload[key] = int(value)
+            elif isinstance(value, int):
+                payload[key] = value
+            else:
+                payload[key] = float(value)
+        self._metrics_history[split].append(payload)
+        self.metrics_path.write_text(json.dumps(self._metrics_history, indent=2))
 
     def _get_model_aux_loss(self, model: nn.Module) -> torch.Tensor | None:
         aux_loss = getattr(model, "latest_aux_loss", None)
