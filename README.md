@@ -1,4 +1,6 @@
-# GloViTa
+A PyTorch framework for classification and regression of images, volumes, timeseries and videos including various finetuning methods and training from scratch strategies.
+
+# GloViTa - Global Vision Tasks
 
 GloViTa is a PyTorch training stack for whole-sample vision prediction:
 
