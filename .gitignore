@@ -95,6 +95,7 @@ ENV/
 .vscode
 .codex
 .claude
+
 .trash
 .delete_later
 datasets/imagenet_resize.py
