@@ -94,6 +94,8 @@ def run_inference(config: InferConfig) -> None:
         config.dataloading,
         encoder_preprocessing=encoder_preprocessing,
     )
+    if test_loader is None:
+        raise ValueError(f"Dataset {config.data.dataset!r} has no test split to evaluate.")
 
     task = reference_run_config.data.task
     subtask = reference_run_config.data.subtask

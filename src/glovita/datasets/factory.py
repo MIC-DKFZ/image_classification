@@ -28,6 +28,7 @@ from torchvision.datasets import CIFAR10, CIFAR100, ImageNet
 
 from glovita.augmentation.policies.registry import build_transforms, resolve_policy_names
 from glovita.datasets.cifar import Cifar10Albumentation, Cifar100Albumentation
+from glovita.datasets.generic_3d_dataset import Generic3DDataset, load_split
 from glovita.datasets.generic_image_dataset import GenericImageDataset
 from glovita.datasets.precomputed_features import PrecomputedFeaturesDataset
 from glovita.datasets.utils import seed_worker
@@ -413,11 +414,38 @@ def _build_generic_image_datasets(
     return train_dataset, val_dataset, test_dataset
 
 
+def _build_generic_3d_datasets(
+    config: DataConfig, encoder_preprocessing: dict | None = None
+) -> tuple[Dataset, Dataset, Dataset | None]:
+    train_transform, test_transform = build_transforms(
+        config.dataset,
+        train_policy=config.augmentation.train_policy,
+        test_policy=config.augmentation.test_policy,
+        train_overrides=_resolve_train_augmentation_kwargs(config),
+        test_overrides=_resolve_test_augmentation_kwargs(config),
+        **_resolve_augmentation_kwargs(config, encoder_preprocessing),
+    )
+
+    common_kwargs = dict(config.dataset_kwargs)
+    common_kwargs.update({"fold": config.fold, "subtask": config.subtask})
+
+    train_dataset = Generic3DDataset(config.data_root_dir, split="train", transform=train_transform, **common_kwargs)
+    val_dataset = Generic3DDataset(config.data_root_dir, split="val", transform=test_transform, **common_kwargs)
+
+    test_dataset = None
+    split_file = common_kwargs.get("split_file", "splits.json")
+    if "test" in load_split(Path(config.data_root_dir) / split_file, config.fold):
+        test_dataset = Generic3DDataset(config.data_root_dir, split="test", transform=test_transform, **common_kwargs)
+
+    return train_dataset, val_dataset, test_dataset
+
+
 _DATASET_REGISTRY: dict[str, DatasetSpec] = {
     "cifar10": DatasetSpec(build_datasets=_build_cifar10_datasets),
     "cifar100": DatasetSpec(build_datasets=_build_cifar100_datasets),
     "imagenet": DatasetSpec(build_datasets=_build_imagenet_datasets),
     "generic_image_dataset": DatasetSpec(build_datasets=_build_generic_image_datasets),
+    "generic_3d_dataset": DatasetSpec(build_datasets=_build_generic_3d_datasets),
     "precomputed_features": DatasetSpec(build_datasets=_build_precomputed_feature_datasets),
     "pcam": DatasetSpec(
         build_datasets=lambda cfg, enc=None: _build_generic_split_datasets(
@@ -633,5 +661,5 @@ def build_dataloaders(
 
     train_loader = _build_train_loader(dataloading, train_dataset)
     val_loader = _build_eval_loader(dataloading, val_dataset)
-    test_loader = _build_eval_loader(dataloading, test_dataset)
+    test_loader = _build_eval_loader(dataloading, test_dataset) if test_dataset is not None else None
     return train_loader, val_loader, test_loader

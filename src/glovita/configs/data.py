@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Annotated, Literal, Optional, Union
 
@@ -251,6 +252,38 @@ class GenericImageDatasetConfig(BaseDataConfig):
         return self
 
 
+class Generic3dDatasetConfig(BaseDataConfig):
+    """Reusable blosc2 (.b2nd) volume dataset described by a dataset.json in data_root_dir."""
+
+    dataset: Literal["generic_3d_dataset"] = "generic_3d_dataset"
+    num_classes: Optional[int] = Field(default=None, ge=1, description="Number of classes. Read from dataset.json when unset.")
+    task: Literal["Classification"] = "Classification"
+    subtask: Optional[Literal["multiclass", "multilabel"]] = Field(default=None, description="Multiclass or multilabel classification. Read from dataset.json when unset.")
+    augmentation: AugmentationConfig = Field(
+        default_factory=lambda: AugmentationConfig(
+            train_policy="default_nnunet",
+            test_policy="shared_default_3d",
+        )
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_from_dataset_json(cls, data):
+        if not isinstance(data, dict) or data.get("data_root_dir") is None:
+            return data
+        missing = [key for key in ("num_classes", "subtask") if data.get(key) is None]
+        if not missing:
+            return data
+        dataset_json_path = Path(data["data_root_dir"]) / "dataset.json"
+        if not dataset_json_path.exists():
+            raise ValueError(f"{dataset_json_path} not found; set {', '.join(missing)} explicitly or add a dataset.json.")
+        dataset_json = json.loads(dataset_json_path.read_text())
+        data = dict(data)
+        for key in missing:
+            data[key] = dataset_json[key]
+        return data
+
+
 class PrecomputedFeaturesConfig(BaseDataConfig):
     """Dataset config for training directly from extracted HDF5 feature files."""
 
@@ -283,6 +316,7 @@ DataConfig = Annotated[
         FGVCAircraftConfig,
         DiabeticRetinaConfig,
         GenericImageDatasetConfig,
+        Generic3dDatasetConfig,
         PrecomputedFeaturesConfig,
     ],
     Field(discriminator="dataset"),
