@@ -21,6 +21,7 @@ Then use the topic-specific docs below.
 - [precomputed_features.md](precomputed_features.md): HDF5 feature training and extraction
 - [mil.md](mil.md): MIL and CLAM over precomputed bags
 - [video.md](video.md): video encoders, intermediates, and framewise heads
+- [nnfoundation.md](nnfoundation.md): nnFoundation encoders and the generic 3D dataset
 - [testing/TEST_RUN_README.md](testing/TEST_RUN_README.md): simple smoke-test examples
 - [../tests/README.md](../tests/README.md): test suite structure and how to run it
 
@@ -40,3 +41,5 @@ If you want to:
   - read [mil.md](mil.md)
 - use video encoders or framewise heads:
   - read [video.md](video.md)
+- fine-tune nnFoundation models on 3D volumes:
+  - read [nnfoundation.md](nnfoundation.md)

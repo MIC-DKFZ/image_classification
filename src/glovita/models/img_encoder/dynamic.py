@@ -40,6 +40,22 @@ def _get_nonlin(nonlin: Literal["relu", "leaky_relu", "gelu"]):
     raise ValueError(f"Unsupported nonlinearity={nonlin!r}.")
 
 
+def primus_forward_features(model: nn.Module, x: torch.Tensor) -> torch.Tensor:
+    """Run the PRIMUS patch embedding + EVA encoder and average the patch tokens."""
+    x = model.down_projection(x)
+    x = x.flatten(2).transpose(1, 2)
+
+    register_tokens = getattr(model, "register_tokens", None)
+    if register_tokens is not None:
+        x = torch.cat((register_tokens.expand(x.shape[0], -1, -1), x), dim=1)
+
+    x, _ = model.eva(x)
+    if register_tokens is not None:
+        x = x[:, register_tokens.shape[1] :]
+
+    return x.mean(dim=1)
+
+
 class ResidualEncoder(nn.Module):
     def __init__(
         self,
@@ -165,15 +181,4 @@ class PrimusEncoder(nn.Module):
         self.features_are_tokens = False
 
     def forward_features(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.model.down_projection(x)
-        x = x.flatten(2).transpose(1, 2)
-
-        register_tokens = getattr(self.model, "register_tokens", None)
-        if register_tokens is not None:
-            x = torch.cat((register_tokens.expand(x.shape[0], -1, -1), x), dim=1)
-
-        x, _ = self.model.eva(x)
-        if register_tokens is not None:
-            x = x[:, register_tokens.shape[1] :]
-
-        return x.mean(dim=1)
+        return primus_forward_features(self.model, x)

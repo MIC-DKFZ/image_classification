@@ -19,8 +19,9 @@ SharedTrainPolicy: TypeAlias = Literal[
     "default_3d_4",
     "default_nnunet",
     "default_nnunet_DA5",
+    "default_nnfoundation",
 ]
-SharedTestPolicy: TypeAlias = Literal["shared_default_2d", "shared_default_3d"]
+SharedTestPolicy: TypeAlias = Literal["shared_default_2d", "shared_default_3d", "default_nnfoundation"]
 
 # Dataset-specific train policies currently exposed in the repo.
 DatasetTrainPolicy: TypeAlias = Literal[

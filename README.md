@@ -213,6 +213,9 @@ One especially useful dataset option in [data.py](src/glovita/configs/data.py) i
 Use it when your data is a standard image dataset and you want to avoid writing
 a custom `Dataset` class.
 
+For preprocessed 3D volumes (`.b2nd`), use `generic_3d_dataset`; see
+[docs/nnfoundation.md](docs/nnfoundation.md).
+
 ## Important CLI Patterns
 
 ### Boolean Flags
@@ -542,6 +545,7 @@ Current encoder families include:
 - `dinov3`
 - `residual_encoder`
 - `primus`
+- `nnfoundation`
 - `precomputed`
 
 Current head families include:
@@ -585,6 +589,7 @@ Shared policies currently include:
   - `default_3d_1` to `default_3d_4`
   - `default_nnunet`
   - `default_nnunet_DA5`
+  - `default_nnfoundation`
 
 See [docs/augmentation/policies.md](docs/augmentation/policies.md) for the
 full structure and extension path.
@@ -688,6 +693,7 @@ cases in detail:
 
 - [docs/mil.md](docs/mil.md): MIL / CLAM / bag-of-features path
 - [docs/video.md](docs/video.md): video encoder and framewise-head path
+- [docs/nnfoundation.md](docs/nnfoundation.md): nnFoundation (nnssl ResEnc / PRIMUS) fine-tuning on 3D volumes
 - [docs/precomputed_features.md](docs/precomputed_features.md): HDF5 feature loading and extraction
 - [docs/augmentation/policies.md](docs/augmentation/policies.md): augmentation layout and policy extension
 - [docs/datasets/DATASET_STRUCTURE.md](docs/datasets/DATASET_STRUCTURE.md): dataset structure and split conventions

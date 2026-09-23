@@ -261,8 +261,8 @@ class Generic3dDatasetConfig(BaseDataConfig):
     subtask: Optional[Literal["multiclass", "multilabel"]] = Field(default=None, description="Multiclass or multilabel classification. Read from dataset.json when unset.")
     augmentation: AugmentationConfig = Field(
         default_factory=lambda: AugmentationConfig(
-            train_policy="default_nnunet",
-            test_policy="shared_default_3d",
+            train_policy="default_nnfoundation",
+            test_policy="default_nnfoundation",
         )
     )
 

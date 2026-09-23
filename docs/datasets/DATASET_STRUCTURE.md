@@ -59,6 +59,15 @@ This path is implemented in:
 
 - [../../src/glovita/datasets/generic_image_dataset.py](../../src/glovita/datasets/generic_image_dataset.py)
 
+For preprocessed 3D volumes there is also:
+
+- `dataset="generic_3d_dataset"`
+
+It reads `num_classes` and `subtask` from a `dataset.json`,
+labels from `labels.json` (one-hot / integer for multiclass, multi-hot for
+multilabel), and accepts a single split or a list of per-fold splits in
+`splits.json`. See [../nnfoundation.md](../nnfoundation.md).
+
 ### 3. Split-Aware Repo Datasets
 
 Most repo datasets follow a split-aware pattern:

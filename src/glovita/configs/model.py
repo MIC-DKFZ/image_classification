@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated, Literal, Union
 
+import tyro
 from pydantic import BaseModel, Field, JsonValue
 
 
@@ -125,6 +126,19 @@ class PrimusEncoderConfig(BaseModel):
     patch_drop_rate: float = Field(default=0.0, ge=0.0, lt=1.0, description="Patch dropout rate.")
 
 
+class nnFoundationEncoderConfig(BaseModel):
+    """nnFoundation (nnssl-pretrained ResEnc / PRIMUS) encoder for 3D inputs.
+
+    The architecture is read from the adaptation plan stored in the checkpoint.
+    """
+
+    encoder_type: Literal["nnfoundation"] = "nnfoundation"
+    checkpoint_path: Path = Field(description="Path to the nnssl pretraining checkpoint containing `nnssl_adaptation_plan` and `network_weights`.")
+    pretrained: bool = Field(default=True, description="Load the pretrained encoder weights. If False, only the architecture is taken from the checkpoint.")
+    input_channels: int = Field(default=1, description="Number of input channels. Pretrained stem weights are repeated if this exceeds the pretraining channels.")
+    drop_path_rate: float | None = Field(default=None, ge=0.0, lt=1.0, description="Stochastic depth rate for PRIMUS encoders. None uses the value from the checkpoint plan.")
+
+
 class PrecomputedEncoderConfig(BaseModel):
     """Identity encoder for precomputed feature files."""
 
@@ -143,6 +157,7 @@ EncoderConfig = Annotated[
         Dinov3EncoderConfig,
         ResidualEncoderConfig,
         PrimusEncoderConfig,
+        Annotated[nnFoundationEncoderConfig, tyro.conf.subcommand(name="nnfoundation_encoder_config")],
         PrecomputedEncoderConfig,
     ],
     Field(discriminator="encoder_type"),
@@ -154,6 +169,7 @@ class ClassificationHeadConfig(BaseModel):
 
     head_type: Literal["classification"] = "classification"
     dropout: float = Field(default=0.0, ge=0.0, lt=1.0, description="Dropout applied before the classifier.")
+    init_std: float | None = Field(default=None, gt=0.0, description="If set, initialize the classifier weights from N(0, init_std) and the bias with zeros. None keeps the timm default initialization.")
 
 
 class ClamHeadConfig(BaseModel):

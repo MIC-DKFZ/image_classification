@@ -10,6 +10,7 @@ from glovita.configs.model import (
     Dinov2EncoderConfig,
     Dinov3EncoderConfig,
     EncoderConfig,
+    nnFoundationEncoderConfig,
     PytorchvideoEncoderConfig,
     PrecomputedEncoderConfig,
     PrimusEncoderConfig,
@@ -263,6 +264,14 @@ def resolve_encoder_preprocessing_defaults(encoder_config: EncoderConfig) -> Pre
     if isinstance(encoder_config, PrimusEncoderConfig):
         return PreprocessingDefaults(
             patch_size=tuple(int(v) for v in encoder_config.input_shape),
+        )
+
+    if isinstance(encoder_config, nnFoundationEncoderConfig):
+        from glovita.models.img_encoder.nnfoundation import load_nnfoundation_checkpoint
+
+        plan = load_nnfoundation_checkpoint(encoder_config.checkpoint_path)["nnssl_adaptation_plan"]
+        return PreprocessingDefaults(
+            patch_size=tuple(int(v) for v in plan["recommended_downstream_patchsize"]),
         )
 
     if isinstance(encoder_config, PrecomputedEncoderConfig):

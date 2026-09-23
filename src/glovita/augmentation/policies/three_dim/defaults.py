@@ -46,13 +46,15 @@ def _spatial_transform(
     scaling_range,
     p_rotation,
     p_scaling,
+    random_crop=False,
 ):
     from batchgeneratorsv2.transforms.spatial.spatial import SpatialTransform
 
     return SpatialTransform(
         patch_size,
-        patch_center_dist_from_border=0,
-        random_crop=False,
+        # random crops keep the patch inside the volume
+        patch_center_dist_from_border=[p / 2 for p in patch_size] if random_crop else 0,
+        random_crop=random_crop,
         p_elastic_deform=0.0,
         p_rotation=p_rotation,
         rotation=rotation_range,
@@ -478,6 +480,115 @@ def build_default_nnunet_da5_train_transform(
     return _compose(transforms)
 
 
+def build_default_nnfoundation_train_transform(
+    *,
+    patch_size: Sequence[int] | None = None,
+    mirror_axes: tuple[int, ...] = (0, 1, 2),
+):
+    """Fine-tuning augmentation used for the nnFoundation benchmark (random crop + nnU-Net style DA)."""
+    from batchgeneratorsv2.transforms.intensity.brightness import MultiplicativeBrightnessTransform
+    from batchgeneratorsv2.transforms.intensity.contrast import BGContrast, ContrastTransform
+    from batchgeneratorsv2.transforms.intensity.gamma import GammaTransform
+    from batchgeneratorsv2.transforms.intensity.gaussian_noise import GaussianNoiseTransform
+    from batchgeneratorsv2.transforms.noise.gaussian_blur import GaussianBlurTransform
+    from batchgeneratorsv2.transforms.spatial.low_resolution import SimulateLowResolutionTransform
+    from batchgeneratorsv2.transforms.spatial.mirroring import MirrorTransform
+    from batchgeneratorsv2.transforms.utils.random import RandomTransform
+
+    patch_size = _as_tuple3(patch_size)
+    transforms = [
+        _spatial_transform(
+            patch_size=patch_size,
+            rotation_range=(-0.523599, 0.523599),
+            scaling_range=(0.7, 1.4),
+            p_rotation=0.2,
+            p_scaling=0.2,
+            random_crop=True,
+        ),
+        RandomTransform(
+            GaussianNoiseTransform(noise_variance=(0, 0.1), p_per_channel=1, synchronize_channels=True),
+            apply_probability=0.1,
+        ),
+        RandomTransform(
+            GaussianBlurTransform(
+                blur_sigma=(0.5, 1.0),
+                synchronize_channels=False,
+                synchronize_axes=False,
+                p_per_channel=0.5,
+                benchmark=True,
+            ),
+            apply_probability=0.2,
+        ),
+        RandomTransform(
+            MultiplicativeBrightnessTransform(
+                multiplier_range=BGContrast((0.75, 1.25)),
+                synchronize_channels=False,
+                p_per_channel=1,
+            ),
+            apply_probability=0.15,
+        ),
+        RandomTransform(
+            ContrastTransform(
+                contrast_range=BGContrast((0.75, 1.25)),
+                preserve_range=True,
+                synchronize_channels=False,
+                p_per_channel=1,
+            ),
+            apply_probability=0.15,
+        ),
+        RandomTransform(
+            SimulateLowResolutionTransform(
+                scale=(0.5, 1.0),
+                synchronize_channels=False,
+                synchronize_axes=True,
+                ignore_axes=None,
+                allowed_channels=None,
+                p_per_channel=0.5,
+            ),
+            apply_probability=0.25,
+        ),
+        RandomTransform(
+            GammaTransform(
+                gamma=BGContrast((0.7, 1.5)),
+                p_invert_image=1,
+                synchronize_channels=False,
+                p_per_channel=1,
+                p_retain_stats=1,
+            ),
+            apply_probability=0.1,
+        ),
+        RandomTransform(
+            GammaTransform(
+                gamma=BGContrast((0.7, 1.5)),
+                p_invert_image=0,
+                synchronize_channels=False,
+                p_per_channel=1,
+                p_retain_stats=1,
+            ),
+            apply_probability=0.3,
+        ),
+    ]
+    if mirror_axes:
+        transforms.append(MirrorTransform(allowed_axes=mirror_axes))
+    return _compose(transforms)
+
+
+def build_nnfoundation_test_transform(*, patch_size: Sequence[int] | None = None):
+    """Center crop / pad to `patch_size` without further augmentation."""
+    patch_size = _as_tuple3(patch_size)
+    return _compose(
+        [
+            _spatial_transform(
+                patch_size=patch_size,
+                rotation_range=(0.0, 0.0),
+                scaling_range=(1.0, 1.0),
+                p_rotation=0.0,
+                p_scaling=0.0,
+            )
+        ]
+    )
+
+
 TRAIN_POLICIES: dict[str, TrainPolicySpec] = {
     "default_3d_1": TrainPolicySpec(build_level1_train_transform),
     "default_3d_2": TrainPolicySpec(build_level2_train_transform),
@@ -485,8 +596,10 @@ TRAIN_POLICIES: dict[str, TrainPolicySpec] = {
     "default_3d_4": TrainPolicySpec(build_level4_train_transform),
     "default_nnunet": TrainPolicySpec(build_default_nnunet_train_transform),
     "default_nnunet_DA5": TrainPolicySpec(build_default_nnunet_da5_train_transform),
+    "default_nnfoundation": TrainPolicySpec(build_default_nnfoundation_train_transform),
 }
 
 TEST_POLICIES: dict[str, object] = {
     "shared_default_3d": build_test_transform,
+    "default_nnfoundation": build_nnfoundation_test_transform,
 }

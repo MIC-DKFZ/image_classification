@@ -90,10 +90,12 @@ Defined in [three_dim/defaults.py](../../src/glovita/augmentation/policies/three
 - `default_3d_4`
 - `default_nnunet`
 - `default_nnunet_DA5`
+- `default_nnfoundation`
 
-### Shared 3D Test Policy
+### Shared 3D Test Policies
 
 - `shared_default_3d`
+- `default_nnfoundation`: center crop / pad to `patch_size`
 
 ## Dataset-Specific Defaults
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 import torch
 from pydantic import BaseModel, Field
@@ -33,23 +33,28 @@ class InferConfig(BaseModel):
     )
     fold: Optional[str] = Field(
         default=None,
-        description="Specific fold to evaluate. If unset, infer scans all fold subdirectories and ensembles their last.pt checkpoints when available.",
+        description="Specific fold to evaluate. If unset, infer scans all fold subdirectories and ensembles their checkpoints when available.",
+    )
+    checkpoint: Literal["last", "best"] = Field(
+        default="last",
+        description="Which checkpoint to evaluate: last.pt or best.pt.",
     )
     pred_output: Optional[Path] = Field(
         default=None,
-        description="Optional path to save predictions and labels as a torch file.",
+        description="Optional path to save predictions, labels, probabilities, and case ids (if the dataset provides them) as a torch file.",
     )
 
 
-def _collect_checkpoints(exp_dir: Path, fold: Optional[str]) -> List[Path]:
+def _collect_checkpoints(exp_dir: Path, fold: Optional[str], checkpoint: str = "last") -> List[Path]:
+    filename = f"{checkpoint}.pt"
     if fold is not None:
-        candidates = list((exp_dir / fold / "checkpoints").glob("last.pt"))
+        candidates = list((exp_dir / fold / "checkpoints").glob(filename))
     else:
-        candidates = list(exp_dir.glob("*/checkpoints/last.pt"))
+        candidates = list(exp_dir.glob(f"*/checkpoints/{filename}"))
         if not candidates:
-            candidates = list((exp_dir / "checkpoints").glob("last.pt"))
+            candidates = list((exp_dir / "checkpoints").glob(filename))
     if not candidates:
-        raise FileNotFoundError(f"No 'last.pt' checkpoints found under {exp_dir}")
+        raise FileNotFoundError(f"No '{filename}' checkpoints found under {exp_dir}")
     return sorted(candidates)
 
 
@@ -82,7 +87,7 @@ def _load_model(ckpt_path: Path) -> torch.nn.Module:
 def run_inference(config: InferConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    ckpt_paths = _collect_checkpoints(config.exp_dir, config.fold)
+    ckpt_paths = _collect_checkpoints(config.exp_dir, config.fold, config.checkpoint)
     print(f"Found {len(ckpt_paths)} checkpoint(s).")
 
     reference_run_config = _load_run_config(ckpt_paths[0])
@@ -124,10 +129,13 @@ def run_inference(config: InferConfig) -> None:
 
     if task == "Regression":
         preds = summed.squeeze(-1)
+        probs = None
     elif subtask == "multilabel":
         preds = (summed.sigmoid() > 0.5).long()
+        probs = torch.stack([logits.sigmoid() for logits in all_logits]).mean(dim=0)
     else:
         preds = torch.argmax(summed, dim=1)
+        probs = torch.stack([logits.softmax(dim=1) for logits in all_logits]).mean(dim=0)
 
     from torchmetrics import Accuracy, F1Score, MeanAbsoluteError, MeanSquaredError, MetricCollection
 
@@ -160,7 +168,13 @@ def run_inference(config: InferConfig) -> None:
 
     if config.pred_output is not None:
         config.pred_output.parent.mkdir(parents=True, exist_ok=True)
-        torch.save({"preds": preds, "labels": all_labels}, config.pred_output)
+        outputs = {"preds": preds, "labels": all_labels}
+        if probs is not None:
+            outputs["probs"] = probs
+        case_ids = getattr(test_loader.dataset, "case_ids", None)
+        if case_ids is not None:
+            outputs["case_ids"] = list(case_ids)
+        torch.save(outputs, config.pred_output)
         print(f"Predictions saved to {config.pred_output}")
 
 

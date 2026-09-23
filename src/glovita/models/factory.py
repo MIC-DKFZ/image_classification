@@ -5,6 +5,7 @@ import torch.nn as nn
 from glovita.models.img_encoder.dinov2 import Dinov2Encoder
 from glovita.models.img_encoder.dinov3 import Dinov3Encoder
 from glovita.models.img_encoder.dynamic import PrimusEncoder, ResidualEncoder
+from glovita.models.img_encoder.nnfoundation import nnFoundationEncoder
 from glovita.models.img_encoder.precomputed import PrecomputedEncoder
 from glovita.models.img_encoder.timm import TimmEncoder
 from glovita.models.img_encoder.torchvision import TorchvisionEncoder
@@ -23,6 +24,7 @@ from glovita.configs.model import (
     Dinov3EncoderConfig,
     FramewiseDecoder1DHeadConfig,
     ModelConfig,
+    nnFoundationEncoderConfig,
     PytorchvideoEncoderConfig,
     PrecomputedEncoderConfig,
     PrimusEncoderConfig,
@@ -164,6 +166,13 @@ def build_encoder(config) -> nn.Module:
             drop_path_rate=config.drop_path_rate,
             patch_drop_rate=config.patch_drop_rate,
         )
+    if isinstance(config, nnFoundationEncoderConfig):
+        return nnFoundationEncoder(
+            checkpoint_path=config.checkpoint_path,
+            pretrained=config.pretrained,
+            input_channels=config.input_channels,
+            drop_path_rate=config.drop_path_rate,
+        )
     if isinstance(config, PrecomputedEncoderConfig):
         return PrecomputedEncoder(feature_dim=config.feature_dim)
     raise ValueError(f"Unsupported encoder config: {type(config).__name__}")
@@ -171,7 +180,12 @@ def build_encoder(config) -> nn.Module:
 
 def build_head(config, input_dim: int, output_dim: int) -> nn.Module:
     if isinstance(config, ClassificationHeadConfig):
-        return ClassificationHead(input_dim=input_dim, num_classes=output_dim, dropout=config.dropout)
+        return ClassificationHead(
+            input_dim=input_dim,
+            num_classes=output_dim,
+            dropout=config.dropout,
+            init_std=config.init_std,
+        )
     if isinstance(config, ClamHeadConfig):
         head_cls = CLAM_SB if config.variant == "sb" else CLAM_MB
         return head_cls(

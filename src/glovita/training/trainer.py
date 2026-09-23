@@ -261,6 +261,9 @@ class Trainer:
             if self.cfg.enable_checkpointing and self.accelerator.is_main_process:
                 self._save_checkpoint(model, optimizer, epoch, is_best=False)
 
+        if self.cfg.val_steps_per_epoch is not None:
+            self._final_val(model, optimizer, val_loader)
+
         return self.accelerator.unwrap_model(model)
 
     # ------------------------------------------------------------------
@@ -277,13 +280,21 @@ class Trainer:
         model.train()
         total_loss = 0.0
         nan_count = 0
+        num_batches = 0
         mode = self.task.metric_computation_mode
+
+        max_batches = None
+        if self.cfg.train_steps_per_epoch is not None:
+            max_batches = self.cfg.train_steps_per_epoch * self.cfg.gradient_accumulation_steps
+            if hasattr(loader, "set_epoch"):
+                loader.set_epoch(epoch)
 
         pbar = self._make_progress(
             loader,
             f"Epoch {epoch + 1}/{self.cfg.epochs} [train]",
             rich_style="cyan",
             split="train",
+            max_steps=max_batches,
         )
 
         for x, y in pbar:
@@ -342,7 +353,11 @@ class Trainer:
 
             pbar.set_postfix(**self._progress_postfix(loss, self.train_metrics, split="train"))
 
-        avg_loss = (total_loss / len(loader)).item()
+            num_batches += 1
+            if max_batches is not None and num_batches >= max_batches:
+                break
+
+        avg_loss = (total_loss / num_batches).item()
 
         if self.accelerator.is_main_process:
             log_dict = {"train_loss": avg_loss, "epoch": epoch}
@@ -372,17 +387,21 @@ class Trainer:
         loader,
         epoch: int,
         sanity_steps: int = 0,
+        final: bool = False,
     ) -> None:
         model.eval()
         total_loss = 0.0
+        num_batches = 0
         mode = self.task.metric_computation_mode
+        max_batches = None if final else self.cfg.val_steps_per_epoch
 
         with torch.no_grad():
             pbar = self._make_progress(
                 loader,
-                f"Epoch {epoch + 1}/{self.cfg.epochs} [val]",
+                "Final [val]" if final else f"Epoch {epoch + 1}/{self.cfg.epochs} [val]",
                 rich_style="magenta",
                 split="val",
+                max_steps=max_batches,
             )
 
             for step, (x, y) in enumerate(pbar):
@@ -417,11 +436,27 @@ class Trainer:
 
                 pbar.set_postfix(**self._progress_postfix(loss, self.val_metrics, split="val"))
 
+                num_batches += 1
+                if max_batches is not None and num_batches >= max_batches:
+                    break
+
         if sanity_steps > 0:
             self.val_metrics.reset()
             return
 
-        avg_loss = (total_loss / len(loader)).item()
+        avg_loss = (total_loss / num_batches).item()
+
+        if final:
+            if self.accelerator.is_main_process:
+                log_dict = {"val_loss": avg_loss, **self._compute_and_reset(self.val_metrics)}
+                log_dict = {f"final_{key}": value for key, value in log_dict.items()}
+                self.logger.log_metrics(log_dict, step=epoch)
+                (self.log_dir / "final_val_metrics.json").write_text(json.dumps(log_dict, indent=2))
+            else:
+                self.val_metrics.reset()
+            if self.val_conf_mat is not None:
+                self.val_conf_mat.reset()
+            return
 
         if self.accelerator.is_main_process:
             log_dict = {"val_loss": avg_loss, "epoch": epoch}
@@ -462,6 +497,17 @@ class Trainer:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _final_val(self, model: nn.Module, optimizer: torch.optim.Optimizer, val_loader) -> None:
+        best_path = self.log_dir / "checkpoints" / "best.pt"
+        self.accelerator.wait_for_everyone()
+        if self.cfg.enable_checkpointing and best_path.exists():
+            state = torch.load(best_path, map_location="cpu")
+            self.accelerator.unwrap_model(model).load_state_dict(state["model"])
+            self.accelerator.print(f"Final validation with {best_path} (epoch {state['epoch']}).")
+        else:
+            self.accelerator.print("No best.pt found; final validation uses the last model state.")
+        self._val_epoch(model, optimizer, val_loader, epoch=self.cfg.epochs - 1, final=True)
 
     def _update_metrics(self, metrics, y_hat, y, conf_mat=None):
         metrics.update(y_hat, y)
@@ -524,15 +570,17 @@ class Trainer:
         desc: str,
         rich_style: str | None = None,
         split: str | None = None,
+        max_steps: int | None = None,
     ):
         if not self.accelerator.is_local_main_process:
             return _NoProgress(loader)
+        total = len(loader) if max_steps is None else min(len(loader), max_steps)
         if self.cfg.cluster_progress_bar or not sys.stderr.isatty() or Progress is None:
-            pbar = tqdm(loader, desc=desc, disable=False, dynamic_ncols=True)
+            pbar = tqdm(loader, desc=desc, disable=False, dynamic_ncols=True, total=total)
             if self.cfg.cluster_progress_bar:
-                return _ThrottledTqdm(pbar, total=len(loader))
+                return _ThrottledTqdm(pbar, total=total)
             return pbar
-        return _RichProgress(loader, desc=desc, total=len(loader), style=rich_style, split=split)
+        return _RichProgress(loader, desc=desc, total=total, style=rich_style, split=split)
 
     def _progress_postfix(
         self,
