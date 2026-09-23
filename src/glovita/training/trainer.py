@@ -18,7 +18,7 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from accelerate import Accelerator
+from accelerate import Accelerator, DistributedDataParallelKwargs
 from tqdm import tqdm
 from torchmetrics import MetricCollection
 
@@ -36,6 +36,7 @@ except Exception:
     Progress = None
 
 from glovita.augmentation.mixup import mixup_criterion, mixup_data
+from glovita.metrics.balanced_accuracy import BalancedAccuracy
 from glovita.metrics.conf_mat import ConfusionMatrix
 from glovita.models.peft.gps import maybe_apply_gps
 from glovita.configs.data import DataConfig
@@ -60,56 +61,63 @@ def build_metrics(task_config: TaskConfig, data_config: DataConfig, prefix: str)
     subtask = data_config.subtask
     metric_task = subtask  # "multiclass" | "multilabel"
     metrics_dict = {}
+    # Inputs are already gathered via `gather_for_metrics`; torchmetrics must not sync them again.
+    sync_kwargs = {"sync_on_compute": False}
 
     if task == "Classification":
         if "acc" in task_config.metrics:
             metrics_dict["Accuracy"] = Accuracy(
-                task=metric_task, num_classes=num_classes, num_labels=num_classes
+                task=metric_task, num_classes=num_classes, num_labels=num_classes, **sync_kwargs
             )
         if "balanced_acc" in task_config.metrics:
-            metrics_dict["Balanced_Accuracy"] = Accuracy(
-                task=metric_task, num_classes=num_classes, num_labels=num_classes,
-                average="macro",
-            )
+            if metric_task == "multilabel":
+                metrics_dict["Balanced_Accuracy"] = BalancedAccuracy(
+                    num_classes=num_classes, task="multilabel", **sync_kwargs,
+                )
+            else:
+                metrics_dict["Balanced_Accuracy"] = Accuracy(
+                    task=metric_task, num_classes=num_classes, num_labels=num_classes,
+                    average="macro", **sync_kwargs,
+                )
         if "f1" in task_config.metrics:
             metrics_dict["F1"] = F1Score(
                 task=metric_task, num_classes=num_classes, num_labels=num_classes,
-                average="macro",
+                average="macro", **sync_kwargs,
             )
         if "f1_per_class" in task_config.metrics:
             metrics_dict["F1_per_class"] = F1Score(
                 task=metric_task, num_classes=num_classes, num_labels=num_classes,
-                average=None,
+                average=None, **sync_kwargs,
             )
         if "pr" in task_config.metrics:
             metrics_dict["Precision"] = Precision(
                 task=metric_task, num_classes=num_classes, num_labels=num_classes,
-                average="macro",
+                average="macro", **sync_kwargs,
             )
             metrics_dict["Recall"] = Recall(
                 task=metric_task, num_classes=num_classes, num_labels=num_classes,
-                average="macro",
+                average="macro", **sync_kwargs,
             )
         if "top5acc" in task_config.metrics:
             metrics_dict["Accuracy_top5"] = Accuracy(
                 task=metric_task, num_classes=num_classes, num_labels=num_classes,
-                top_k=5,
+                top_k=5, **sync_kwargs,
             )
         if "auroc" in task_config.metrics:
             metrics_dict["AUROC"] = AUROC(
                 task=metric_task, num_classes=num_classes, num_labels=num_classes,
-                average="macro",
+                average="macro", **sync_kwargs,
             )
         if "ap" in task_config.metrics:
             metrics_dict["AP"] = AveragePrecision(
-                task=metric_task, num_classes=num_classes, num_labels=num_classes,
+                task=metric_task, num_classes=num_classes, num_labels=num_classes, **sync_kwargs,
             )
 
     elif task == "Regression":
         if "mse" in task_config.metrics:
-            metrics_dict["MSE"] = MeanSquaredError()
+            metrics_dict["MSE"] = MeanSquaredError(**sync_kwargs)
         if "mae" in task_config.metrics:
-            metrics_dict["MAE"] = MeanAbsoluteError()
+            metrics_dict["MAE"] = MeanAbsoluteError(**sync_kwargs)
 
     return MetricCollection(metrics_dict, prefix=prefix)
 
@@ -148,9 +156,13 @@ class Trainer:
             "val": [],
         }
 
+        kwargs_handlers = []
+        if training_config.ddp_find_unused_parameters:
+            kwargs_handlers.append(DistributedDataParallelKwargs(find_unused_parameters=True))
         self.accelerator = Accelerator(
             mixed_precision=training_config.precision if training_config.precision != "no" else "no",
             gradient_accumulation_steps=training_config.gradient_accumulation_steps,
+            kwargs_handlers=kwargs_handlers,
         )
 
         # Criterion
@@ -208,15 +220,11 @@ class Trainer:
         if self.cfg.compile:
             model = torch.compile(model, mode="default")
 
-        # Accelerate takes ownership of distribution / device placement
-        if scheduler is not None:
-            model, optimizer, train_loader, val_loader, scheduler = (
-                self.accelerator.prepare(model, optimizer, train_loader, val_loader, scheduler)
-            )
-        else:
-            model, optimizer, train_loader, val_loader = (
-                self.accelerator.prepare(model, optimizer, train_loader, val_loader)
-            )
+        # Accelerate takes ownership of distribution / device placement.
+        # The scheduler is not prepared: a prepared scheduler steps num_processes times per call.
+        model, optimizer, train_loader, val_loader = (
+            self.accelerator.prepare(model, optimizer, train_loader, val_loader)
+        )
 
         maybe_apply_gps(
             model=model,
@@ -354,6 +362,8 @@ class Trainer:
                     self.train_conf_mat.reset()
             self.logger.log_metrics(log_dict, step=epoch)
             self._append_local_metrics("train", log_dict)
+        else:
+            self.train_metrics.reset()
 
     def _val_epoch(
         self,
@@ -446,6 +456,8 @@ class Trainer:
                     if is_best:
                         self._best_val_metric = primary_val
                         self._save_checkpoint(model, optimizer, epoch, is_best=True)
+        else:
+            self.val_metrics.reset()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -482,7 +494,13 @@ class Trainer:
         y_hat: torch.Tensor,
         y: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        gathered_y_hat = self.accelerator.gather_for_metrics(y_hat.detach())
+        y_hat = y_hat.detach()
+        if self.data.task == "Classification" and y_hat.ndim == 2:
+            if self.data.subtask == "multilabel":
+                y_hat = y_hat.float().sigmoid()
+            else:
+                y_hat = y_hat.float().softmax(dim=1)
+        gathered_y_hat = self.accelerator.gather_for_metrics(y_hat)
         gathered_y = self.accelerator.gather_for_metrics(y.detach())
         return gathered_y_hat, gathered_y
 
@@ -508,7 +526,7 @@ class Trainer:
         split: str | None = None,
     ):
         if not self.accelerator.is_local_main_process:
-            return loader
+            return _NoProgress(loader)
         if self.cfg.cluster_progress_bar or not sys.stderr.isatty() or Progress is None:
             pbar = tqdm(loader, desc=desc, disable=False, dynamic_ncols=True)
             if self.cfg.cluster_progress_bar:
@@ -523,6 +541,8 @@ class Trainer:
         split: str,
         max_items: int = 3,
     ) -> dict[str, str]:
+        if not self.accelerator.is_local_main_process:
+            return {}
         postfix = {"split": split, "loss": f"{loss.item():.4f}"}
         try:
             raw = metrics.compute()
@@ -582,6 +602,23 @@ class Trainer:
         torch.save(state, ckpt_dir / "last.pt")
         if is_best:
             torch.save(state, ckpt_dir / "best.pt")
+
+
+# ---------------------------------------------------------------------------
+# No-op progress wrapper for non-main processes
+# ---------------------------------------------------------------------------
+
+class _NoProgress:
+    """Iterable with a no-op ``set_postfix`` for processes that do not show progress."""
+
+    def __init__(self, iterable):
+        self._iterable = iterable
+
+    def __iter__(self):
+        return iter(self._iterable)
+
+    def set_postfix(self, **kwargs):
+        pass
 
 
 # ---------------------------------------------------------------------------

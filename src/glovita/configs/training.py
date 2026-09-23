@@ -27,6 +27,7 @@ class TrainingConfig(BaseModel):
     cv_folds: int = Field(default=1, ge=1)
     # Number of sanity validation steps before training (0 = disabled)
     num_sanity_val_steps: int = Field(default=0, ge=0, description="Number of validation batches to run before the first training epoch.")
+    ddp_find_unused_parameters: bool = Field(default=False, description="Allow DDP to handle parameters that receive no gradient in a step.")
 
     @field_validator("gradient_clip_val")
     @classmethod

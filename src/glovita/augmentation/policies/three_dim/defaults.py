@@ -47,7 +47,6 @@ def _spatial_transform(
     p_rotation,
     p_scaling,
 ):
-    from batchgeneratorsv2.helpers.scalar_type import RandomScalar
     from batchgeneratorsv2.transforms.spatial.spatial import SpatialTransform
 
     return SpatialTransform(
@@ -56,7 +55,7 @@ def _spatial_transform(
         random_crop=False,
         p_elastic_deform=0.0,
         p_rotation=p_rotation,
-        rotation=RandomScalar(rotation_range),
+        rotation=rotation_range,
         p_scaling=p_scaling,
         scaling=scaling_range,
         p_synchronize_scaling_across_axes=1,

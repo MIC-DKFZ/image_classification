@@ -18,16 +18,15 @@ class BatchgeneratorsTransformAdapter:
     """Adapter for single-sample 3D volumes.
 
     Expects a channel-first volume and returns the transformed image payload.
+    batchgeneratorsv2 transforms operate on torch tensors.
     """
 
     def __init__(self, transform):
         self.transform = transform
 
     def __call__(self, image):
-        if isinstance(image, torch.Tensor):
-            image = image.detach().cpu().numpy()
-        if not isinstance(image, np.ndarray):
-            image = np.asarray(image)
+        if not isinstance(image, torch.Tensor):
+            image = torch.from_numpy(np.ascontiguousarray(np.asarray(image)))
         result = self.transform(image=image)
         if isinstance(result, dict) and "image" in result:
             image = result["image"]

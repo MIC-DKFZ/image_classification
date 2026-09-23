@@ -10,12 +10,13 @@ class BalancedAccuracy(Metric):
         task: str = "multiclass",
         threshold: float = 0.5,
         dist_sync_on_step=False,
+        **kwargs,
     ):
         assert task in {
             "multiclass",
             "multilabel",
         }, "Only 'multiclass' and 'multilabel' tasks are supported."
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        super().__init__(dist_sync_on_step=dist_sync_on_step, **kwargs)
 
         self.num_classes = num_classes
         self.task = task
