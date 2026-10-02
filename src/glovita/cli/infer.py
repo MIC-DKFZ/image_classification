@@ -11,6 +11,7 @@ from glovita.configs.data import DataConfig
 from glovita.configs.dataloading import DataloadingConfig
 from glovita.configs.root import resolve_encoder_input_shape
 from glovita.datasets.factory import build_dataloaders
+from glovita.models.factory import use_finetuned_checkpoint
 from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
 
 
@@ -74,11 +75,11 @@ def _load_model(ckpt_path: Path) -> torch.nn.Module:
     from glovita.models.peft.registry import apply_peft
 
     run_config = _load_run_config(ckpt_path)
+    state = torch.load(ckpt_path, map_location="cpu", mmap=True)
     output_dim = getattr(run_config.data, "num_classes", 1)
-    model = build_model(run_config.model, output_dim=output_dim)
+    model = build_model(use_finetuned_checkpoint(run_config.model, ckpt_path, state), output_dim=output_dim)
     model = apply_peft(model, run_config.peft)
 
-    state = torch.load(ckpt_path, map_location="cpu")
     model.load_state_dict(state["model"])
     model.eval()
     return model
@@ -92,10 +93,11 @@ def run_inference(config: InferConfig) -> None:
     print(f"Found {len(ckpt_paths)} checkpoint(s).")
 
     reference_run_config = _load_run_config(ckpt_paths[0])
-    resolve_encoder_input_shape(config.data, reference_run_config.model)
-    encoder_preprocessing = resolve_encoder_preprocessing_defaults(
-        reference_run_config.model.encoder
-    ).as_kwargs()
+    reference_model_config = use_finetuned_checkpoint(
+        reference_run_config.model, ckpt_paths[0], torch.load(ckpt_paths[0], map_location="cpu", mmap=True)
+    )
+    resolve_encoder_input_shape(config.data, reference_model_config)
+    encoder_preprocessing = resolve_encoder_preprocessing_defaults(reference_model_config.encoder).as_kwargs()
     _, _, test_loader = build_dataloaders(
         config.data,
         config.dataloading,

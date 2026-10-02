@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import torch.nn as nn
 
 from glovita.models.img_encoder.dinov2 import Dinov2Encoder
@@ -223,6 +225,13 @@ def build_head(config, input_dim: int, output_dim: int) -> nn.Module:
     if isinstance(config, RegressionHeadConfig):
         return RegressionHead(input_dim=input_dim, out_dim=config.out_dim, dropout=config.dropout)
     raise ValueError(f"Unsupported head config: {type(config).__name__}")
+
+
+def use_finetuned_checkpoint(config: ModelConfig, checkpoint_path: Path, state: dict) -> ModelConfig:
+    if "nnssl_adaptation_plan" not in state:
+        return config
+    encoder = config.encoder.model_copy(update={"checkpoint_path": checkpoint_path, "pretrained": False})
+    return config.model_copy(update={"encoder": encoder})
 
 
 def build_model(config: ModelConfig, output_dim: int) -> ComposedModel:

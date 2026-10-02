@@ -15,7 +15,7 @@ from glovita.configs.model import ModelConfig
 from glovita.configs.peft import FullFinetuningConfig, PeftConfig
 from glovita.configs.root import RootConfig, resolve_encoder_input_shape
 from glovita.datasets.factory import build_dataloaders
-from glovita.models.factory import build_model
+from glovita.models.factory import build_model, use_finetuned_checkpoint
 from glovita.models.feature_aggregator import aggregate_features
 from glovita.models.peft.registry import apply_peft
 from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
@@ -133,6 +133,8 @@ def _resolve_runtime_config(config: ExtractConfig) -> tuple[DataConfig, ModelCon
         data_config = config.data if config.data is not None else root_config.data
         model_config = config.model if config.model is not None else root_config.model
         peft_config = config.peft if config.peft.method != "full_finetuning" else root_config.peft
+        state = torch.load(config.checkpoint_path, map_location="cpu", mmap=True)
+        model_config = use_finetuned_checkpoint(model_config, config.checkpoint_path, state)
         resolve_encoder_input_shape(data_config, model_config)
         return data_config, model_config, peft_config
 

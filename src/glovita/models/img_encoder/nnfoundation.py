@@ -255,6 +255,7 @@ class nnFoundationEncoder(nn.Module):
         if pretrained:
             load_pretrained_weights(self.model, checkpoint, input_channels, pos_embed_grids)
         del checkpoint
+        self.adaptation_plan = plan
 
         if isinstance(self.model, Primus):
             self.model.up_projection = nn.Identity()

@@ -640,11 +640,15 @@ class Trainer:
     ):
         ckpt_dir = self.log_dir / "checkpoints"
         ckpt_dir.mkdir(parents=True, exist_ok=True)
+        unwrapped_model = self.accelerator.unwrap_model(model)
         state = {
             "epoch": epoch,
-            "model": self.accelerator.unwrap_model(model).state_dict(),
+            "model": unwrapped_model.state_dict(),
             "optimizer": optimizer.state_dict(),
         }
+        adaptation_plan = getattr(getattr(unwrapped_model, "encoder", None), "adaptation_plan", None)
+        if adaptation_plan is not None:
+            state["nnssl_adaptation_plan"] = adaptation_plan
         torch.save(state, ckpt_dir / f"epoch_{epoch:04d}.pt")
         # Always keep a 'last.pt' pointer
         torch.save(state, ckpt_dir / "last.pt")
