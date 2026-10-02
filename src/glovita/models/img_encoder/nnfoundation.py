@@ -1,6 +1,7 @@
 """nnFoundation encoders built from the `nnssl_adaptation_plan` stored in the checkpoint."""
 from __future__ import annotations
 
+import inspect
 import pkgutil
 import pydoc
 import warnings
@@ -13,7 +14,10 @@ import torch.nn as nn
 from glovita.models.img_encoder.dynamic import primus_forward_features
 
 
-_PRIMUS_CLASS = "dynamic_network_architectures.architectures.primus.Primus"
+_PRIMUS_MODULE = "dynamic_network_architectures.architectures.primus"
+_PRIMUS_CLASS = f"{_PRIMUS_MODULE}.Primus"
+_PRIMUS_PRESETS = ("PrimusS", "PrimusB", "PrimusM", "PrimusL")
+_PRIMUS_PRESET_PATCH_EMBED_SIZE = (8, 8, 8)
 
 _PRIMUS_KWARGS = (
     "embed_dim",
@@ -65,6 +69,11 @@ def load_nnfoundation_checkpoint(checkpoint_path: Path) -> dict:
     return torch.load(checkpoint_path, map_location="cpu", weights_only=False, mmap=True)
 
 
+def get_pretrain_patch_size(plan: dict) -> tuple[int, ...]:
+    configurations = plan["pretrain_plan"]["configurations"]
+    return tuple(next(iter(configurations.values()))["patch_size"])
+
+
 def get_architecture_from_plan(plan: dict) -> tuple[str, dict, list[str]]:
     architecture_plans = plan["architecture_plans"]
     arch_class_name = architecture_plans["arch_class_name"]
@@ -72,6 +81,14 @@ def get_architecture_from_plan(plan: dict) -> tuple[str, dict, list[str]]:
     if arch_class_name in _ARCHITECTURE_PRESETS:
         class_name, arch_kwargs, req_import = _ARCHITECTURE_PRESETS[arch_class_name]
         return class_name, dict(arch_kwargs), list(req_import)
+
+    if arch_class_name in _PRIMUS_PRESETS:
+        arch_kwargs = {
+            "patch_embed_size": _PRIMUS_PRESET_PATCH_EMBED_SIZE,
+            "input_shape": get_pretrain_patch_size(plan),
+            "drop_path_rate": _PRIMUS_DEFAULT_KWARGS["drop_path_rate"],
+        }
+        return f"{_PRIMUS_MODULE}.{arch_class_name}", arch_kwargs, []
 
     arch_kwargs = dict(architecture_plans["arch_kwargs"])
     if arch_class_name.split(".")[-1] in ("Primus", "PrimusX"):
@@ -112,10 +129,11 @@ def get_network_from_plans(
     nw_class = pydoc.locate(arch_class_name)
     # sometimes things move around, this makes it so that we can at least recover some of that
     if nw_class is None:
-        warnings.warn(
-            f"Network class {arch_class_name} not found. Attempting to locate it within "
-            "dynamic_network_architectures.architectures..."
-        )
+        if "." in arch_class_name:
+            warnings.warn(
+                f"Network class {arch_class_name} not found. Attempting to locate it within "
+                "dynamic_network_architectures.architectures..."
+            )
         nw_class = _find_dynamic_network_architecture(arch_class_name.split(".")[-1])
         if nw_class is None:
             raise ImportError(f"Network class {arch_class_name} could not be found.")
@@ -123,9 +141,10 @@ def get_network_from_plans(
     if deep_supervision is not None:
         architecture_kwargs["deep_supervision"] = deep_supervision
 
+    output_kwarg = "output_channels" if "output_channels" in inspect.signature(nw_class).parameters else "num_classes"
     network = nw_class(
         input_channels=input_channels,
-        num_classes=output_channels,
+        **{output_kwarg: output_channels},
         **architecture_kwargs,
     )
 
@@ -186,7 +205,7 @@ class nnFoundationEncoder(nn.Module):
         arch_class_name, arch_kwargs, arch_kwargs_req_import = get_architecture_from_plan(
             checkpoint["nnssl_adaptation_plan"]
         )
-        is_primus = arch_class_name == _PRIMUS_CLASS
+        is_primus = arch_class_name.startswith(f"{_PRIMUS_MODULE}.")
         if drop_path_rate is not None:
             if not is_primus:
                 raise ValueError("drop_path_rate is only supported for PRIMUS nnFoundation encoders.")
@@ -208,7 +227,7 @@ class nnFoundationEncoder(nn.Module):
         if isinstance(self.model, Primus):
             self.model.up_projection = nn.Identity()
             self.model.mask_token = None
-            self.output_dim = int(arch_kwargs["embed_dim"])
+            self.output_dim = int(self.model.embed_dim)
         elif isinstance(self.model, ResidualEncoderUNet):
             self.model.decoder = nn.Identity()
             self.model.encoder.return_skips = False

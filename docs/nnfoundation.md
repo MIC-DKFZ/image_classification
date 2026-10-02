@@ -22,7 +22,7 @@ checkpoint and built like nnU-Net's `get_network_from_plans`. Supported
 architectures:
 
 - `ResEncL` preset and `ResidualEncoderUNet` plans
-- `Primus` / `PrimusX` plans
+- `Primus` / `PrimusX` plans and the `PrimusS` / `PrimusB` / `PrimusM` / `PrimusL` presets
 
 Weight loading follows nnU-Net's `load_pretrained_weights`, restricted to the
 stem and encoder keys of the plan. The decoder is dropped.
