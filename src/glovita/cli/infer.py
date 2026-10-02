@@ -135,11 +135,11 @@ def run_inference(config: InferConfig) -> None:
         preds = summed.squeeze(-1)
         probs = None
     elif subtask == "multilabel":
-        preds = (summed.sigmoid() > 0.5).long()
         probs = torch.stack([logits.sigmoid() for logits in all_logits]).mean(dim=0)
+        preds = (probs > 0.5).long()
     else:
-        preds = torch.argmax(summed, dim=1)
         probs = torch.stack([logits.softmax(dim=1) for logits in all_logits]).mean(dim=0)
+        preds = torch.argmax(probs, dim=1)
 
     from torchmetrics import Accuracy, F1Score, MeanAbsoluteError, MeanSquaredError, MetricCollection
 

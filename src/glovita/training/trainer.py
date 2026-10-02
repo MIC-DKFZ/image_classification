@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from itertools import islice
 from pathlib import Path
 from typing import Optional
 
@@ -354,8 +355,6 @@ class Trainer:
             pbar.set_postfix(**self._progress_postfix(loss, self.train_metrics, split="train"))
 
             num_batches += 1
-            if max_batches is not None and num_batches >= max_batches:
-                break
 
         avg_loss = (total_loss / num_batches).item()
 
@@ -437,8 +436,6 @@ class Trainer:
                 pbar.set_postfix(**self._progress_postfix(loss, self.val_metrics, split="val"))
 
                 num_batches += 1
-                if max_batches is not None and num_batches >= max_batches:
-                    break
 
         if sanity_steps > 0:
             self.val_metrics.reset()
@@ -572,15 +569,16 @@ class Trainer:
         split: str | None = None,
         max_steps: int | None = None,
     ):
+        iterable = loader if max_steps is None else islice(loader, max_steps)
         if not self.accelerator.is_local_main_process:
-            return _NoProgress(loader)
+            return _NoProgress(iterable)
         total = len(loader) if max_steps is None else min(len(loader), max_steps)
         if self.cfg.cluster_progress_bar or not sys.stderr.isatty() or Progress is None:
-            pbar = tqdm(loader, desc=desc, disable=False, dynamic_ncols=True, total=total)
+            pbar = tqdm(iterable, desc=desc, disable=False, dynamic_ncols=True, total=total)
             if self.cfg.cluster_progress_bar:
                 return _ThrottledTqdm(pbar, total=total)
             return pbar
-        return _RichProgress(loader, desc=desc, total=total, style=rich_style, split=split)
+        return _RichProgress(iterable, desc=desc, total=total, style=rich_style, split=split)
 
     def _progress_postfix(
         self,
