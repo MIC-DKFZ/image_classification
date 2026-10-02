@@ -267,6 +267,9 @@ def resolve_encoder_preprocessing_defaults(encoder_config: EncoderConfig) -> Pre
         )
 
     if isinstance(encoder_config, nnFoundationEncoderConfig):
+        if encoder_config.input_shape is not None:
+            return PreprocessingDefaults(patch_size=tuple(int(v) for v in encoder_config.input_shape))
+
         from glovita.models.img_encoder.nnfoundation import load_nnfoundation_checkpoint
 
         plan = load_nnfoundation_checkpoint(encoder_config.checkpoint_path)["nnssl_adaptation_plan"]

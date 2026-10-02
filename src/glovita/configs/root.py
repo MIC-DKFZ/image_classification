@@ -16,6 +16,22 @@ from glovita.configs.task import TaskConfig
 from glovita.configs.training import TrainingConfig
 
 
+def resolve_encoder_input_shape(data: DataConfig, model: ModelConfig) -> None:
+    """Build encoders with an `input_shape` at an explicitly set augmentation patch size."""
+    encoder = model.encoder
+    patch_size = data.augmentation.patch_size
+    if not hasattr(encoder, "input_shape") or patch_size is None:
+        return
+    patch_size = tuple(patch_size)
+    if encoder.input_shape is None:
+        encoder.input_shape = patch_size
+    elif tuple(encoder.input_shape) != patch_size:
+        raise ValueError(
+            f"model.encoder.input_shape={tuple(encoder.input_shape)} and "
+            f"data.augmentation.patch_size={patch_size} differ. Set only one of them or make them match."
+        )
+
+
 class RootConfig(BaseModel):
     """Top-level experiment configuration.
 
@@ -55,6 +71,11 @@ class RootConfig(BaseModel):
             data = dict(data)
             data["logger"] = data.pop("wandb")
         return data
+
+    @model_validator(mode="after")
+    def _resolve_encoder_input_shape(self):
+        resolve_encoder_input_shape(self.data, self.model)
+        return self
 
     @property
     def default_logger_experiment_name(self) -> str:

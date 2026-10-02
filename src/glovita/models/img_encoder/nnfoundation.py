@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import inspect
+import math
 import pkgutil
 import pydoc
 import warnings
@@ -10,6 +11,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from glovita.models.img_encoder.dynamic import primus_forward_features
 
@@ -154,10 +156,30 @@ def get_network_from_plans(
     return network
 
 
-def load_pretrained_weights(network: nn.Module, checkpoint: dict, input_channels: int) -> None:
+def resize_pos_embed(
+    pos_embed: torch.Tensor, source_grid: tuple[int, ...], target_grid: tuple[int, ...]
+) -> torch.Tensor:
+    num_prefix_tokens = pos_embed.shape[1] - math.prod(source_grid)
+    prefix_tokens, patch_tokens = pos_embed[:, :num_prefix_tokens], pos_embed[:, num_prefix_tokens:]
+    patch_tokens = patch_tokens.transpose(1, 2).reshape(1, -1, *source_grid)
+    patch_tokens = F.interpolate(patch_tokens.float(), size=target_grid, mode="trilinear", align_corners=False)
+    patch_tokens = patch_tokens.flatten(2).transpose(1, 2).to(pos_embed.dtype)
+    return torch.cat((prefix_tokens, patch_tokens), dim=1)
+
+
+def load_pretrained_weights(
+    network: nn.Module,
+    checkpoint: dict,
+    input_channels: int,
+    pos_embed_grids: tuple[tuple[int, ...], tuple[int, ...]] | None = None,
+) -> None:
     plan = checkpoint["nnssl_adaptation_plan"]
     prefixes = (plan["key_to_stem"], plan["key_to_encoder"])
     pretrained_dict = {k: v for k, v in checkpoint["network_weights"].items() if k.startswith(prefixes)}
+
+    key_to_lpe = plan.get("key_to_lpe")
+    if key_to_lpe is not None and pos_embed_grids is not None and pos_embed_grids[0] != pos_embed_grids[1]:
+        pretrained_dict[key_to_lpe] = resize_pos_embed(pretrained_dict[key_to_lpe], *pos_embed_grids)
 
     pretrain_input_channels = plan["pretrain_num_input_channels"]
     if input_channels > pretrain_input_channels:
@@ -196,20 +218,30 @@ class nnFoundationEncoder(nn.Module):
         pretrained: bool,
         input_channels: int,
         drop_path_rate: float | None,
+        input_shape: tuple[int, int, int] | None = None,
     ):
         super().__init__()
         from dynamic_network_architectures.architectures.primus import Primus
         from dynamic_network_architectures.architectures.unet import ResidualEncoderUNet
 
         checkpoint = load_nnfoundation_checkpoint(checkpoint_path)
-        arch_class_name, arch_kwargs, arch_kwargs_req_import = get_architecture_from_plan(
-            checkpoint["nnssl_adaptation_plan"]
-        )
+        plan = checkpoint["nnssl_adaptation_plan"]
+        arch_class_name, arch_kwargs, arch_kwargs_req_import = get_architecture_from_plan(plan)
         is_primus = arch_class_name.startswith(f"{_PRIMUS_MODULE}.")
         if drop_path_rate is not None:
             if not is_primus:
                 raise ValueError("drop_path_rate is only supported for PRIMUS nnFoundation encoders.")
             arch_kwargs["drop_path_rate"] = drop_path_rate
+
+        pos_embed_grids = None
+        if is_primus:
+            pretrain_shape = get_pretrain_patch_size(plan)
+            target_shape = tuple(input_shape or plan["recommended_downstream_patchsize"])
+            arch_kwargs["input_shape"] = target_shape
+            patch_embed_size = arch_kwargs["patch_embed_size"]
+            pos_embed_grids = tuple(
+                tuple(s // p for s, p in zip(shape, patch_embed_size)) for shape in (pretrain_shape, target_shape)
+            )
 
         self.model = get_network_from_plans(
             arch_class_name,
@@ -221,7 +253,7 @@ class nnFoundationEncoder(nn.Module):
             deep_supervision=None if is_primus else False,
         )
         if pretrained:
-            load_pretrained_weights(self.model, checkpoint, input_channels)
+            load_pretrained_weights(self.model, checkpoint, input_channels, pos_embed_grids)
         del checkpoint
 
         if isinstance(self.model, Primus):

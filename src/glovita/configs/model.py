@@ -137,6 +137,7 @@ class nnFoundationEncoderConfig(BaseModel):
     pretrained: bool = Field(default=True, description="Load the pretrained encoder weights. If False, only the architecture is taken from the checkpoint.")
     input_channels: int = Field(default=1, description="Number of input channels. Pretrained stem weights are repeated if this exceeds the pretraining channels.")
     drop_path_rate: float | None = Field(default=None, ge=0.0, lt=1.0, description="Stochastic depth rate for PRIMUS encoders. None uses the value from the checkpoint plan.")
+    input_shape: tuple[int, int, int] | None = Field(default=None, description="Input patch size. None uses the recommended downstream patch size from the checkpoint plan.")
 
 
 class PrecomputedEncoderConfig(BaseModel):

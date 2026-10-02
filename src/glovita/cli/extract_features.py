@@ -13,7 +13,7 @@ from glovita.configs.data import DataConfig
 from glovita.configs.dataloading import DataloadingConfig
 from glovita.configs.model import ModelConfig
 from glovita.configs.peft import FullFinetuningConfig, PeftConfig
-from glovita.configs.root import RootConfig
+from glovita.configs.root import RootConfig, resolve_encoder_input_shape
 from glovita.datasets.factory import build_dataloaders
 from glovita.models.factory import build_model
 from glovita.models.feature_aggregator import aggregate_features
@@ -133,12 +133,14 @@ def _resolve_runtime_config(config: ExtractConfig) -> tuple[DataConfig, ModelCon
         data_config = config.data if config.data is not None else root_config.data
         model_config = config.model if config.model is not None else root_config.model
         peft_config = config.peft if config.peft.method != "full_finetuning" else root_config.peft
+        resolve_encoder_input_shape(data_config, model_config)
         return data_config, model_config, peft_config
 
     if config.data is None or config.model is None:
         raise ValueError(
             "Either provide --checkpoint-path, or provide both data and model config blocks."
         )
+    resolve_encoder_input_shape(config.data, config.model)
     return config.data, config.model, config.peft
 
 

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from glovita.configs.cli import parse_cli
 from glovita.configs.data import DataConfig
 from glovita.configs.dataloading import DataloadingConfig
+from glovita.configs.root import resolve_encoder_input_shape
 from glovita.datasets.factory import build_dataloaders
 from glovita.models.preprocessing import resolve_encoder_preprocessing_defaults
 
@@ -91,6 +92,7 @@ def run_inference(config: InferConfig) -> None:
     print(f"Found {len(ckpt_paths)} checkpoint(s).")
 
     reference_run_config = _load_run_config(ckpt_paths[0])
+    resolve_encoder_input_shape(config.data, reference_run_config.model)
     encoder_preprocessing = resolve_encoder_preprocessing_defaults(
         reference_run_config.model.encoder
     ).as_kwargs()

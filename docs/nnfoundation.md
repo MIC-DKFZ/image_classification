@@ -34,6 +34,8 @@ Options:
 - `--model.encoder.no_pretrained`: use only the architecture from the checkpoint.
 - `--model.encoder.drop_path_rate`: PRIMUS stochastic depth. Defaults to the
   value in the checkpoint plan.
+- `--model.encoder.input_shape`: input patch size. Defaults to the
+  recommended downstream patch size from the checkpoint plan.
 
 The encoder returns average-pooled features: the mean over all patch tokens for
 PRIMUS and the spatial mean of the last stage for ResEnc.

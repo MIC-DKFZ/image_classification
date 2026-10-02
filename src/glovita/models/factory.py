@@ -172,6 +172,7 @@ def build_encoder(config) -> nn.Module:
             pretrained=config.pretrained,
             input_channels=config.input_channels,
             drop_path_rate=config.drop_path_rate,
+            input_shape=config.input_shape,
         )
     if isinstance(config, PrecomputedEncoderConfig):
         return PrecomputedEncoder(feature_dim=config.feature_dim)
